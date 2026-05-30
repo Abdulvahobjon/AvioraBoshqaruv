@@ -1,0 +1,26 @@
+{
+  "name": "aviora-boshqaruv",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aviora Boshqaruv tizimi — IT firma uchun ichki boshqaruv (CRM, loyihalar, vazifalar, moliya, oyliklar, audit)",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n backend,frontend -c blue,magenta \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev:backend": "npm --workspace backend run start:dev",
+    "dev:frontend": "npm --workspace frontend run dev",
+    "build": "npm --workspace backend run build && npm --workspace frontend run build",
+    "db:generate": "npm --workspace backend run prisma:generate",
+    "db:migrate": "npm --workspace backend run prisma:migrate",
+    "db:seed": "npm --workspace backend run prisma:seed",
+    "db:reset": "npm --workspace backend run prisma:reset"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

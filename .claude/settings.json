@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma *)",
+      "PowerShell($c = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $c | Select-Object -Unique OwningProcess | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue } }; Start-Sleep -Seconds 1; \"backend to'xtatildi\")",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\).on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);console.log\\('   tugatildi:',!!j.finishedAt\\);j.attendance.forEach\\(a=>console.log\\('    -',a.user.fullName,'| qatnashdi:',a.attended,'| sabab:',a.absenceReason||'yo\\\\\\\\'q'\\)\\)}\\)\")",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"fullName\":\"Madina Dizayner\",\"password\":\"Aviora2026!\"}')",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\).on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);const a=j.attendance.find\\(x=>x.userId===6\\);console.log\\('   Madina: qatnashdi:',a.attended,'| sabab:',a.absenceReason\\)}\\)\")",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"fullName\":\"Asadbek Superadmin\",\"password\":\"Aviora2026!\"}')",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\).on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);console.log\\('  yangi uid:',j.uid\\)}\\)\")"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Asadbek\\.claude\\projects\\c--Users-Asadbek-Desktop-avioraBoshqaruv\\memory"
+    ]
+  }
+}

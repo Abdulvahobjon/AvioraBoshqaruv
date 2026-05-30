@@ -1,0 +1,541 @@
+// ─────────────────────────────────────────────────────────
+//  AVIORA BOSHQARUV — Prisma schema
+//  Pul summalari: BigInt (eng kichik birlik / tiyin)
+//  Soft delete: deleted_at (null = faol)
+// ─────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────── ENUMS ───────────────
+
+enum Role {
+  superadmin
+  admin
+  manager
+  employee
+  accountant
+}
+
+enum UserStatus {
+  active
+  inactive
+}
+
+enum ClientType {
+  jismoniy // physical person
+  yuridik  // legal entity
+}
+
+enum ClientStatus {
+  active
+  inactive
+}
+
+enum ProjectStatus {
+  planning
+  active
+  overdue
+  completed
+  cancelled
+}
+
+enum PaymentStatus {
+  unpaid // To'lanmagan
+  paid   // To'langan
+}
+
+enum Currency {
+  UZS
+  USD
+}
+
+enum ProjectRole {
+  manager
+  employee
+}
+
+enum TaskStatus {
+  todo
+  in_progress
+  overdue
+  done
+  checked
+  production
+  rejected
+}
+
+enum TaskPriority {
+  low
+  medium
+  high
+  critical
+}
+
+enum TaskType {
+  bug          // Bug
+  extra        // Qo'shimcha ish
+  feature      // Yangi funksiya
+  research     // Research
+}
+
+enum FinanceRequestType {
+  salary   // oylik
+  company  // kompaniya
+  other    // boshqa
+}
+
+enum FinanceRequestStatus {
+  pending   // yuborilgan, kutilmoqda
+  paid      // buxgalter to'lagan (Pending balansda)
+  closed    // xodim tasdiqlagan, Ledgerga arxivlangan
+  rejected  // rad etilgan
+}
+
+enum LedgerDirection {
+  debit  // chiqim (company -> user)
+  credit // kirim
+}
+
+enum PayrollStatus {
+  draft     // hisoblangan
+  ready     // to'lovga tayyor
+  paid      // to'langan (Pending)
+  closed    // tasdiqlangan
+}
+
+// ─────────────── REFERENCE / NOMENKLATURA ───────────────
+
+model Region {
+  id        Int       @id @default(autoincrement())
+  name      String
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  clients Client[]
+
+  @@map("regions")
+}
+
+model Position {
+  id        Int       @id @default(autoincrement())
+  name      String
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  users User[]
+  tasks Task[]
+
+  @@map("positions")
+}
+
+model ProjectType {
+  id        Int       @id @default(autoincrement())
+  name      String
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  projects Project[]
+
+  @@map("project_types")
+}
+
+model ExpenseCategory {
+  id        Int       @id @default(autoincrement())
+  name      String
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  expenses        Expense[]
+  financeRequests FinanceRequest[]
+
+  @@map("expense_categories")
+}
+
+// ─────────────── USERS ───────────────
+
+model User {
+  id           Int        @id @default(autoincrement())
+  fullName     String     @map("full_name")
+  passwordHash String     @map("password_hash")
+  role         Role       @default(employee)
+  positionId   Int?       @map("position_id")
+  fixedSalary  BigInt     @default(0) @map("fixed_salary") // tiyin
+  balance      BigInt     @default(0) // tiyin (closed/confirmed balans)
+  avatar       String?
+  status       UserStatus @default(active)
+  deletedAt    DateTime?  @map("deleted_at")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  position Position? @relation(fields: [positionId], references: [id])
+
+  managedClients   Client[]            @relation("ClientManager")
+  createdProjects  Project[]           @relation("ProjectCreator")
+  projectMembers   ProjectMember[]
+  assignedTasks    Task[]              @relation("TaskAssignee")
+  taskComments     TaskComment[]
+  taskFiles        TaskFile[]
+  createdMeetings  Meeting[]           @relation("MeetingCreator")
+  meetingAttendance MeetingAttendance[]
+  financeRequests  FinanceRequest[]
+  ledgerEntries    LedgerEntry[]
+  payrolls         Payroll[]
+  todos            Todo[]
+  auditLogs        AuditLog[]
+  notifications    Notification[]
+
+  @@map("users")
+}
+
+// ─────────────── CLIENTS (CRM) ───────────────
+
+model Client {
+  id        Int          @id @default(autoincrement())
+  name      String
+  type      ClientType   @default(yuridik)
+  phone     String?
+  email     String?
+  address   String?
+  regionId  Int?         @map("region_id")
+  managerId Int?         @map("manager_id")
+  status    ClientStatus @default(active)
+  note      String?
+  deletedAt DateTime?    @map("deleted_at")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  region   Region? @relation(fields: [regionId], references: [id])
+  manager  User?   @relation("ClientManager", fields: [managerId], references: [id])
+  projects Project[]
+  payments ClientPayment[]
+
+  @@map("clients")
+}
+
+// ─────────────── PROJECTS ───────────────
+
+model Project {
+  id              Int           @id @default(autoincrement())
+  name            String
+  code            String?       // meeting UID prefiksi uchun qisqa kod (masalan "DSR")
+  typeId          Int?          @map("type_id")
+  description     String?
+  deadline        DateTime?
+  status          ProjectStatus @default(planning)
+  price           BigInt        @default(0) // tiyin
+  currency        Currency      @default(UZS)
+  paymentStatus   PaymentStatus @default(unpaid) @map("payment_status")
+  clientId        Int?          @map("client_id")
+  progressPercent Int           @default(0) @map("progress_percent")
+  createdBy       Int?          @map("created_by")
+  deletedAt       DateTime?     @map("deleted_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  type    ProjectType? @relation(fields: [typeId], references: [id])
+  client  Client?      @relation(fields: [clientId], references: [id])
+  creator User?        @relation("ProjectCreator", fields: [createdBy], references: [id])
+
+  members  ProjectMember[]
+  tasks    Task[]
+  meetings Meeting[]
+  payments ClientPayment[]
+
+  @@map("projects")
+}
+
+model ProjectMember {
+  id            Int         @id @default(autoincrement())
+  projectId     Int         @map("project_id")
+  userId        Int         @map("user_id")
+  roleInProject ProjectRole @default(employee) @map("role_in_project")
+  shareAmount   BigInt      @default(0) @map("share_amount") // tiyin
+  shareCurrency Currency    @default(UZS) @map("share_currency")
+  paidToBalance Boolean     @default(false) @map("paid_to_balance")
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([projectId, userId])
+  @@map("project_members")
+}
+
+// ─────────────── TASKS (Kanban) ───────────────
+
+model Task {
+  id               Int          @id @default(autoincrement())
+  projectId        Int          @map("project_id")
+  title            String
+  description      String?
+  assigneeId       Int?         @map("assignee_id")
+  status           TaskStatus   @default(todo)
+  priority         TaskPriority @default(medium)
+  type             TaskType     @default(feature)
+  positionId       Int?         @map("position_id")
+  deadline         DateTime?
+  estimatedMinutes Int?         @map("estimated_minutes")
+  actualMinutes    Int?         @map("actual_minutes")
+  reopenedCount    Int          @default(0) @map("reopened_count")
+  rejectReason     String?      @map("reject_reason")
+  orderIndex       Int          @default(0) @map("order_index") // Kanban tartib
+  deletedAt        DateTime?    @map("deleted_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee User?     @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  position Position? @relation(fields: [positionId], references: [id])
+
+  files    TaskFile[]
+  comments TaskComment[]
+
+  @@map("tasks")
+}
+
+model TaskFile {
+  id         Int      @id @default(autoincrement())
+  taskId     Int      @map("task_id")
+  fileUrl    String   @map("file_url")
+  fileName   String?  @map("file_name")
+  uploadedBy Int?     @map("uploaded_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  task     Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploader User? @relation(fields: [uploadedBy], references: [id])
+
+  @@map("task_files")
+}
+
+model TaskComment {
+  id        Int      @id @default(autoincrement())
+  taskId    Int      @map("task_id")
+  userId    Int      @map("user_id")
+  body      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("task_comments")
+}
+
+// ─────────────── MEETINGS ───────────────
+
+model Meeting {
+  id         Int       @id @default(autoincrement())
+  uid        String?   @unique // masalan "DSR-M-0001"
+  title      String? // yig'ilish nomi
+  projectId  Int?      @map("project_id")
+  link       String?
+  content    String?
+  duration   Int? // minutes
+  startAt    DateTime  @map("start_at")
+  finishedAt DateTime? @map("finished_at") // null = tugatilmagan
+  createdBy  Int?      @map("created_by")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  project    Project?            @relation(fields: [projectId], references: [id])
+  creator    User?               @relation("MeetingCreator", fields: [createdBy], references: [id])
+  attendance MeetingAttendance[]
+
+  @@map("meetings")
+}
+
+model MeetingAttendance {
+  id            Int      @id @default(autoincrement())
+  meetingId     Int      @map("meeting_id")
+  userId        Int      @map("user_id")
+  attended      Boolean  @default(false)
+  absenceReason String?  @map("absence_reason")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([meetingId, userId])
+  @@map("meeting_attendance")
+}
+
+// ─────────────── FINANCE ───────────────
+
+model FinanceRequest {
+  id          Int                  @id @default(autoincrement())
+  userId      Int                  @map("user_id")
+  amount      BigInt // tiyin
+  currency    Currency             @default(UZS)
+  reason      String?
+  card        String?
+  type        FinanceRequestType   @default(salary)
+  categoryId  Int?                 @map("category_id")
+  status      FinanceRequestStatus @default(pending)
+  paidAt      DateTime?            @map("paid_at")
+  confirmedAt DateTime?            @map("confirmed_at")
+  createdAt   DateTime             @default(now()) @map("created_at")
+  updatedAt   DateTime             @updatedAt @map("updated_at")
+
+  user     User             @relation(fields: [userId], references: [id])
+  category ExpenseCategory? @relation(fields: [categoryId], references: [id])
+  ledger   LedgerEntry[]
+
+  @@map("finance_requests")
+}
+
+// Ledger: yozuvlar O'CHIRILMAYDI. Xato -> reverse (is_reversal) yozuv.
+model LedgerEntry {
+  id              Int             @id @default(autoincrement())
+  requestId       Int?            @map("request_id")
+  userId          Int?            @map("user_id")
+  amount          BigInt // tiyin (har doim musbat; yo'nalish direction'da)
+  type            String // "salary" | "company" | "other" | "project_share" | "withdrawal" | "reversal"
+  direction       LedgerDirection
+  isReversal      Boolean         @default(false) @map("is_reversal")
+  reversedEntryId Int?            @map("reversed_entry_id")
+  note            String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  request        FinanceRequest? @relation(fields: [requestId], references: [id])
+  user           User?           @relation(fields: [userId], references: [id])
+  reversedEntry  LedgerEntry?    @relation("Reversal", fields: [reversedEntryId], references: [id])
+  reversals      LedgerEntry[]   @relation("Reversal")
+
+  @@map("ledger_entries")
+}
+
+// ─────────────── PAYROLL ───────────────
+
+model Payroll {
+  id                Int           @id @default(autoincrement())
+  userId            Int           @map("user_id")
+  month             String // "2026-05"
+  fixedAmount       BigInt        @default(0) @map("fixed_amount") // tiyin
+  projectShareTotal BigInt        @default(0) @map("project_share_total") // tiyin
+  total             BigInt        @default(0) // tiyin
+  status            PayrollStatus @default(draft)
+  paidAt            DateTime?     @map("paid_at")
+  confirmedAt       DateTime?     @map("confirmed_at")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, month])
+  @@map("payrolls")
+}
+
+// ─────────────── CLIENT PAYMENTS ───────────────
+
+model ClientPayment {
+  id        Int      @id @default(autoincrement())
+  clientId  Int      @map("client_id")
+  projectId Int?     @map("project_id")
+  amount    BigInt // tiyin
+  currency  Currency @default(UZS)
+  date      DateTime @default(now())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  client  Client   @relation(fields: [clientId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@map("client_payments")
+}
+
+// ─────────────── CURRENCY ───────────────
+
+model CurrencyRate {
+  id        Int      @id @default(autoincrement())
+  code      Currency @unique
+  name      String
+  rateToUzs Int      @map("rate_to_uzs") // 1 birlik = N so'm (UZS uchun 1)
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  history CurrencyHistory[]
+
+  @@map("currencies")
+}
+
+model CurrencyHistory {
+  id         Int      @id @default(autoincrement())
+  currencyId Int      @map("currency_id")
+  rateToUzs  Int      @map("rate_to_uzs")
+  changedAt  DateTime @default(now()) @map("changed_at")
+
+  currency CurrencyRate @relation(fields: [currencyId], references: [id])
+
+  @@map("currency_history")
+}
+
+// ─────────────── EXPENSES ───────────────
+
+model Expense {
+  id          Int      @id @default(autoincrement())
+  categoryId  Int?     @map("category_id")
+  date        DateTime @default(now())
+  amount      BigInt // tiyin (kiritilgan valutada)
+  currency    Currency @default(UZS)
+  amountUzs   BigInt   @map("amount_uzs") // joriy kurs bilan so'm ekvivalenti (tiyin)
+  note        String?
+  createdBy   Int?     @map("created_by")
+  deletedAt   DateTime? @map("deleted_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  category ExpenseCategory? @relation(fields: [categoryId], references: [id])
+
+  @@map("expenses")
+}
+
+// ─────────────── TODO ───────────────
+
+model Todo {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  title     String
+  isDone    Boolean  @default(false) @map("is_done")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("todos")
+}
+
+// ─────────────── AUDIT ───────────────
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?     @map("user_id")
+  entity    String
+  entityId  String?  @map("entity_id")
+  action    String // CREATE | UPDATE | DELETE | LOGIN | ...
+  ip        String?
+  oldValue  Json?    @map("old_value")
+  newValue  Json?    @map("new_value")
+  flagged   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+// ─────────────── NOTIFICATIONS ───────────────
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  type      String
+  payload   Json?
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}

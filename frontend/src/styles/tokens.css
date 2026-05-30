@@ -1,0 +1,28 @@
+/* ─────────────────────────────────────────────────────────
+   AVIORA BOSHQARUV — Dizayn tokenlari (MAJBURIY)
+   Hech qaerda rang hardcode qilinmaydi. Faqat shu o'zgaruvchilar.
+   ───────────────────────────────────────────────────────── */
+
+/* ── LIGHT MODE ── */
+:root {
+  --white:#FFFFFF; --black:#000000;
+  --bg-base:#FFFFFF; --bg-elevation-1:#F8F9FC; --bg-elevation-1-alt:#F1F3F9;
+  --bg-elevation-2:#E9ECF5; --bg-elevation-2-alt:#E2E6F2; --bg-elevation-3:#DADFF0; --bg-elevation-3-alt:#D2D8EC;
+  --accent-strong:#3F57B3; --accent-sub:#526ED3; --accent-soft:#7F95E6; --accent-disabled:#E9EEFF; --accent-white:#FFFFFF;
+  --text-strong:#1A1D2E; --text-sub:#5B6078; --text-soft:#8F95A8; --text-disabled:#B6BCCB; --text-white:#FFFFFF; --text-accent:#526ED3; --text-in-dark:#0D1117;
+  --stroke-strong:#D0D5E2; --stroke-sub:#E2E6F2; --stroke-soft:#EEF1F7; --stroke-accent:#526ED3; --stroke-white:#FFFFFF;
+  --icon-strong:#1A1D2E; --icon-sub:#5B6078; --icon-soft:#9AA1B5; --icon-disable:#C5CAD8; --icon-white:#FFFFFF; --icon-accent:#526ED3; --icon-in-white:#FFFFFF; --icon-in-black:#000000;
+  --error-strong:#E02D2D; --error-sub:#FA5252; --error-soft:#FFF2F2; --error-disabled:#F8D7DA;
+}
+
+/* ── DARK MODE ── */
+.dark {
+  --white:#000000; --black:#FFFFFF;
+  --bg-base:#0D1117; --bg-elevation-1:#161B22; --bg-elevation-1-alt:#1C2128;
+  --bg-elevation-2:#21262D; --bg-elevation-2-alt:#262C36; --bg-elevation-3:#2D333B; --bg-elevation-3-alt:#343B43;
+  --accent-strong:#2B3553; --accent-sub:#2e3f83; --accent-soft:#7F95E6; --accent-disabled:#E9EEFF; --accent-white:#FFFFFF;
+  --text-strong:#E6EDF3; --text-sub:#8B949E; --text-soft:#6E7681; --text-disabled:#484F58; --text-white:#FFFFFF; --text-accent:#7F95E6; --text-in-dark:#0D1117;
+  --stroke-strong:#30363D; --stroke-sub:#262C36; --stroke-soft:#21262D; --stroke-accent:#7F95E6; --stroke-white:#FFFFFF;
+  --icon-strong:#FFFFFF; --icon-sub:#C2C8E0; --icon-soft:#8E95B5; --icon-disable:#5C627D; --icon-white:#FFFFFF; --icon-accent:#7F95E6; --icon-in-white:#FFFFFF; --icon-in-black:#000000;
+  --error-strong:#E02D2D; --error-sub:#FA5252; --error-soft:#FFF2F2; --error-disabled:#F8D7DA;
+}
