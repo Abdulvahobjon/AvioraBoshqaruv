@@ -33,14 +33,25 @@ export const CLIENT_STATUS = {
 
 // ── Vazifa (Kanban) statuslari ──
 export const TASK_STATUS = {
-  todo: { label: 'Bajarish kerak', tone: 'neutral' },
+  todo: { label: 'Qilinishi kerak', tone: 'warning' },
   in_progress: { label: 'Jarayonda', tone: 'info' },
-  overdue: { label: 'Kechikkan', tone: 'error' },
-  done: { label: 'Bajarildi', tone: 'success' },
-  checked: { label: 'Tekshirildi (QA)', tone: 'success' },
-  production: { label: 'Productionda', tone: 'info' },
+  done: { label: 'Bajarilgan', tone: 'info' },
+  production: { label: 'Ishga tushirilgan', tone: 'success' },
+  checked: { label: 'Tekshirilgan', tone: 'success' },
   rejected: { label: 'Rad etilgan', tone: 'error' },
+  overdue: { label: "Muddati o'tgan", tone: 'muted' },
 };
+
+// Kanban ustunlari tartibi va rangi (referensdagidek)
+export const KANBAN_COLUMNS = [
+  { status: 'todo', label: 'Qilinishi kerak', dot: '#F59E0B', tint: 'rgba(245,158,11,0.07)', count: '#F59E0B' },
+  { status: 'in_progress', label: 'Jarayonda', dot: '#3B82F6', tint: 'rgba(59,130,246,0.07)', count: '#3B82F6' },
+  { status: 'done', label: 'Bajarilgan', dot: '#8B5CF6', tint: 'rgba(139,92,246,0.07)', count: '#8B5CF6' },
+  { status: 'production', label: 'Ishga tushirilgan', dot: '#22C55E', tint: 'rgba(34,197,94,0.07)', count: '#22C55E' },
+  { status: 'checked', label: 'Tekshirilgan', dot: '#06B6D4', tint: 'rgba(6,182,212,0.07)', count: '#06B6D4' },
+  { status: 'rejected', label: 'Rad etilgan', dot: '#EF4444', tint: 'rgba(239,68,68,0.07)', count: '#EF4444' },
+  { status: 'overdue', label: "Muddati o'tgan", dot: '#6B7280', tint: 'rgba(107,114,128,0.07)', count: '#6B7280' },
+];
 
 export const TASK_PRIORITY = {
   low: { label: 'Past', tone: 'muted' },

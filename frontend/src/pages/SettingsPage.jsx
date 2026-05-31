@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Tabs } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { FormField } from '@/components/ui/FormField';
 import { Avatar } from '@/components/ui/Avatar';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
@@ -78,13 +79,13 @@ function ProfileTab({ user }) {
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
             <FormField label="Joriy parol" error={errors.oldPassword?.message} required>
-              <Input type="password" {...register('oldPassword')} error={errors.oldPassword} />
+              <PasswordInput {...register('oldPassword')} error={errors.oldPassword} />
             </FormField>
             <FormField label="Yangi parol" error={errors.newPassword?.message} required>
-              <Input type="password" {...register('newPassword')} error={errors.newPassword} />
+              <PasswordInput {...register('newPassword')} error={errors.newPassword} />
             </FormField>
             <FormField label="Tasdiqlang" error={errors.confirm?.message} required>
-              <Input type="password" {...register('confirm')} error={errors.confirm} />
+              <PasswordInput {...register('confirm')} error={errors.confirm} />
             </FormField>
             <Button type="submit" loading={change.isPending}>Saqlash</Button>
           </form>

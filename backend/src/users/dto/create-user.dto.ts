@@ -26,4 +26,9 @@ export class CreateUserDto {
   @IsOptional()
   @Min(0)
   fixedSalary?: number;
+
+  @ApiPropertyOptional({ description: 'Bank karta raqami' })
+  @IsOptional()
+  @IsString()
+  card?: string;
 }

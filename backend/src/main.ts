@@ -24,8 +24,17 @@ async function bootstrap() {
   app.useStaticAssets(join(process.cwd(), uploadDir), { prefix: '/uploads/' });
 
   app.setGlobalPrefix('api');
+  // CORS_ORIGIN may be a comma-separated list. Also allow any *.vercel.app preview.
+  const corsEnv = config.get<string>('CORS_ORIGIN', 'http://localhost:5173');
+  const allowedOrigins = corsEnv.split(',').map((o) => o.trim()).filter(Boolean);
   app.enableCors({
-    origin: config.get<string>('CORS_ORIGIN', 'http://localhost:5173'),
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin)) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
     credentials: true,
   });
 

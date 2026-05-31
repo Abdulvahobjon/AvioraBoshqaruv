@@ -28,8 +28,13 @@ export class TasksController {
   constructor(private readonly tasks: TasksService) {}
 
   @Get('board')
-  board(@Query('projectId', ParseIntPipe) projectId: number, @CurrentUser() user: AuthUser) {
-    return this.tasks.board(projectId, user);
+  board(@CurrentUser() user: AuthUser, @Query() q: any) {
+    return this.tasks.board(user, q);
+  }
+
+  @Get()
+  findAll(@CurrentUser() user: AuthUser, @Query() q: any) {
+    return this.tasks.findAll(user, q);
   }
 
   @Get(':id')

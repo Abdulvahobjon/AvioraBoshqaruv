@@ -1,0 +1,32 @@
+# Render.com uchun backend (NestJS API) deploy konfiguratsiyasi.
+# render.com → New → Blueprint → shu reponi tanlang (root: backend/).
+services:
+  - type: web
+    name: aviora-backend
+    runtime: node
+    region: frankfurt
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npx prisma generate && npm run build
+    # migrate deploy — bazaga migratsiyalarni qo'llaydi (interaktiv emas)
+    startCommand: npx prisma migrate deploy && node dist/main.js
+    healthCheckPath: /api/docs
+    envVars:
+      - key: DATABASE_URL
+        sync: false # Render dashboardda qo'lda kiriting (Neon connection string)
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRES
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES
+        value: 7d
+      - key: NODE_ENV
+        value: production
+      - key: CORS_ORIGIN
+        sync: false # Vercel frontend domeningiz, masalan https://aviora-boshqaruv-frontend.vercel.app
+      - key: UPLOAD_DIR
+        value: uploads
+      - key: SEED_DEFAULT_PASSWORD
+        value: Aviora2026!

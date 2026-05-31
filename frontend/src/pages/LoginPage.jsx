@@ -10,6 +10,7 @@ import { useThemeStore } from '@/store/themeStore';
 import { apiError } from '@/lib/api/axios';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { FormField } from '@/components/ui/FormField';
 
 const schema = z.object({
@@ -59,7 +60,7 @@ export function LoginPage() {
             <Input placeholder="Asadbek Superadmin" error={errors.fullName} {...register('fullName')} />
           </FormField>
           <FormField label="Parol" error={errors.password?.message} required>
-            <Input type="password" placeholder="••••••••" error={errors.password} {...register('password')} />
+            <PasswordInput placeholder="••••••••" error={errors.password} {...register('password')} />
           </FormField>
           <Button type="submit" className="w-full" loading={login.isPending}>
             Kirish

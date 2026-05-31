@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TaskPriority, TaskStatus, TaskType } from '@prisma/client';
-import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateTaskDto {
   @ApiProperty()
@@ -51,4 +51,19 @@ export class CreateTaskDto {
   @IsOptional()
   @IsInt()
   estimatedMinutes?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  sprint?: number;
+
+  @ApiPropertyOptional({ description: 'Vazifa narxi (tiyin)' })
+  @IsOptional()
+  @Min(0)
+  price?: number;
+
+  @ApiPropertyOptional({ description: 'Jarima foizi (%)' })
+  @IsOptional()
+  @Min(0)
+  penaltyPercent?: number;
 }

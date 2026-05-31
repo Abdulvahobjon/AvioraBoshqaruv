@@ -14,6 +14,7 @@ const userSelect = {
   position: { select: { id: true, name: true } },
   fixedSalary: true,
   balance: true,
+  card: true,
   avatar: true,
   status: true,
   createdAt: true,
@@ -62,6 +63,7 @@ export class UsersService {
         role: dto.role,
         positionId: dto.positionId ?? null,
         fixedSalary: BigInt(dto.fixedSalary ?? 0),
+        card: dto.card ?? null,
       },
       select: userSelect,
     });
@@ -78,6 +80,7 @@ export class UsersService {
     if (dto.role !== undefined) data.role = dto.role;
     if (dto.positionId !== undefined) data.positionId = dto.positionId;
     if (dto.fixedSalary !== undefined) data.fixedSalary = BigInt(dto.fixedSalary);
+    if (dto.card !== undefined) data.card = dto.card;
     if (dto.status !== undefined) data.status = dto.status;
     if (dto.password) data.passwordHash = await bcrypt.hash(dto.password, 10);
 

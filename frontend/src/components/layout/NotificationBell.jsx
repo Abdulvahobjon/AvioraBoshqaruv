@@ -1,10 +1,11 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, Check, BellOff } from 'lucide-react';
 import { Drawer } from '@/components/ui/Drawer';
 import { cn } from '@/lib/utils/cn';
 import { formatDate } from '@/lib/utils/format';
 import dayjs from 'dayjs';
-import { useNotifications, useMarkAllRead, describeNotification } from '@/features/notifications/notificationsApi';
+import { useNotifications, useMarkAllRead, useMarkRead, describeNotification, notifLink } from '@/features/notifications/notificationsApi';
 
 /** Group notifications by calendar day (newest first). */
 function groupByDay(items) {
@@ -18,12 +19,20 @@ function groupByDay(items) {
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const { data } = useNotifications();
   const markAll = useMarkAllRead();
+  const markRead = useMarkRead();
 
   const unread = data?.unread || 0;
   const items = data?.items || [];
   const groups = groupByDay(items);
+
+  const onItemClick = (n) => {
+    if (!n.isRead) markRead.mutate(n.id);
+    setOpen(false);
+    navigate(notifLink(n));
+  };
 
   return (
     <>
@@ -62,7 +71,11 @@ export function NotificationBell() {
                   const d = describeNotification(n);
                   const Icon = d.icon;
                   return (
-                    <div key={n.id} className={cn('flex items-start gap-3 border-b border-stroke-soft px-5 py-3', !n.isRead && 'bg-bg-elevation-1/60')}>
+                    <button
+                      key={n.id}
+                      onClick={() => onItemClick(n)}
+                      className={cn('flex w-full items-start gap-3 border-b border-stroke-soft px-5 py-3 text-left transition-colors hover:bg-bg-elevation-1-alt', !n.isRead && 'bg-bg-elevation-1/60')}
+                    >
                       <span className="relative mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg-elevation-2 text-icon-accent">
                         <Icon className="h-4 w-4" />
                         {!n.isRead && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-error-strong ring-2 ring-bg-base" />}
@@ -72,7 +85,7 @@ export function NotificationBell() {
                         {d.body && <p className="text-xs text-text-sub">{d.body}</p>}
                       </div>
                       <span className="shrink-0 text-xs text-text-soft">{dayjs(n.createdAt).format('HH:mm')}</span>
-                    </div>
+                    </button>
                   );
                 })}
               </div>

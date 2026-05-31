@@ -1,12 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api/axios';
 
-export function useBoard(projectId) {
+export function useBoard(filters = {}) {
   return useQuery({
-    queryKey: ['board', projectId],
-    enabled: !!projectId,
+    queryKey: ['board', filters],
     queryFn: async () => {
-      const { data } = await api.get('/tasks/board', { params: { projectId } });
+      const { data } = await api.get('/tasks/board', { params: filters });
+      return data;
+    },
+  });
+}
+
+export function useTasks(filters = {}) {
+  return useQuery({
+    queryKey: ['tasks', filters],
+    queryFn: async () => {
+      const { data } = await api.get('/tasks', { params: filters });
       return data;
     },
   });
@@ -23,29 +32,34 @@ export function useTask(id) {
   });
 }
 
-export function useSaveTask(projectId) {
+function invalidateLists(qc) {
+  qc.invalidateQueries({ queryKey: ['board'] });
+  qc.invalidateQueries({ queryKey: ['tasks'] });
+}
+
+export function useSaveTask() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...payload }) => {
       const { data } = id ? await api.patch(`/tasks/${id}`, payload) : await api.post('/tasks', payload);
       return data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['board', projectId] }),
+    onSuccess: () => invalidateLists(qc),
   });
 }
 
-export function useChangeStatus(projectId) {
+export function useChangeStatus() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, status, orderIndex }) => {
       const { data } = await api.patch(`/tasks/${id}/status`, { status, orderIndex });
       return data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['board', projectId] }),
+    onSuccess: () => invalidateLists(qc),
   });
 }
 
-export function useReviewTask(projectId) {
+export function useReviewTask() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, verdict, comment }) => {
@@ -53,7 +67,7 @@ export function useReviewTask(projectId) {
       return data;
     },
     onSuccess: (_d, vars) => {
-      qc.invalidateQueries({ queryKey: ['board', projectId] });
+      invalidateLists(qc);
       qc.invalidateQueries({ queryKey: ['task', String(vars.id)] });
     },
   });
@@ -85,13 +99,13 @@ export function useUploadFile() {
   });
 }
 
-export function useDeleteTask(projectId) {
+export function useDeleteTask() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id) => {
       const { data } = await api.delete(`/tasks/${id}`);
       return data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['board', projectId] }),
+    onSuccess: () => invalidateLists(qc),
   });
 }

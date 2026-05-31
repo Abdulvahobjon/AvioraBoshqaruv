@@ -20,8 +20,10 @@ export class TasksService {
   ) {}
 
   private taskInclude = {
-    assignee: { select: { id: true, fullName: true, avatar: true } },
+    assignee: { select: { id: true, fullName: true, avatar: true, position: { select: { name: true } } } },
+    creator: { select: { id: true, fullName: true } },
     position: { select: { id: true, name: true } },
+    project: { select: { id: true, name: true, code: true } },
     _count: { select: { comments: true, files: true } },
   };
 
@@ -38,27 +40,72 @@ export class TasksService {
     return { project, isMember };
   }
 
-  /** Kanban: all tasks for a project, grouped by status. Employees see only their own. */
-  async board(projectId: number, user: AuthUser) {
-    await this.assertProjectAccess(projectId, user);
+  /** Visibility filter: employees see only their own; managers see their projects' tasks; admins all. */
+  private visibilityWhere(user: AuthUser) {
+    if (['superadmin', 'admin', 'accountant'].includes(user.role)) return {};
+    if (user.role === 'manager') return { project: { members: { some: { userId: user.id } } } };
+    return { assigneeId: user.id }; // employee
+  }
 
-    const where: any = { projectId };
-    if (user.role === 'employee') where.assigneeId = user.id;
+  /** Build a where clause from query filters (shared by board + table). */
+  private buildWhere(user: AuthUser, q: any) {
+    const where: any = { ...this.visibilityWhere(user) };
+    if (q.projectId) where.projectId = Number(q.projectId);
+    if (q.assigneeId) where.assigneeId = Number(q.assigneeId);
+    if (q.createdBy) where.createdBy = Number(q.createdBy);
+    if (q.status) where.status = q.status;
+    if (q.priority) where.priority = q.priority;
+    if (q.type) where.type = q.type;
+    if (q.mine === 'true' || q.mine === true) where.assigneeId = user.id;
+    if (q.search) {
+      where.OR = [
+        { title: { contains: q.search, mode: 'insensitive' } },
+        { uid: { contains: q.search, mode: 'insensitive' } },
+      ];
+    }
+    if (q.from || q.to) {
+      where.deadline = {};
+      if (q.from) where.deadline.gte = new Date(q.from);
+      if (q.to) where.deadline.lte = new Date(q.to);
+    }
+    return where;
+  }
 
+  private withOverdue(tasks: any[]) {
+    const now = Date.now();
+    return tasks.map((t) => ({
+      ...t,
+      isOverdue: !!t.deadline && new Date(t.deadline).getTime() < now && !['done', 'checked', 'production'].includes(t.status),
+    }));
+  }
+
+  /** Kanban board: all visible tasks (optionally filtered), grouped on the client by status. */
+  async board(user: AuthUser, q: any = {}) {
+    const where = this.buildWhere(user, q);
     const tasks = await this.prisma.task.findMany({
       where,
       include: this.taskInclude,
       orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
     });
+    return this.withOverdue(tasks);
+  }
 
-    const now = Date.now();
-    return tasks.map((t) => ({
-      ...t,
-      isOverdue:
-        !!t.deadline &&
-        t.deadline.getTime() < now &&
-        !['done', 'checked', 'production'].includes(t.status),
-    }));
+  /** Table view: paginated list with filters. */
+  async findAll(user: AuthUser, q: any = {}) {
+    const where = this.buildWhere(user, q);
+    const page = Number(q.page) || 1;
+    const limit = Number(q.limit) || 20;
+    const [items, total] = await Promise.all([
+      this.prisma.task.findMany({
+        where,
+        include: this.taskInclude,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.task.count({ where }),
+    ]);
+    return { items: this.withOverdue(items), total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findOne(id: number, user: AuthUser) {
@@ -79,20 +126,36 @@ export class TasksService {
     return task;
   }
 
+  /** Generate a task UID like "CRM-T-0001" from the project code (or derived prefix). */
+  private async generateUid(projectId: number): Promise<string> {
+    const project = await this.prisma.project.findFirst({ where: { id: projectId }, select: { code: true, name: true } });
+    let prefix = 'GEN';
+    if (project?.code) prefix = project.code.toUpperCase();
+    else if (project?.name) prefix = project.name.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() || 'GEN';
+    const count = await this.prisma.task.count({ where: { uid: { startsWith: `${prefix}-T-` } } });
+    return `${prefix}-T-${String(count + 1).padStart(4, '0')}`;
+  }
+
   async create(dto: CreateTaskDto, user: AuthUser, ip?: string) {
     if (!PRIVILEGED.includes(user.role)) throw new ForbiddenException('Vazifa yaratishga ruxsatingiz yo\'q');
     await this.assertProjectAccess(dto.projectId, user);
+    const uid = await this.generateUid(dto.projectId);
 
     const task = await this.prisma.task.create({
       data: {
+        uid,
         projectId: dto.projectId,
         title: dto.title,
         description: dto.description,
         assigneeId: dto.assigneeId ?? null,
+        createdBy: user.id,
         status: dto.status ?? 'todo',
         priority: dto.priority ?? 'medium',
         type: dto.type ?? 'feature',
         positionId: dto.positionId ?? null,
+        sprint: dto.sprint ?? null,
+        price: BigInt(dto.price ?? 0),
+        penaltyPercent: dto.penaltyPercent ?? null,
         deadline: dto.deadline ? new Date(dto.deadline) : null,
         estimatedMinutes: dto.estimatedMinutes ?? null,
       },
@@ -116,6 +179,7 @@ export class TasksService {
     const prevAssignee = existing.assigneeId;
     const data: any = { ...dto };
     if (dto.deadline !== undefined) data.deadline = dto.deadline ? new Date(dto.deadline) : null;
+    if (dto.price !== undefined) data.price = BigInt(dto.price);
     delete data.projectId;
 
     const task = await this.prisma.task.update({ where: { id }, data, include: this.taskInclude });

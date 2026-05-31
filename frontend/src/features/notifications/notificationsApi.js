@@ -63,6 +63,26 @@ export function useMarkAllRead() {
   });
 }
 
+export function useMarkRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id) => (await api.patch(`/notifications/${id}/read`)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+}
+
+/** Where a notification leads when clicked. */
+export function notifLink(n) {
+  const p = n.payload || {};
+  const t = n.type || '';
+  if (t.startsWith('task')) return '/tasks';
+  if (t.startsWith('meeting')) return '/meetings';
+  if (t === 'payroll_paid') return '/payroll';
+  if (t === 'expense_request' || t.startsWith('request')) return '/finance';
+  if (t.startsWith('project')) return p.projectId ? `/projects/${p.projectId}` : '/projects';
+  return '/';
+}
+
 /** Connects to the Socket.io gateway and refreshes notifications on push. */
 export function useNotificationSocket() {
   const token = useAuthStore((s) => s.accessToken);
