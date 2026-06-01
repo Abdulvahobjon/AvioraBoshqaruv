@@ -1,7 +1,11 @@
-import { Menu, Search } from 'lucide-react';
+import { Menu, ChevronRight } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { NotificationBell } from './NotificationBell';
+import { breadcrumbForPath } from './navConfig';
 
 export function Topbar({ onMenuClick, onCollapseToggle }) {
+  const { pathname } = useLocation();
+  const bc = breadcrumbForPath(pathname);
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-stroke-sub bg-bg-base px-4">
       <button className="rounded-md p-2 text-icon-sub hover:bg-bg-1-alt lg:hidden" onClick={onMenuClick}>
@@ -11,16 +15,20 @@ export function Topbar({ onMenuClick, onCollapseToggle }) {
         <Menu className="h-5 w-5" />
       </button>
 
-      {/* Global search */}
-      <div className="relative hidden max-w-md flex-1 sm:block">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-icon-soft" />
-        <input
-          placeholder="Qidirish..."
-          className="h-9 w-full rounded-md border border-stroke-sub bg-bg-elevation-1 pl-9 pr-3 text-sm text-text-strong placeholder:text-text-soft focus:border-stroke-accent focus-visible:outline-none"
-        />
+      {/* Current page name */}
+      <div className="flex min-w-0 items-center gap-1.5 text-sm">
+        {bc.group && (
+          <>
+            <span className="hidden truncate text-text-soft sm:inline">{bc.group}</span>
+            <ChevronRight className="hidden h-4 w-4 shrink-0 text-icon-soft sm:inline" />
+          </>
+        )}
+        <span className="truncate font-semibold text-text-strong">{bc.label}</span>
       </div>
 
-      <div className="ml-auto flex items-center gap-1">
+      <div className="ml-auto flex items-center gap-2">
+        {/* Page-specific actions are portalled here by the active page. */}
+        <div id="page-actions" className="flex flex-wrap items-center justify-end gap-2" />
         <NotificationBell />
       </div>
     </header>

@@ -55,7 +55,19 @@ export function useChangeStatus() {
       const { data } = await api.patch(`/tasks/${id}/status`, { status, orderIndex });
       return data;
     },
-    onSuccess: () => invalidateLists(qc),
+    // Optimistic: move the card to the new column instantly (Trello-like), roll back on error.
+    onMutate: async ({ id, status }) => {
+      await qc.cancelQueries({ queryKey: ['board'] });
+      const prev = qc.getQueriesData({ queryKey: ['board'] });
+      qc.setQueriesData({ queryKey: ['board'] }, (old) =>
+        Array.isArray(old) ? old.map((t) => (t.id === id ? { ...t, status } : t)) : old,
+      );
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      ctx?.prev?.forEach(([key, data]) => qc.setQueryData(key, data));
+    },
+    onSettled: () => invalidateLists(qc),
   });
 }
 

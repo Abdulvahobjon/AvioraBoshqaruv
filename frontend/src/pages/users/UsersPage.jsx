@@ -12,13 +12,20 @@ import { PasswordInput } from '@/components/ui/PasswordInput';
 import { FormField } from '@/components/ui/FormField';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { cn } from '@/lib/utils/cn';
 import { ROLE_LABELS } from '@/lib/constants';
 import { formatMoney, formatDate, toTiyin, fromTiyin } from '@/lib/utils/format';
 import { apiError } from '@/lib/api/axios';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useReference } from '@/features/settings/settingsApi';
 import { useUsersList, useSaveUser, useDeleteUser } from '@/features/users/usersApi';
+
+/** Faqat raqamlar (max 16). */
+const cardDigits = (val) => (val || '').replace(/\D/g, '').slice(0, 16);
+/** "XXXX XXXX XXXX XXXX" ko'rinishida formatlash (4 talab guruh). */
+const formatCard = (val) => cardDigits(val).replace(/(.{4})/g, '$1 ').trim();
 
 export function UsersPage() {
   const [search, setSearch] = useState('');
@@ -70,13 +77,16 @@ export function UsersPage() {
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-icon-soft" />
         <Input placeholder="Ism bo'yicha qidirish..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
-      <DataTable
-        columns={columns}
-        data={data?.items}
-        loading={isLoading}
-        onRowClick={(r) => setDetail(r)}
-        emptyTitle="Foydalanuvchilar yo'q"
-      />
+      {isLoading ? (
+        <UsersSkeleton />
+      ) : (
+        <DataTable
+          columns={columns}
+          data={data?.items}
+          onRowClick={(r) => setDetail(r)}
+          emptyTitle="Foydalanuvchilar yo'q"
+        />
+      )}
 
       <UserDialog open={formOpen} onClose={() => setFormOpen(false)} user={editing} />
       {detail && (
@@ -108,7 +118,7 @@ function UserDialog({ open, onClose, user }) {
     if (!open) return;
     reset(
       user
-        ? { fullName: user.fullName, role: user.role, positionId: user.positionId || '', fixedSalary: fromTiyin(user.fixedSalary), card: user.card || '', status: user.status, password: '' }
+        ? { fullName: user.fullName, role: user.role, positionId: user.positionId || '', fixedSalary: fromTiyin(user.fixedSalary), card: formatCard(user.card), status: user.status, password: '' }
         : { fullName: '', role: 'employee', positionId: '', fixedSalary: '', card: '', status: 'active', password: '' },
     );
   }, [open, user, reset]);
@@ -158,8 +168,22 @@ function UserDialog({ open, onClose, user }) {
             render={({ field }) => <MoneyInput value={field.value} onChange={field.onChange} placeholder="0" />}
           />
         </FormField>
-        <FormField label="Karta raqami">
-          <Input placeholder="8600 0000 0000 0000" {...register('card')} />
+        <FormField label="Karta raqami" error={errors.card?.message}>
+          <Controller
+            name="card"
+            control={control}
+            rules={{ validate: (val) => !val || cardDigits(val).length === 16 || '16 ta raqam kiriting' }}
+            render={({ field }) => (
+              <Input
+                inputMode="numeric"
+                maxLength={19}
+                placeholder="8600 0000 0000 0000"
+                value={field.value || ''}
+                onChange={(e) => field.onChange(formatCard(e.target.value))}
+                error={errors.card}
+              />
+            )}
+          />
         </FormField>
         {isEdit && (
           <FormField label="Status">
@@ -206,6 +230,37 @@ function UserDetailDialog({ user, open, onClose, onEdit }) {
         <DetailRow icon={Calendar} label="Qo'shilgan sana" value={formatDate(user.createdAt)} />
       </div>
     </Dialog>
+  );
+}
+
+/** Content-matching loading skeleton for the users table. */
+function UsersSkeleton() {
+  const headers = ['w-6', 'flex-1', 'w-16', 'w-24', 'w-20', 'w-14', 'w-10'];
+  return (
+    <div className="overflow-hidden rounded-lg border border-stroke-sub bg-bg-elevation-1">
+      {/* Header */}
+      <div className="flex items-center gap-4 border-b border-stroke-sub bg-bg-elevation-1-alt px-4 py-3">
+        {headers.map((w, i) => <Skeleton key={i} className={cn('h-3.5', w)} />)}
+      </div>
+      {/* Rows */}
+      {Array.from({ length: 6 }).map((_, r) => (
+        <div key={r} className="flex items-center gap-4 border-b border-stroke-soft px-4 py-3.5 last:border-0">
+          <Skeleton className="h-4 w-6 shrink-0" />
+          <div className="flex flex-1 items-center gap-2.5">
+            <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
+            <div className="space-y-1.5">
+              <Skeleton className="h-3.5 w-32" />
+              <Skeleton className="h-2.5 w-20" />
+            </div>
+          </div>
+          <Skeleton className="h-5 w-16 shrink-0 rounded-full" />
+          <Skeleton className="h-4 w-24 shrink-0" />
+          <Skeleton className="h-4 w-20 shrink-0" />
+          <Skeleton className="h-5 w-14 shrink-0 rounded-full" />
+          <Skeleton className="h-4 w-10 shrink-0" />
+        </div>
+      ))}
+    </div>
   );
 }
 

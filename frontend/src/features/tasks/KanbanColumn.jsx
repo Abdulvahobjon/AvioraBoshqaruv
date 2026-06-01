@@ -1,38 +1,57 @@
-import { useDroppable } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { Droppable } from '@hello-pangea/dnd';
+import { Plus, MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { TaskCard } from './TaskCard';
 
-export function KanbanColumn({ column, tasks, onCardClick }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `col:${column.status}` });
-
+/** Trello-style list: fixed-width grey column with a header, a droppable card area and an add footer. */
+export function KanbanColumn({ column, tasks, onCardClick, onAddCard, canAdd }) {
   return (
-    <div className="flex min-w-[260px] flex-1 flex-col">
+    <div className="flex h-full min-w-0 flex-1 flex-col rounded-xl bg-bg-2">
       {/* Header */}
-      <div className="mb-3 flex items-center justify-center gap-2 px-1">
-        <span className="h-2.5 w-2.5 rounded-full" style={{ background: column.dot }} />
-        <span className="text-sm font-semibold text-text-strong">{column.label}</span>
-        <span
-          className="ml-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold text-white"
-          style={{ background: column.count }}
-        >
+      <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5">
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: column.dot }} />
+        <span className="truncate text-sm font-semibold text-text-strong">{column.label}</span>
+        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-bg-3 px-1.5 text-xs font-semibold text-text-sub">
           {tasks.length}
         </span>
+        <button className="ml-auto rounded p-1 text-icon-soft transition-colors hover:bg-bg-3" title="Amallar">
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
       </div>
 
-      {/* Droppable body — fills available height */}
-      <div
-        ref={setNodeRef}
-        style={{ background: column.tint }}
-        className={cn(
-          'flex-1 space-y-3 overflow-y-auto rounded-xl p-2.5 transition-colors scrollbar-none',
-          isOver && 'ring-2 ring-stroke-accent',
+      {/* Droppable card area */}
+      <Droppable droppableId={column.status}>
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            className={cn(
+              'min-h-[8px] flex-1 space-y-2 overflow-y-auto px-2 py-1 scrollbar-none',
+              snapshot.isDraggingOver && 'rounded-lg bg-bg-2-alt',
+            )}
+          >
+            {tasks.length === 0 && !snapshot.isDraggingOver && (
+              <div className="flex min-h-[60px] items-center justify-center rounded-lg border border-dashed border-stroke-sub/60 px-3 py-4 text-center text-xs text-text-soft">
+                Vazifa yo'q
+              </div>
+            )}
+            {tasks.map((t, i) => (
+              <TaskCard key={t.id} task={t} index={i} onClick={onCardClick} />
+            ))}
+            {provided.placeholder}
+          </div>
         )}
-      >
-        <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-          {tasks.map((t) => <TaskCard key={t.id} task={t} onClick={onCardClick} />)}
-        </SortableContext>
-      </div>
+      </Droppable>
+
+      {/* Add footer */}
+      {canAdd && (
+        <button
+          onClick={() => onAddCard?.(column.status)}
+          className="m-2 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-text-sub transition-colors hover:bg-bg-3 hover:text-text-strong"
+        >
+          <Plus className="h-4 w-4" /> Karta qo'shish
+        </button>
+      )}
     </div>
   );
 }

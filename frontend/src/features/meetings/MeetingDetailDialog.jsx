@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Calendar, Clock, ExternalLink, ChevronDown, ChevronUp, Send } from 'lucide-react';
+import { Calendar, Clock, ExternalLink, ChevronDown, ChevronUp, Send, CheckCircle2 } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Input';
@@ -19,12 +19,17 @@ function attendanceMeta(a) {
   return { label: 'Qatnashmadi | Sababsiz', tone: 'error' };
 }
 
-export function MeetingDetailDialog({ meetingId, open, onClose }) {
+export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
   const myId = useAuthStore((s) => s.user?.id);
+  const role = useAuthStore((s) => s.user?.role);
   const { data: meeting, isLoading } = useMeeting(meetingId);
   const submitReason = useSubmitReason();
   const [expanded, setExpanded] = useState(null);
   const [reason, setReason] = useState('');
+
+  // Creator (or admin) can finish a meeting that isn't finished yet.
+  const canFinish = !!meeting && !meeting.finishedAt && !!onFinish &&
+    (meeting.createdBy === myId || ['superadmin', 'admin'].includes(role));
 
   const send = () => {
     if (!reason.trim()) { toast.error('Sabab kiriting'); return; }
@@ -35,7 +40,19 @@ export function MeetingDetailDialog({ meetingId, open, onClose }) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} onBack={onClose} title="Yig'ilish ma'lumotlari" size="lg">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      onBack={onClose}
+      title="Yig'ilish ma'lumotlari"
+      size="lg"
+      footer={canFinish ? (
+        <div className="flex w-full items-center justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>Yopish</Button>
+          <Button onClick={() => onFinish(meeting.id)}><CheckCircle2 className="h-4 w-4" /> Yig'ilishni yakunlash</Button>
+        </div>
+      ) : undefined}
+    >
       {isLoading || !meeting ? (
         <div className="space-y-3"><Skeleton className="h-6 w-2/3" /><Skeleton className="h-24" /></div>
       ) : (
@@ -108,9 +125,20 @@ export function MeetingDetailDialog({ meetingId, open, onClose }) {
 
           <div className="flex items-center justify-between border-t border-stroke-sub pt-4">
             <span className="text-sm text-text-sub">Tugatildimi?</span>
-            <span className={cn('h-6 w-11 rounded-full p-0.5 transition-colors', meeting.finishedAt ? 'bg-accent-strong' : 'bg-bg-elevation-3')}>
-              <span className={cn('block h-5 w-5 rounded-full bg-white transition-transform', meeting.finishedAt && 'translate-x-5')} />
-            </span>
+            {canFinish ? (
+              <button
+                type="button"
+                onClick={() => onFinish(meeting.id)}
+                title="Yig'ilishni yakunlash"
+                className="h-6 w-11 rounded-full bg-bg-3 p-0.5 transition-colors hover:bg-bg-3-alt"
+              >
+                <span className="block h-5 w-5 rounded-full bg-white transition-transform" />
+              </button>
+            ) : (
+              <span className={cn('h-6 w-11 rounded-full p-0.5 transition-colors', meeting.finishedAt ? 'bg-accent-strong' : 'bg-bg-elevation-3')}>
+                <span className={cn('block h-5 w-5 rounded-full bg-white transition-transform', meeting.finishedAt && 'translate-x-5')} />
+              </span>
+            )}
           </div>
         </div>
       )}

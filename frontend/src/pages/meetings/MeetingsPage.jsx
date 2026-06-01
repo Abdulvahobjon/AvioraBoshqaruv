@@ -81,7 +81,14 @@ export function MeetingsPage() {
       />
 
       <MeetingDialog open={createOpen} onClose={() => setCreateOpen(false)} />
-      {detailId && <MeetingDetailDialog meetingId={detailId} open={!!detailId} onClose={() => setDetailId(null)} />}
+      {detailId && (
+        <MeetingDetailDialog
+          meetingId={detailId}
+          open={!!detailId}
+          onClose={() => setDetailId(null)}
+          onFinish={(id) => { setDetailId(null); setAttendanceId(id); }}
+        />
+      )}
       {attendanceId && <AttendanceDialog meetingId={attendanceId} open={!!attendanceId} onClose={() => setAttendanceId(null)} />}
       <ConfirmDialog
         open={!!deleting}

@@ -1,71 +1,64 @@
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { Flag, Calendar, Clock, Hourglass, RotateCcw, User } from 'lucide-react';
+import { Draggable } from '@hello-pangea/dnd';
+import { Calendar, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { Avatar } from '@/components/ui/Avatar';
+import { Badge } from '@/components/ui/Badge';
+import { TASK_PRIORITY } from '@/lib/constants';
 import { formatDate, deadlineInfo } from '@/lib/utils/format';
 
-function estimatedText(min) {
-  if (!min && min !== 0) return null;
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return `${h ? h + 'h ' : ''}${m}min`;
-}
-
-export function TaskCard({ task, onClick }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
-  const style = { transform: CSS.Translate.toString(transform), transition };
+/** Trello-style draggable card with a fixed (uniform) height. */
+export function TaskCard({ task, index, onClick }) {
   const dl = task.deadline ? deadlineInfo(task.deadline) : null;
-  const est = estimatedText(task.estimatedMinutes);
+  const priority = TASK_PRIORITY[task.priority];
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      onClick={() => onClick?.(task)}
-      className={cn(
-        'cursor-pointer rounded-xl border bg-bg-base p-3.5 shadow-card transition-shadow hover:shadow-elevated',
-        isDragging && 'opacity-50',
-        task.isOverdue ? 'border-2 border-error-strong animate-pulse-error' : 'border-stroke-sub',
+    <Draggable draggableId={String(task.id)} index={index}>
+      {(provided, snapshot) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          {...provided.dragHandleProps}
+          onClick={() => onClick?.(task)}
+          className={cn(
+            'flex h-[118px] cursor-pointer select-none flex-col overflow-hidden rounded-lg border bg-bg-base p-2.5 shadow-card transition-shadow hover:shadow-elevated',
+            snapshot.isDragging && 'shadow-elevated ring-2 ring-stroke-accent',
+            task.isOverdue ? 'border-error-strong' : 'border-stroke-sub',
+          )}
+        >
+          {/* Top: priority + reopened */}
+          <div className="mb-1 flex items-center gap-1">
+            {priority && <Badge tone={priority.tone} className="px-2 py-0 text-[11px]">{priority.label}</Badge>}
+            {task.reopenedCount > 0 && (
+              <span className="ml-auto inline-flex items-center gap-0.5 text-[11px] text-[#F59E0B]" title="Qayta ochilgan">
+                <RotateCcw className="h-3 w-3" />{task.reopenedCount}
+              </span>
+            )}
+          </div>
+
+          {/* Title */}
+          <p className="line-clamp-2 text-sm font-medium leading-snug text-text-strong">{task.title}</p>
+          {task.uid && <p className="mt-0.5 truncate font-mono text-[10px] text-text-soft">{task.uid}</p>}
+
+          {/* Footer pinned to bottom */}
+          <div className="mt-auto flex items-center gap-1.5 pt-1">
+            {task.deadline && (
+              <span
+                className={cn(
+                  'inline-flex min-w-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium',
+                  dl?.overdue ? 'bg-error-soft text-error-strong' : 'bg-bg-2 text-text-sub',
+                )}
+              >
+                <Calendar className="h-3 w-3 shrink-0" /><span className="truncate">{formatDate(task.deadline)}</span>
+              </span>
+            )}
+            {task.assignee && (
+              <span className="ml-auto shrink-0" title={task.assignee.fullName}>
+                <Avatar name={task.assignee.fullName} src={task.assignee.avatar} size="sm" className="h-6 w-6 text-[10px] ring-2 ring-bg-base" />
+              </span>
+            )}
+          </div>
+        </div>
       )}
-    >
-      <p className="mb-2 text-sm font-bold text-text-strong line-clamp-2">{task.title}</p>
-
-      <div className="space-y-1.5 text-xs text-text-soft">
-        <div className="flex items-center justify-between">
-          <span className="inline-flex items-center gap-1.5"><Flag className="h-3.5 w-3.5" />{task.uid || '—'}</span>
-          {task.reopenedCount > 0 && (
-            <span className="inline-flex items-center gap-0.5 text-[#F59E0B]"><RotateCcw className="h-3 w-3" />{task.reopenedCount}</span>
-          )}
-        </div>
-        {task.deadline && (
-          <div className="inline-flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />{formatDate(task.deadline, true)}</div>
-        )}
-        <div className="flex items-center gap-3">
-          {est && <span className="inline-flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" />{est}</span>}
-          {dl && (
-            <span className={cn('inline-flex items-center gap-1', dl.overdue ? 'font-medium text-error-strong' : 'text-text-soft')}>
-              <Hourglass className="h-3.5 w-3.5" />{dl.text}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-3 flex items-center gap-2 border-t border-stroke-soft pt-2.5">
-        {task.assignee ? (
-          <>
-            <Avatar name={task.assignee.fullName} src={task.assignee.avatar} size="sm" />
-            <div className="min-w-0">
-              <p className="truncate text-xs font-semibold text-text-strong">{task.assignee.fullName}</p>
-              <p className="truncate text-[11px] text-text-soft">{task.assignee.position?.name || '—'}</p>
-            </div>
-          </>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 text-xs text-text-soft"><User className="h-4 w-4" /> Biriktirilmagan</span>
-        )}
-      </div>
-    </div>
+    </Draggable>
   );
 }

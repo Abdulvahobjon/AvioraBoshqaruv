@@ -70,3 +70,19 @@ export function navForRole(role) {
 export function leafLinks(role) {
   return navForRole(role).flatMap((n) => (n.type === 'group' ? n.children : [n]));
 }
+
+/** Breadcrumb for the navbar: { group, label } for a given path (handles detail pages). */
+export function breadcrumbForPath(pathname) {
+  const matches = (to) => pathname === to || (to !== '/' && pathname.startsWith(to + '/'));
+  for (const node of NAV) {
+    if (node.type === 'group') {
+      const child = node.children.find((c) => matches(c.to));
+      if (child) return { group: node.label, label: child.label };
+    } else if (matches(node.to)) {
+      return { group: null, label: node.label };
+    }
+  }
+  // Routes not present in the sidebar nav:
+  if (pathname.startsWith('/settings')) return { group: null, label: 'Sozlamalar' };
+  return { group: null, label: '' };
+}

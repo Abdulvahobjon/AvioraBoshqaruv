@@ -1,7 +1,30 @@
 {
   "permissions": {
     "allow": [
-      "PowerShell($c = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $c | Select-Object -Unique OwningProcess | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue } }; Start-Sleep -Seconds 1; \"3000 to'xtatildi\")"
+      "PowerShell($c = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $c | Select-Object -Unique OwningProcess | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue } }; Start-Sleep -Seconds 1; \"3000 to'xtatildi\")",
+      "Bash(ls -la backend/.env)",
+      "Bash(ls -d node_modules)",
+      "Bash(ls -d backend/node_modules)",
+      "Bash(ls -d frontend/node_modules)",
+      "Bash(ls -d backend/node_modules/.prisma)",
+      "Bash(npm run *)",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri 'https://get.enterprisedb.com/postgresql/postgresql-16.4-1-windows-x64-binaries.zip' -Method Head -TimeoutSec 15 -UseBasicParsing; $len = [math]::Round\\($r.Headers['Content-Length']/1MB,1\\); Write-Output \"OK status=$\\($r.StatusCode\\) size=${len}MB\" } catch { Write-Output \"XATO: $\\($_.Exception.Message\\)\" })",
+      "PowerShell($base = 'C:\\\\Users\\\\Asadbek\\\\.aviora-pg'; if \\(-not \\(Test-Path $base\\)\\) { New-Item -ItemType Directory -Path $base | Out-Null }; $zip = Join-Path $base 'pg.zip'; if \\(Test-Path $zip\\) { Remove-Item $zip -Force }; Write-Output \"Yuklab olish boshlandi -> $zip\"; & curl.exe -L -s -o $zip 'https://get.enterprisedb.com/postgresql/postgresql-16.4-1-windows-x64-binaries.zip'; if \\(Test-Path $zip\\) { $mb = [math]::Round\\(\\(Get-Item $zip\\).Length/1MB,1\\); Write-Output \"Tugadi: ${mb}MB\" } else { Write-Output 'Yuklab olinmadi' })",
+      "PowerShell(if \\(Test-Path 'C:\\\\Users\\\\Asadbek\\\\.aviora-pg\\\\pg.zip'\\) { $mb=[math]::Round\\(\\(Get-Item 'C:\\\\Users\\\\Asadbek\\\\.aviora-pg\\\\pg.zip'\\).Length/1MB,1\\); Write-Output \"Joriy: ${mb} / 323 MB\" } else { Write-Output 'hali boshlanmadi' })",
+      "PowerShell($base = 'C:\\\\Users\\\\Asadbek\\\\.aviora-pg'; $zip = Join-Path $base 'pg.zip'; Write-Output \\(\"Zip: \" + [math]::Round\\(\\(Get-Item $zip\\).Length/1MB,1\\) + \" MB\"\\); if \\(Test-Path \\(Join-Path $base 'pgsql'\\)\\) { Remove-Item \\(Join-Path $base 'pgsql'\\) -Recurse -Force }; Write-Output \"Arxiv ochilmoqda...\"; Expand-Archive -Path $zip -DestinationPath $base -Force; if \\(Test-Path \\(Join-Path $base 'pgsql\\\\bin\\\\postgres.exe'\\)\\) { Write-Output \"OK: pgsql\\\\bin tayyor\"; & \\(Join-Path $base 'pgsql\\\\bin\\\\postgres.exe'\\) --version } else { Write-Output \"XATO: postgres.exe topilmadi\" })",
+      "PowerShell($bin='C:\\\\Users\\\\Asadbek\\\\.aviora-pg\\\\pgsql\\\\bin'; Write-Output '== bazalar =='; & \\(Join-Path $bin 'psql.exe'\\) -h localhost -p 5433 -U postgres -tAc \"SELECT datname FROM pg_database WHERE datname='aviora'\" 2>&1; $env:PGPASSWORD=$null; Write-Output '== aviora yaratish \\(agar yo`q bo`lsa\\) =='; & \\(Join-Path $bin 'createdb.exe'\\) -h localhost -p 5433 -U postgres aviora 2>&1; Write-Output \\(\"createdb exit=\" + $LASTEXITCODE\\))",
+      "Bash(node prisma/seed.js)",
+      "PowerShell(try { $r = Invoke-RestMethod -Uri 'http://localhost:3000/api/auth/login' -Method Post -ContentType 'application/json' -Body '{\"fullName\":\"Asadbek Superadmin\",\"password\":\"Aviora2026!\"}' -TimeoutSec 15; Write-Output \\(\"LOGIN OK -> \" + $r.user.fullName + \" | role=\" + $r.user.role + \" | token=\" + $r.accessToken.Substring\\(0,20\\) + \"...\"\\) } catch { Write-Output \\(\"XATO: \" + $_.Exception.Message\\); if \\($_.ErrorDetails\\) { Write-Output $_.ErrorDetails.Message } })",
+      "Bash(npm install *)",
+      "Bash(node -e \"const p=require\\('./node_modules/@hello-pangea/dnd/package.json'\\); console.log\\('version:', p.version\\); console.log\\('react peer:', p.peerDependencies && p.peerDependencies.react\\)\")",
+      "Bash(curl -s \"http://localhost:5173/src/styles/index.css\" -o /tmp/aviora.css)",
+      "Bash(grep -c \"bg-bg-elevation-2\" /tmp/aviora.css)",
+      "Bash(grep -co \"\\\\.bg-bg-2[^-]\" /tmp/aviora.css)",
+      "Bash(wc -c /tmp/aviora.css)",
+      "Bash(npx vite *)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Asadbek\\.aviora-pg"
     ]
   }
 }
