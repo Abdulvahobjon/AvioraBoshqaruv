@@ -41,7 +41,8 @@
       "PowerShell(Start-Process \"https://accounts.google.com/o/oauth2/v2/auth?access_type=offline&prompt=consent&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcalendar.events&response_type=code&client_id=571124877992-3fj45jg682hm9uhltgjfna791abfvp41.apps.googleusercontent.com&redirect_uri=http%3A%2F%2Flocalhost%3A5050%2Foauth2callback\")",
       "Bash(node -e \"const p=require\\('./backend/package.json'\\); console.log\\(JSON.stringify\\(p.scripts,null,2\\)\\); console.log\\('prisma seed:', JSON.stringify\\(p.prisma\\)\\)\")",
       "Bash(powershell -Command 'function P\\($p\\){ if \\(Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue\\) {'\\\\''OK'\\\\''} else {'\\\\''STOP'\\\\''} }; '\\\\''PG :5433='\\\\'' + \\(P 5433\\) + '\\\\'' | Backend :3000='\\\\'' + \\(P 3000\\) + '\\\\'' | Frontend :5173='\\\\'' + \\(P 5173\\)')",
-      "Bash(grep -iE \"REFRESH_TOKEN|refresh_token|Xato|1//\" \"C:\\\\Users\\\\Asadbek\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Asadbek-Desktop-AvioraBoshqaruv\\\\b1a82871-540d-42e0-9c49-4a6b4279d9af\\\\tasks\\\\bdnxj0kse.output\")"
+      "Bash(grep -iE \"REFRESH_TOKEN|refresh_token|Xato|1//\" \"C:\\\\Users\\\\Asadbek\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Asadbek-Desktop-AvioraBoshqaruv\\\\b1a82871-540d-42e0-9c49-4a6b4279d9af\\\\tasks\\\\bdnxj0kse.output\")",
+      "Bash(node -e \"const c=require\\('crypto'\\); console.log\\('ACCESS='+c.randomBytes\\(32\\).toString\\('hex'\\)\\); console.log\\('REFRESH='+c.randomBytes\\(32\\).toString\\('hex'\\)\\)\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\Asadbek\\.aviora-pg"

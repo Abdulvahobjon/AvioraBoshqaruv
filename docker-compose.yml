@@ -1,3 +1,9 @@
+# ─────────────────────────────────────────────────────────
+#  AVIORA — Server deploy (Docker Compose)
+#  Frontend → 9000 · Backend → 9001 · Postgres → ichki (tashqariga ochilmaydi)
+#  Server IP: 157.180.46.214  (o'zingiznikiga tekshiring!)
+#  Ishga tushirish:  docker compose up -d --build
+# ─────────────────────────────────────────────────────────
 services:
   postgres:
     image: postgres:16-alpine
@@ -7,8 +13,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: aviora
-    ports:
-      - "5432:5432"
     volumes:
       - aviora_pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -16,6 +20,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    # ports ataylab yo'q — DB faqat ichki tarmoqda (xost 5432 boshqa ilova bilan band)
 
   backend:
     build:
@@ -28,17 +33,25 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/aviora?schema=public
-      JWT_ACCESS_SECRET: docker-access-secret
-      JWT_REFRESH_SECRET: docker-refresh-secret
+      JWT_ACCESS_SECRET: "5ae5d318f8c89e5e1734c3fb97d4e68fdd444c9ef3aafa3d789e0d84c7840b5a"
+      JWT_REFRESH_SECRET: "b59d4545c46fbbab4ad37cd858115549d84600e2cdaa20a51e649bc2de7474b8"
       JWT_ACCESS_EXPIRES: 15m
       JWT_REFRESH_EXPIRES: 7d
       PORT: 3000
       NODE_ENV: production
-      CORS_ORIGIN: http://localhost:5173
+      CORS_ORIGIN: http://157.180.46.214:9000
       UPLOAD_DIR: uploads
       SEED_DEFAULT_PASSWORD: Aviora2026!
+      # ── Google Meet (ixtiyoriy — yoqmoqchi bo'lsangiz izohni oching va to'ldiring) ──
+      # GOOGLE_CLIENT_ID: "571124877992-...apps.googleusercontent.com"
+      # GOOGLE_CLIENT_SECRET: "GOCSPX-..."
+      # GOOGLE_REDIRECT_URI: "http://157.180.46.214:5050/oauth2callback"
+      # GOOGLE_TIMEZONE: "Asia/Tashkent"
+      # GOOGLE_REFRESH_TOKEN_ASOSITLLM: "1//0..."
+    volumes:
+      - aviora_uploads:/app/uploads
     ports:
-      - "3000:3000"
+      - "9001:3000"
     command: sh -c "npx prisma migrate deploy && npm run prisma:seed && node dist/main.js"
 
   frontend:
@@ -46,13 +59,14 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://localhost:3000
+        VITE_API_URL: http://157.180.46.214:9001
     container_name: aviora-frontend
     restart: unless-stopped
     depends_on:
       - backend
     ports:
-      - "5173:80"
+      - "9000:80"
 
 volumes:
   aviora_pg_data:
+  aviora_uploads:
