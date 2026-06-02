@@ -168,7 +168,17 @@ model User {
   positionId   Int?       @map("position_id")
   fixedSalary  BigInt     @default(0) @map("fixed_salary") // tiyin
   balance      BigInt     @default(0) // tiyin (closed/confirmed balans)
-  card         String?    // bank karta raqami
+  card         String?    // bank karta raqami (asosiy)
+  card2        String?    // ikkinchi karta raqami
+  phone        String?    // telefon raqami
+  phone2       String?    // qo'shimcha telefon raqami
+  region       String?    // viloyat
+  district     String?    // tuman
+  passportSeries String?  @map("passport_series")
+  passportNumber String?  @map("passport_number")
+  passportImage  String?  @map("passport_image") // fayl URL
+  link1        String?    // havola 1
+  link2        String?    // havola 2
   avatar       String?
   status       UserStatus @default(active)
   deletedAt    DateTime?  @map("deleted_at")
@@ -345,9 +355,14 @@ model Meeting {
   link       String?
   content    String?
   duration   Int? // minutes
+  penaltyPercent Int?  @map("penalty_percent") // jarima foizi (faqat ma'lumot, moliyaga ta'sirsiz)
   startAt    DateTime  @map("start_at")
   finishedAt DateTime? @map("finished_at") // null = tugatilmagan
   createdBy  Int?      @map("created_by")
+  // ── Google Meet (Calendar API orqali) ──
+  googleEventId String? @map("google_event_id") // Calendar event id (patch/delete uchun)
+  meetLink      String? @map("meet_link")       // hangoutLink (Google Meet havolasi)
+  meetAccount   String? @map("meet_account")    // qaysi akkaunt yaratdi: 'asositllm' | 'abdulvahob'
   createdAt  DateTime  @default(now()) @map("created_at")
 
   project    Project?            @relation(fields: [projectId], references: [id])

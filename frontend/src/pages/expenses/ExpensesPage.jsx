@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { Plus, Pencil, Trash2, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -9,6 +9,7 @@ import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea, Select } from '@/components/ui/Input';
 import { FormField } from '@/components/ui/FormField';
+import { DateTimeBox } from '@/components/ui/DateTimeBox';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { formatMoney, formatDate, toTiyin, fromTiyin } from '@/lib/utils/format';
 import { apiError } from '@/lib/api/axios';
@@ -66,7 +67,7 @@ export function ExpensesPage() {
 function ExpenseDialog({ open, onClose, expense }) {
   const { data: categories } = useReference('expenseCategory');
   const save = useSaveExpense();
-  const { register, handleSubmit, reset, formState: { errors } } = useForm();
+  const { register, control, handleSubmit, reset, formState: { errors } } = useForm();
 
   useEffect(() => {
     if (!open) return;
@@ -106,7 +107,7 @@ function ExpenseDialog({ open, onClose, expense }) {
           </Select>
         </FormField>
         <FormField label="Sana">
-          <Input type="date" {...register('date')} />
+          <Controller name="date" control={control} render={({ field }) => <DateTimeBox type="date" value={field.value} onChange={field.onChange} />} />
         </FormField>
         <FormField label="Miqdor" required error={errors.amount && 'Kiriting'}>
           <Input type="number" min="0" step="any" {...register('amount', { required: true })} error={errors.amount} />

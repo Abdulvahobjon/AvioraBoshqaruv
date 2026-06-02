@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Search } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
-import { Input, Select } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Input';
+import { DateTimeBox } from '@/components/ui/DateTimeBox';
 import { FormField } from '@/components/ui/FormField';
 import { Switch } from '@/components/ui/Switch';
 import { TASK_STATUS, TASK_PRIORITY, TASK_TYPE } from '@/lib/constants';
@@ -79,10 +80,10 @@ export function TaskFilterDialog({ open, onClose, value, onApply }) {
           </Select>
         </FormField>
         <FormField label="Muddat (dan)">
-          <Input type="date" value={f.from} onChange={(e) => set('from', e.target.value)} />
+          <DateTimeBox type="date" value={f.from} onChange={(v) => set('from', v)} />
         </FormField>
         <FormField label="Muddat (gacha)">
-          <Input type="date" value={f.to} onChange={(e) => set('to', e.target.value)} />
+          <DateTimeBox type="date" value={f.to} onChange={(v) => set('to', v)} />
         </FormField>
       </div>
     </Dialog>

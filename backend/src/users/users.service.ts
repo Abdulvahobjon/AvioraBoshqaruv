@@ -15,10 +15,26 @@ const userSelect = {
   fixedSalary: true,
   balance: true,
   card: true,
+  card2: true,
+  phone: true,
+  phone2: true,
+  region: true,
+  district: true,
+  passportSeries: true,
+  passportNumber: true,
+  passportImage: true,
+  link1: true,
+  link2: true,
   avatar: true,
   status: true,
   createdAt: true,
 };
+
+// Optional profile fields shared by create/update (only string columns).
+const PROFILE_FIELDS = [
+  'card', 'card2', 'phone', 'phone2', 'region', 'district',
+  'passportSeries', 'passportNumber', 'passportImage', 'avatar', 'link1', 'link2',
+] as const;
 
 @Injectable()
 export class UsersService {
@@ -56,17 +72,17 @@ export class UsersService {
     if (exists) throw new BadRequestException('Bu login allaqachon mavjud');
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    const user = await this.prisma.user.create({
-      data: {
-        fullName: dto.fullName,
-        passwordHash,
-        role: dto.role,
-        positionId: dto.positionId ?? null,
-        fixedSalary: BigInt(dto.fixedSalary ?? 0),
-        card: dto.card ?? null,
-      },
-      select: userSelect,
-    });
+    const data: any = {
+      fullName: dto.fullName,
+      passwordHash,
+      role: dto.role,
+      positionId: dto.positionId ?? null,
+      fixedSalary: BigInt(dto.fixedSalary ?? 0),
+    };
+    for (const f of PROFILE_FIELDS) {
+      if ((dto as any)[f] !== undefined) data[f] = (dto as any)[f] || null;
+    }
+    const user = await this.prisma.user.create({ data, select: userSelect });
     await this.audit.record({ userId: actorId, entity: 'User', entityId: user.id, action: 'CREATE', ip, newValue: { fullName: user.fullName, role: user.role } });
     return user;
   }
@@ -80,9 +96,11 @@ export class UsersService {
     if (dto.role !== undefined) data.role = dto.role;
     if (dto.positionId !== undefined) data.positionId = dto.positionId;
     if (dto.fixedSalary !== undefined) data.fixedSalary = BigInt(dto.fixedSalary);
-    if (dto.card !== undefined) data.card = dto.card;
     if (dto.status !== undefined) data.status = dto.status;
     if (dto.password) data.passwordHash = await bcrypt.hash(dto.password, 10);
+    for (const f of PROFILE_FIELDS) {
+      if ((dto as any)[f] !== undefined) data[f] = (dto as any)[f] || null;
+    }
 
     const user = await this.prisma.user.update({ where: { id }, data, select: userSelect });
     await this.audit.record({

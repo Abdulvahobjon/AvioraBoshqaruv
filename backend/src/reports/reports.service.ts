@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CurrenciesService } from '../currencies/currencies.service';
+import { AuthUser } from '../common/decorators/current-user.decorator';
 
 const n = (b: bigint) => Number(b) / 100; // tiyin -> unit for display/export
+const MONTHS_SHORT = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'];
 
 interface Range {
   from?: string;
@@ -70,12 +72,22 @@ export class ReportsService {
     const payrolls = await this.prisma.payroll.findMany({ where: { status: { in: ['paid', 'closed'] } } });
     const payrollTotal = payrolls.reduce((a, p) => a + p.fixedAmount, 0n);
 
+    // Kutilayotgan daromad: hali to'lanmagan va bekor qilinmagan loyihalar narxi (UZS).
+    // Ya'ni loyihalar ortidan kelajakda kelishi kutilayotgan umumiy mablag'.
+    const pendingProjects = await this.prisma.project.findMany({
+      where: { paymentStatus: 'unpaid', status: { not: 'cancelled' } },
+      select: { price: true, currency: true },
+    });
+    let expectedIncome = 0n;
+    for (const p of pendingProjects) expectedIncome += await this.currencies.toUzs(p.price, p.currency);
+
     const net = income - expenseTotal - payrollTotal;
     return {
       income: n(income),
       expenses: n(expenseTotal),
       payroll: n(payrollTotal),
       net: n(net),
+      expectedIncome: n(expectedIncome),
     };
   }
 
@@ -96,5 +108,102 @@ export class ReportsService {
       earned: n(u.ledgerEntries.reduce((a, l) => a + l.amount, 0n)),
       tasks: u._count.assignedTasks,
     }));
+  }
+
+  // ─────────────── DASHBOARD (rolga qarab, hammasi DB'dan) ───────────────
+
+  /** Rolga mos bosh sahifa ma'lumotlari. Hamma sanoq/statistika serverda hisoblanadi. */
+  async dashboard(user: AuthUser) {
+    if (user.role === 'employee') return this.employeeDashboard(user);
+    if (user.role === 'accountant') return this.accountantDashboard();
+    return this.adminDashboard();
+  }
+
+  /** So'nggi `months` oy uchun oylik tushum trendi (UZS, unit). userId berilsa — shaxsiy daromad (ledger credit). */
+  private async incomeTrend(months = 6, userId?: number) {
+    const now = new Date();
+    const out: { month: string; label: string; value: number }[] = [];
+    for (let i = months - 1; i >= 0; i--) {
+      const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+      const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
+      let sum = 0n;
+      if (userId) {
+        const entries = await this.prisma.ledgerEntry.findMany({
+          where: { userId, direction: 'credit', createdAt: { gte: start, lt: end } },
+          select: { amount: true },
+        });
+        for (const e of entries) sum += e.amount;
+      } else {
+        const payments = await this.prisma.clientPayment.findMany({
+          where: { date: { gte: start, lt: end } },
+          select: { amount: true, currency: true },
+        });
+        for (const p of payments) sum += await this.currencies.toUzs(p.amount, p.currency);
+      }
+      out.push({
+        month: `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, '0')}`,
+        label: MONTHS_SHORT[start.getUTCMonth()],
+        value: n(sum),
+      });
+    }
+    return out;
+  }
+
+  /** Loyihalarni status bo'yicha real sanog'i (soft-delete hisobga olingan). */
+  private async projectCounts() {
+    const grouped = await this.prisma.project.groupBy({
+      by: ['status'],
+      where: { deletedAt: null },
+      _count: { _all: true },
+    });
+    const counts: Record<string, number> = { planning: 0, active: 0, overdue: 0, completed: 0, cancelled: 0 };
+    let total = 0;
+    for (const g of grouped) { counts[g.status] = g._count._all; total += g._count._all; }
+    return { ...counts, total };
+  }
+
+  private async adminDashboard() {
+    const [finance, projectCounts, recentProjects, incomeTrend] = await Promise.all([
+      this.finance({}),
+      this.projectCounts(),
+      this.prisma.project.findMany({ orderBy: { createdAt: 'desc' }, take: 6, select: { id: true, name: true, deadline: true, status: true } }),
+      this.incomeTrend(6),
+    ]);
+    return { role: 'admin', finance, projectCounts, recentProjects, incomeTrend };
+  }
+
+  private async accountantDashboard() {
+    const [finance, pendingRequests, incomeTrend] = await Promise.all([
+      this.finance({}),
+      this.prisma.financeRequest.count({ where: { status: 'pending' } }),
+      this.incomeTrend(6),
+    ]);
+    return { role: 'accountant', finance, pendingRequests, incomeTrend };
+  }
+
+  private async employeeDashboard(user: AuthUser) {
+    const u = await this.prisma.user.findFirst({ where: { id: user.id }, select: { balance: true } });
+    const pendingReqs = await this.prisma.financeRequest.findMany({
+      where: { userId: user.id, status: 'paid' },
+      select: { amount: true, currency: true },
+    });
+    let pending = 0n;
+    for (const r of pendingReqs) pending += await this.currencies.toUzs(r.amount, r.currency);
+
+    const myProjects = await this.prisma.project.findMany({
+      where: { members: { some: { userId: user.id } } },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, name: true, deadline: true, status: true },
+    });
+    const earningTrend = await this.incomeTrend(6, user.id);
+
+    return {
+      role: 'employee',
+      balance: n(u?.balance ?? 0n),
+      pending: n(pending),
+      myProjectCount: myProjects.length,
+      myProjects: myProjects.slice(0, 6),
+      earningTrend,
+    };
   }
 }

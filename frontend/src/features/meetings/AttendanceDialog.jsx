@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Check, CheckCircle2 } from 'lucide-react';
-import { Dialog } from '@/components/ui/Dialog';
+import { Drawer } from '@/components/ui/Drawer';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/utils/cn';
+import { formatDate } from '@/lib/utils/format';
 import { apiError } from '@/lib/api/axios';
 import { useMeeting, useFinishMeeting } from './meetingsApi';
 
-/** Finish flow: organizer marks who attended; absentees get notified to submit reasons. */
+/** Finish flow (right drawer): organizer marks who attended; absentees get notified to submit reasons. */
 export function AttendanceDialog({ meetingId, open, onClose }) {
   const { data: meeting, isLoading } = useMeeting(meetingId);
   const finish = useFinishMeeting();
@@ -29,49 +30,53 @@ export function AttendanceDialog({ meetingId, open, onClose }) {
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      onBack={onClose}
-      title="Davomat olish"
-      size="md"
-      footer={
-        <div className="flex w-full items-center justify-between">
-          <span className="text-sm text-text-sub">{attended.length} / {meeting?.attendance.length || 0} qatnashdi</span>
-          <Button onClick={doFinish} loading={finish.isPending}><CheckCircle2 className="h-4 w-4" /> Yakunlash</Button>
-        </div>
-      }
-    >
-      <p className="mb-3 text-sm text-text-sub">Yig'ilishda qatnashgan xodimlarni belgilang. Qatnashmaganlarga bildirishnoma boradi va ular sabab kiritishi mumkin.</p>
+    <Drawer open={open} onClose={onClose} title="Yig'ilish ishtirokchilarini belgilang" width="max-w-lg">
       {isLoading || !meeting ? (
-        <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14" />)}</div>
+        <div className="space-y-2 p-5">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
       ) : (
-        <div className="space-y-1.5">
-          {meeting.attendance.map((a) => {
-            const checked = attended.includes(a.userId);
-            return (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => toggle(a.userId)}
-                className={cn(
-                  'flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors',
-                  checked ? 'border-stroke-accent bg-accent-disabled/40' : 'border-stroke-soft hover:bg-bg-elevation-1-alt',
-                )}
-              >
-                <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2', checked ? 'border-accent-strong bg-accent-strong text-text-white' : 'border-stroke-strong')}>
-                  {checked && <Check className="h-3 w-3" />}
-                </span>
-                <Avatar name={a.user?.fullName} src={a.user?.avatar} size="sm" />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-text-strong">{a.user?.fullName}</p>
-                  <p className="truncate text-xs text-text-soft">{a.user?.position?.name || '—'}</p>
-                </div>
-              </button>
-            );
-          })}
+        <div className="flex h-full flex-col">
+          <div className="flex items-start justify-between gap-2 border-b border-stroke-soft px-5 py-3">
+            <div className="min-w-0">
+              <p className="text-xs text-text-soft">Yig'ilish</p>
+              <p className="truncate text-sm font-semibold text-text-strong">{meeting.title}</p>
+            </div>
+            <p className="shrink-0 text-sm text-text-sub">{formatDate(meeting.startAt, true)}</p>
+          </div>
+
+          <p className="px-5 pt-3 text-sm font-medium text-text-sub">Qatnashgan xodimlarni tanlang</p>
+          <div className="flex-1 space-y-2 overflow-y-auto px-5 py-3">
+            {meeting.attendance.map((a) => {
+              const checked = attended.includes(a.userId);
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => toggle(a.userId)}
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors',
+                    checked ? 'border-stroke-accent bg-accent-disabled/40' : 'border-stroke-soft hover:bg-bg-elevation-1-alt',
+                  )}
+                >
+                  <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2', checked ? 'border-accent-strong bg-accent-strong text-text-white' : 'border-stroke-strong')}>
+                    {checked && <Check className="h-3 w-3" />}
+                  </span>
+                  <Avatar name={a.user?.fullName} src={a.user?.avatar} size="sm" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-text-strong">{a.user?.fullName}</p>
+                    <p className="truncate text-xs text-text-soft">{a.user?.position?.name || '—'}</p>
+                  </div>
+                </button>
+              );
+            })}
+            {!meeting.attendance.length && <p className="text-sm text-text-soft">Ishtirokchilar yo'q</p>}
+          </div>
+
+          <div className="flex items-center justify-between gap-2 border-t border-stroke-sub px-5 py-4">
+            <span className="text-sm text-text-sub">{attended.length} / {meeting.attendance.length} qatnashdi</span>
+            <Button onClick={doFinish} loading={finish.isPending}><CheckCircle2 className="h-4 w-4" /> Tasdiqlash</Button>
+          </div>
         </div>
       )}
-    </Dialog>
+    </Drawer>
   );
 }

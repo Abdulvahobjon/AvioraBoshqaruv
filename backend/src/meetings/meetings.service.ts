@@ -1,15 +1,20 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { GoogleCalendarService, GoogleAccountKey } from '../google-calendar/google-calendar.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 
 const PRIVILEGED = ['superadmin', 'admin', 'manager'];
+const DEFAULT_ACCOUNT: GoogleAccountKey = 'asositllm';
 
 @Injectable()
 export class MeetingsService {
+  private readonly logger = new Logger('Meetings');
+
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    private gcal: GoogleCalendarService,
   ) {}
 
   private include = {
@@ -18,12 +23,21 @@ export class MeetingsService {
     attendance: { include: { user: { select: { id: true, fullName: true, avatar: true, position: { select: { name: true } } } } } },
   };
 
-  async findAll(user: AuthUser) {
+  async findAll(user: AuthUser, q: any = {}) {
     const where: any = {};
-    if (user.role === 'employee') {
-      where.attendance = { some: { userId: user.id } };
+    if (user.role === 'employee') where.attendance = { some: { userId: user.id } };
+    if (q.search) where.title = { contains: q.search, mode: 'insensitive' };
+    if (q.organizerId) where.createdBy = Number(q.organizerId);
+    if (q.projectId) where.projectId = Number(q.projectId);
+    if (q.status === 'finished') where.finishedAt = { not: null };
+    else if (q.status === 'planned') where.finishedAt = null;
+    if (q.from || q.to) {
+      where.startAt = {};
+      if (q.from) where.startAt.gte = new Date(q.from);
+      if (q.to) where.startAt.lte = new Date(q.to);
     }
-    return this.prisma.meeting.findMany({ where, include: this.include, orderBy: { startAt: 'desc' } });
+    const order = q.sort === 'oldest' ? 'asc' : 'desc';
+    return this.prisma.meeting.findMany({ where, include: this.include, orderBy: { startAt: order } });
   }
 
   async findOne(id: number) {
@@ -59,6 +73,7 @@ export class MeetingsService {
         link: dto.link ?? null,
         content: dto.content ?? null,
         duration: dto.duration ? Number(dto.duration) : null,
+        penaltyPercent: dto.penaltyPercent != null && dto.penaltyPercent !== '' ? Number(dto.penaltyPercent) : null,
         startAt: new Date(dto.startAt),
         createdBy: user.id,
         attendance: { create: participantIds.map((pid) => ({ userId: pid })) },
@@ -70,7 +85,93 @@ export class MeetingsService {
     for (const pid of participantIds) {
       await this.notifications.notify(pid, 'meeting_created', { meetingId: meeting.id, title: meeting.title, startAt: meeting.startAt });
     }
-    return meeting;
+
+    // Best-effort: belgilangan vaqtga Google Meet yaratamiz. Xato bo'lsa ham yig'ilish saqlanadi.
+    const withMeet = await this.attachMeet(meeting, dto.account as GoogleAccountKey);
+    return withMeet;
+  }
+
+  /** Yig'ilishga Google Meet havolasini biriktiradi (best-effort). */
+  private async attachMeet(meeting: any, account?: GoogleAccountKey) {
+    const acc: GoogleAccountKey = account || DEFAULT_ACCOUNT;
+    if (!this.gcal.isConfigured(acc)) {
+      this.logger.warn(`Google '${acc}' sozlanmagan — yig'ilish #${meeting.id} Meet havolasisiz saqlandi.`);
+      return meeting;
+    }
+    try {
+      const start = new Date(meeting.startAt);
+      const end = new Date(start.getTime() + (meeting.duration || 30) * 60000);
+      const r = await this.gcal.createMeetEvent({
+        account: acc,
+        title: meeting.title || 'Yig\'ilish',
+        description: meeting.content || undefined,
+        startISO: start.toISOString(),
+        endISO: end.toISOString(),
+      });
+      return this.prisma.meeting.update({
+        where: { id: meeting.id },
+        data: {
+          googleEventId: r.googleEventId,
+          meetLink: r.meetLink,
+          meetAccount: r.account,
+          // Meet havolasini "Havolasi" maydoniga ham yozamiz (qo'lda havola kiritilmagan bo'lsa).
+          ...(r.meetLink && !meeting.link ? { link: r.meetLink } : {}),
+        },
+        include: this.include,
+      });
+    } catch (e: any) {
+      this.logger.warn(`Yig'ilish #${meeting.id} uchun Meet yaratilmadi (yig'ilish saqlandi): ${e?.message || e}`);
+      return meeting;
+    }
+  }
+
+  /** Yig'ilishni tahrirlash (tashkilotchi/admin). Ishtirokchilar va Google Meet eventi ham sinxronlanadi. */
+  async update(id: number, dto: any, user: AuthUser) {
+    const meeting = await this.prisma.meeting.findFirst({ where: { id }, include: { attendance: true } });
+    if (!meeting) throw new NotFoundException('Yig\'ilish topilmadi');
+    // Faqat o'zi yaratgan va yakunlanmagan yig'ilishni tahrirlash mumkin.
+    if (meeting.createdBy !== user.id) throw new ForbiddenException('Faqat o\'zingiz yaratgan yig\'ilishni tahrirlay olasiz');
+    if (meeting.finishedAt) throw new BadRequestException('Yakunlangan yig\'ilishni tahrirlab bo\'lmaydi');
+
+    const data: any = {};
+    if (dto.title !== undefined) data.title = dto.title;
+    if (dto.projectId !== undefined) data.projectId = dto.projectId ? Number(dto.projectId) : null;
+    if (dto.link !== undefined) data.link = dto.link || null;
+    if (dto.content !== undefined) data.content = dto.content || null;
+    if (dto.duration !== undefined) data.duration = dto.duration ? Number(dto.duration) : null;
+    if (dto.penaltyPercent !== undefined) data.penaltyPercent = dto.penaltyPercent !== '' && dto.penaltyPercent != null ? Number(dto.penaltyPercent) : null;
+    if (dto.startAt !== undefined) data.startAt = new Date(dto.startAt);
+    if (dto.finished !== undefined) data.finishedAt = dto.finished ? (meeting.finishedAt || new Date()) : null;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.meeting.update({ where: { id }, data });
+      if (Array.isArray(dto.participantIds)) {
+        const ids = dto.participantIds.map(Number);
+        const existingIds = meeting.attendance.map((a) => a.userId);
+        const toRemove = existingIds.filter((uid) => !ids.includes(uid));
+        const toAdd = ids.filter((uid) => !existingIds.includes(uid));
+        if (toRemove.length) await tx.meetingAttendance.deleteMany({ where: { meetingId: id, userId: { in: toRemove } } });
+        for (const uid of toAdd) await tx.meetingAttendance.create({ data: { meetingId: id, userId: uid } });
+      }
+    });
+
+    // Best-effort: bog'langan Google Meet eventini yangilaymiz (vaqt/nomi o'zgarsa)
+    if (meeting.googleEventId && meeting.meetAccount && (dto.startAt !== undefined || dto.title !== undefined || dto.duration !== undefined || dto.content !== undefined)) {
+      try {
+        const start = new Date(dto.startAt ?? meeting.startAt);
+        const dur = dto.duration !== undefined ? (Number(dto.duration) || 30) : (meeting.duration || 30);
+        await this.gcal.updateMeetEvent(meeting.meetAccount as GoogleAccountKey, meeting.googleEventId, {
+          title: dto.title ?? meeting.title ?? undefined,
+          description: dto.content ?? meeting.content ?? undefined,
+          startISO: start.toISOString(),
+          endISO: new Date(start.getTime() + dur * 60000).toISOString(),
+        });
+      } catch (e: any) {
+        this.logger.warn(`Yig'ilish #${id} Meet eventini yangilab bo'lmadi: ${e?.message || e}`);
+      }
+    }
+
+    return this.findOne(id);
   }
 
   /**
@@ -132,6 +233,16 @@ export class MeetingsService {
     const isOwner = m.createdBy === actor.id;
     const isAdmin = ['superadmin', 'admin'].includes(actor.role);
     if (!isOwner && !isAdmin) throw new ForbiddenException('Faqat yaratgan odam o\'chira oladi');
+
+    // Best-effort: bog'langan Google Meet eventini ham bekor qilamiz.
+    if (m.googleEventId && m.meetAccount) {
+      try {
+        await this.gcal.cancelMeetEvent(m.meetAccount as GoogleAccountKey, m.googleEventId);
+      } catch (e: any) {
+        this.logger.warn(`Yig'ilish #${id} Meet eventini bekor qilib bo'lmadi: ${e?.message || e}`);
+      }
+    }
+
     await this.prisma.meeting.delete({ where: { id } });
     return { message: 'Yig\'ilish o\'chirildi' };
   }

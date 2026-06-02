@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+import { DateTimeBox } from '@/components/ui/DateTimeBox';
 import { Badge } from '@/components/ui/Badge';
 import { formatMoney } from '@/lib/utils/format';
 import { PAYROLL_STATUS } from '@/lib/constants';
@@ -55,7 +55,7 @@ export function PayrollPage() {
         actions={
           isAccountant && (
             <div className="flex items-center gap-2">
-              <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-40" />
+              <div className="w-40"><DateTimeBox type="month" value={month} onChange={setMonth} /></div>
               <Button onClick={() => generate.mutate(month, { onSuccess: () => toast.success('Oylik hisoblandi'), onError: (e) => toast.error(apiError(e)) })} loading={generate.isPending}>
                 <RefreshCw className="h-4 w-4" /> Hisoblash
               </Button>

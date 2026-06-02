@@ -6,6 +6,7 @@ import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea, Select } from '@/components/ui/Input';
 import { MoneyInput } from '@/components/ui/MoneyInput';
+import { DateTimeBox } from '@/components/ui/DateTimeBox';
 import { FormField } from '@/components/ui/FormField';
 import { apiError } from '@/lib/api/axios';
 import { toTiyin, fromTiyin } from '@/lib/utils/format';
@@ -165,11 +166,26 @@ export function TaskFormDialog({ open, onClose, task }) {
           <Input type="number" min="0" placeholder="Jarima" {...register('penaltyPercent')} />
         </FormField>
 
-        <FormField label="Muddati">
-          <Input type="datetime-local" {...register('deadline')} />
-        </FormField>
+        <Controller
+          name="deadline"
+          control={control}
+          render={({ field }) => {
+            const [d, t] = (field.value || '').split('T');
+            const todayISO = () => { const x = new Date(); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
+            return (
+              <>
+                <FormField label="Muddati (sana)">
+                  <DateTimeBox type="date" value={d} onChange={(v) => field.onChange(v ? `${v}T${t || '00:00'}` : '')} />
+                </FormField>
+                <FormField label="Muddati (vaqt)">
+                  <DateTimeBox type="time" value={t} onChange={(v) => field.onChange(`${d || todayISO()}T${v || '00:00'}`)} />
+                </FormField>
+              </>
+            );
+          }}
+        />
         <FormField label="Taxminiy vaqt (soat:daqiqa)">
-          <Input type="time" {...register('estimated')} />
+          <Controller name="estimated" control={control} render={({ field }) => <DateTimeBox type="time" value={field.value} onChange={field.onChange} />} />
         </FormField>
 
         {/* Files */}

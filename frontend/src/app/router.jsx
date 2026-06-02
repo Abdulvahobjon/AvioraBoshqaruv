@@ -22,6 +22,7 @@ const ReportsPage = lazyPage(() => import('@/pages/reports/ReportsPage'), 'Repor
 const TodosPage = lazyPage(() => import('@/pages/todos/TodosPage'), 'TodosPage');
 const AuditPage = lazyPage(() => import('@/pages/audit/AuditPage'), 'AuditPage');
 const UsersPage = lazyPage(() => import('@/pages/users/UsersPage'), 'UsersPage');
+const UserDetailPage = lazyPage(() => import('@/pages/users/UserDetailPage'), 'UserDetailPage');
 const SettingsPage = lazyPage(() => import('@/pages/SettingsPage'), 'SettingsPage');
 
 const S = (el) => <Suspense fallback={<PageLoader />}>{el}</Suspense>;
@@ -53,6 +54,7 @@ export const router = createBrowserRouter([
       { path: 'todos', element: S(<TodosPage />) },
       { path: 'audit', element: <RequireRole roles={['superadmin', 'admin', 'accountant']}>{S(<AuditPage />)}</RequireRole> },
       { path: 'users', element: <RequireRole roles={['superadmin', 'admin']}>{S(<UsersPage />)}</RequireRole> },
+      { path: 'users/:id', element: <RequireRole roles={['superadmin', 'admin']}>{S(<UserDetailPage />)}</RequireRole> },
 
       { path: 'settings', element: S(<SettingsPage />) },
     ],

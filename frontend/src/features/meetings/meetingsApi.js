@@ -1,8 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api/axios';
 
-export function useMeetings() {
-  return useQuery({ queryKey: ['meetings'], queryFn: async () => (await api.get('/meetings')).data });
+export function useMeetings(params = {}) {
+  return useQuery({
+    queryKey: ['meetings', params],
+    queryFn: async () => (await api.get('/meetings', { params })).data,
+  });
 }
 
 export function useMeeting(id) {
@@ -18,6 +21,17 @@ export function useCreateMeeting() {
   return useMutation({
     mutationFn: async (payload) => (await api.post('/meetings', payload)).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['meetings'] }),
+  });
+}
+
+export function useUpdateMeeting() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...payload }) => (await api.patch(`/meetings/${id}`, payload)).data,
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ['meetings'] });
+      qc.invalidateQueries({ queryKey: ['meeting', String(v.id)] });
+    },
   });
 }
 

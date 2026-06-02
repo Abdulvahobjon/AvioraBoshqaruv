@@ -1,8 +1,9 @@
+import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils/cn';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 
-export function StatCard({ icon: Icon, label, value, hint, tone = 'accent', loading = false, className }) {
+export function StatCard({ icon: Icon, label, value, hint, tone = 'accent', loading = false, className, to }) {
   const iconTones = {
     accent: 'bg-accent-disabled text-accent-strong',
     success: 'bg-bg-2 text-text-accent',
@@ -25,8 +26,8 @@ export function StatCard({ icon: Icon, label, value, hint, tone = 'accent', load
     );
   }
 
-  return (
-    <Card className={cn('p-5', className)}>
+  const inner = (
+    <Card className={cn('p-5', to && 'cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-elevated', className)}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm text-text-sub">{label}</p>
@@ -41,4 +42,6 @@ export function StatCard({ icon: Icon, label, value, hint, tone = 'accent', load
       </div>
     </Card>
   );
+
+  return to ? <Link to={to} className="block">{inner}</Link> : inner;
 }

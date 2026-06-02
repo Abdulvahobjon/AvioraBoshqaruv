@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils/cn';
 
 /** Modal dialog with smooth Framer Motion enter/exit. Closes on Esc / backdrop click.
  *  Pass `onBack` to show a ← arrow on the left (e.g. for nested step modals). */
-export function Dialog({ open, onClose, title, children, footer, size = 'md', onBack }) {
+export function Dialog({ open, onClose, title, subtitle, children, footer, size = 'md', onBack }) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => e.key === 'Escape' && onClose?.();
@@ -44,14 +44,17 @@ export function Dialog({ open, onClose, title, children, footer, size = 'md', on
             role="dialog"
             aria-modal="true"
           >
-            <div className="flex items-center justify-between border-b border-stroke-sub px-5 py-4">
-              <div className="flex items-center gap-2">
+            <div className="flex items-start justify-between border-b border-stroke-sub px-5 py-4">
+              <div className="flex items-start gap-2">
                 {onBack && (
-                  <button onClick={onBack} className="rounded-md p-1 text-icon-sub transition-colors hover:bg-bg-1-alt hover:text-icon-strong" aria-label="Orqaga">
+                  <button onClick={onBack} className="mt-0.5 rounded-md p-1 text-icon-sub transition-colors hover:bg-bg-1-alt hover:text-icon-strong" aria-label="Orqaga">
                     <ArrowLeft className="h-5 w-5" />
                   </button>
                 )}
-                <h2 className="text-base font-semibold text-text-strong">{title}</h2>
+                <div>
+                  <h2 className="text-base font-semibold text-text-strong">{title}</h2>
+                  {subtitle && <p className="mt-0.5 text-sm text-text-sub">{subtitle}</p>}
+                </div>
               </div>
               <button
                 onClick={onClose}

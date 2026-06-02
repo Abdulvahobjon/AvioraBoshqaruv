@@ -6,7 +6,7 @@ import { StatCard } from '@/components/shared/StatCard';
 import { DataTable } from '@/components/shared/DataTable';
 import { Tabs } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+import { AntDate } from '@/components/ui/AntDate';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { formatMoney } from '@/lib/utils/format';
@@ -45,13 +45,13 @@ export function ReportsPage() {
       <PageHeader title="Hisobotlar" subtitle="Moliyaviy va loyiha hisobotlari" />
 
       <div className="mb-4 flex flex-wrap items-end gap-2">
-        <div>
+        <div className="w-44">
           <label className="mb-1 block text-xs text-text-soft">Dan</label>
-          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-40" />
+          <AntDate value={from} onChange={setFrom} />
         </div>
-        <div>
+        <div className="w-44">
           <label className="mb-1 block text-xs text-text-soft">Gacha</label>
-          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-40" />
+          <AntDate value={to} onChange={setTo} />
         </div>
         {tab !== 'finance' && (
           <div className="ml-auto flex gap-2">

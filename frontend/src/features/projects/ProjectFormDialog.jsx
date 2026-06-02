@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { toast } from 'sonner';
 import { Plus, Trash2, UserPlus } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea, Select } from '@/components/ui/Input';
 import { FormField } from '@/components/ui/FormField';
+import { AntDate } from '@/components/ui/AntDate';
 import { Avatar } from '@/components/ui/Avatar';
 import { apiError } from '@/lib/api/axios';
 import { toTiyin, fromTiyin } from '@/lib/utils/format';
@@ -24,7 +25,7 @@ export function ProjectFormDialog({ open, onClose, project }) {
   const { data: clients } = useClients({ limit: 100 });
   const save = useSaveProject();
 
-  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm();
+  const { register, control, handleSubmit, reset, setValue, formState: { errors } } = useForm();
   const [members, setMembers] = useState([]);
   const [typeOpen, setTypeOpen] = useState(false);
   const [clientOpen, setClientOpen] = useState(false);
@@ -154,7 +155,7 @@ export function ProjectFormDialog({ open, onClose, project }) {
             </Select>
           </FormField>
           <FormField label="Deadline">
-            <Input type="date" {...register('deadline')} />
+            <Controller name="deadline" control={control} render={({ field }) => <AntDate value={field.value} onChange={field.onChange} />} />
           </FormField>
           <FormField label="Status">
             <Select {...register('status')}>

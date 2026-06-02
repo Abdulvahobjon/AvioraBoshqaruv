@@ -1,5 +1,11 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Req } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import {
+  Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Req,
+  UploadedFile, UseInterceptors, BadRequestException,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -7,6 +13,14 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+
+const uploadStorage = diskStorage({
+  destination: process.env.UPLOAD_DIR || 'uploads',
+  filename: (_req, file, cb) => {
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `${unique}${extname(file.originalname)}`);
+  },
+});
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -18,6 +32,15 @@ export class UsersController {
   @Get()
   findAll(@Query() q: PaginationDto) {
     return this.users.findAll(q);
+  }
+
+  /** Upload an avatar / passport file before (or while) saving a user → returns its URL. */
+  @Post('upload')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { storage: uploadStorage, limits: { fileSize: 10 * 1024 * 1024 } }))
+  upload(@UploadedFile() file: any) {
+    if (!file) throw new BadRequestException('Fayl yuklanmadi');
+    return { url: `/uploads/${file.filename}`, name: file.originalname, size: file.size };
   }
 
   @Get(':id')

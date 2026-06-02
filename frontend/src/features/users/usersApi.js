@@ -12,12 +12,36 @@ export function useUsersList(params = {}) {
   });
 }
 
+/** Full user record (for the detail/edit page). */
+export function useUser(id) {
+  return useQuery({
+    queryKey: ['user', id],
+    enabled: !!id,
+    queryFn: async () => (await api.get(`/users/${id}`)).data,
+  });
+}
+
+/** Upload an avatar / passport file → returns { url, name, size }. */
+export function useUploadUserFile() {
+  return useMutation({
+    mutationFn: async (file) => {
+      const form = new FormData();
+      form.append('file', file);
+      const { data } = await api.post('/users/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      return data;
+    },
+  });
+}
+
 export function useSaveUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...payload }) =>
       (id ? await api.patch(`/users/${id}`, payload) : await api.post('/users', payload)).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['users'] });
+      if (vars.id) qc.invalidateQueries({ queryKey: ['user', vars.id] });
+    },
   });
 }
 

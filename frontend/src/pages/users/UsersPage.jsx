@@ -1,141 +1,247 @@
-import { useState, useEffect } from 'react';
-import { useForm, Controller } from 'react-hook-form';
-import { Plus, Pencil, Trash2, Search, CreditCard, Wallet, Banknote, Briefcase, Calendar, ShieldCheck } from 'lucide-react';
+import { useMemo, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Trash2, Check, Minus, CheckSquare, Square, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { DataTable } from '@/components/shared/DataTable';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { MoneyInput } from '@/components/ui/MoneyInput';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 import { FormField } from '@/components/ui/FormField';
-import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { EmptyState } from '@/components/shared/EmptyState';
 import { cn } from '@/lib/utils/cn';
 import { ROLE_LABELS } from '@/lib/constants';
-import { formatMoney, formatDate, toTiyin, fromTiyin } from '@/lib/utils/format';
+import { toTiyin } from '@/lib/utils/format';
 import { apiError } from '@/lib/api/axios';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useReference } from '@/features/settings/settingsApi';
 import { useUsersList, useSaveUser, useDeleteUser } from '@/features/users/usersApi';
+import { CardInput, RegionDistrict, FileUpload, AvatarUpload, moneyUZS, fileUrl } from '@/features/users/userFields';
 
-/** Faqat raqamlar (max 16). */
-const cardDigits = (val) => (val || '').replace(/\D/g, '').slice(0, 16);
-/** "XXXX XXXX XXXX XXXX" ko'rinishida formatlash (4 talab guruh). */
-const formatCard = (val) => cardDigits(val).replace(/(.{4})/g, '$1 ').trim();
+const SORTS = [
+  { value: 'az', label: 'A dan Z gacha' },
+  { value: 'za', label: 'Z dan A gacha' },
+  { value: 'new', label: 'Yangi → Eski' },
+  { value: 'old', label: 'Eski → Yangi' },
+];
 
 export function UsersPage() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const debounced = useDebounce(search);
   const { data, isLoading } = useUsersList({ search: debounced });
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [deleting, setDeleting] = useState(null);
-  const [detail, setDetail] = useState(null);
+  const { data: positions } = useReference('position');
+  const save = useSaveUser();
   const del = useDeleteUser();
 
-  const columns = [
-    { key: 'idx', header: '№', className: 'w-12', render: (_r, i) => i + 1 },
-    {
-      key: 'fullName', header: 'Ism Sharifi',
-      render: (r) => (
-        <div className="flex items-center gap-2.5">
-          <Avatar name={r.fullName} src={r.avatar} size="sm" />
-          <div>
-            <p className="font-medium text-text-strong">{r.fullName}</p>
-            <p className="text-xs text-text-soft">{r.position?.name || '—'}</p>
-          </div>
-        </div>
-      ),
-    },
-    { key: 'role', header: 'Rol', render: (r) => <Badge tone="info">{ROLE_LABELS[r.role]}</Badge> },
-    { key: 'fixedSalary', header: 'Oylik maosh', render: (r) => <span className="font-medium">{formatMoney(r.fixedSalary)}</span> },
-    { key: 'balance', header: 'Balans', render: (r) => formatMoney(r.balance) },
-    { key: 'status', header: 'Status', render: (r) => <Badge tone={r.status === 'active' ? 'success' : 'muted'}>{r.status === 'active' ? 'Faol' : 'Nofaol'}</Badge> },
-    {
-      key: 'actions', header: '', className: 'w-20',
-      render: (r) => (
-        <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-          <button className="rounded p-1.5 text-icon-sub hover:bg-bg-2" onClick={() => { setEditing(r); setFormOpen(true); }}><Pencil className="h-4 w-4" /></button>
-          <button className="rounded p-1.5 text-error-strong hover:bg-error-soft" onClick={() => setDeleting(r)}><Trash2 className="h-4 w-4" /></button>
-        </div>
-      ),
-    },
-  ];
+  const [fPos, setFPos] = useState('');
+  const [fRole, setFRole] = useState('');
+  const [sort, setSort] = useState('az');
+  const [formOpen, setFormOpen] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState([]);
+  const [deleting, setDeleting] = useState(null); // user | 'bulk'
+
+  const rows = useMemo(() => {
+    let arr = [...(data?.items || [])];
+    if (fPos) arr = arr.filter((u) => String(u.positionId) === fPos);
+    if (fRole) arr = arr.filter((u) => u.role === fRole);
+    arr.sort((a, b) => {
+      if (sort === 'az') return a.fullName.localeCompare(b.fullName);
+      if (sort === 'za') return b.fullName.localeCompare(a.fullName);
+      if (sort === 'new') return new Date(b.createdAt) - new Date(a.createdAt);
+      if (sort === 'old') return new Date(a.createdAt) - new Date(b.createdAt);
+      return 0;
+    });
+    return arr;
+  }, [data, fPos, fRole, sort]);
+
+  const toggleActive = (u) =>
+    save.mutate({ id: u.id, status: u.status === 'active' ? 'inactive' : 'active' }, { onError: (e) => toast.error(apiError(e)) });
+
+  const toggleSelect = (id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const allSelected = rows.length > 0 && selected.length === rows.length;
+  const toggleAll = () => setSelected(allSelected ? [] : rows.map((u) => u.id));
+
+  const confirmDelete = async () => {
+    const ids = deleting === 'bulk' ? selected : [deleting.id];
+    try {
+      for (const id of ids) await del.mutateAsync(id);
+      toast.success("O'chirildi");
+      setSelected([]);
+      setDeleting(null);
+    } catch (e) {
+      toast.error(apiError(e));
+    }
+  };
+
+  const pill = 'h-10 rounded-full px-4';
 
   return (
     <div>
+      {/* "Yangi xodim" lives in the top navbar; "Tanlash" stays here. */}
+      <TopbarActions>
+        <Button size="sm" onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" /> Yangi xodim</Button>
+      </TopbarActions>
+
       <PageHeader
         title="Foydalanuvchilar"
         subtitle="Xodimlar va rollar boshqaruvi"
-        actions={<Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" /> Yangi xodim</Button>}
+        actions={
+          <Button variant={selectMode ? 'secondary' : 'outline'} onClick={() => { setSelectMode((v) => !v); setSelected([]); }}>
+            <Check className="h-4 w-4" /> Tanlash
+          </Button>
+        }
       />
-      <div className="relative mb-4 max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-icon-soft" />
-        <Input placeholder="Ism bo'yicha qidirish..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+
+      {/* Filters */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative w-full sm:w-72">
+          <Input placeholder="Ism Sharifi bo'yicha izlash..." className="rounded-full" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <Select value={fPos} onChange={(e) => setFPos(e.target.value)} className={cn(pill, 'w-auto min-w-[180px]')}>
+          <option value="">Barcha lavozimlar</option>
+          {(positions || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </Select>
+        <Select value={fRole} onChange={(e) => setFRole(e.target.value)} className={cn(pill, 'w-auto min-w-[160px]')}>
+          <option value="">Barcha rollar</option>
+          {Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </Select>
+        <Select value={sort} onChange={(e) => setSort(e.target.value)} className={cn(pill, 'w-auto min-w-[160px]')}>
+          {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+        </Select>
       </div>
-      {isLoading ? (
-        <UsersSkeleton />
-      ) : (
-        <DataTable
-          columns={columns}
-          data={data?.items}
-          onRowClick={(r) => setDetail(r)}
-          emptyTitle="Foydalanuvchilar yo'q"
-        />
+
+      {/* Bulk action bar */}
+      {selectMode && selected.length > 0 && (
+        <div className="mb-3 flex items-center justify-between rounded-lg border border-stroke-sub bg-bg-elevation-1 px-4 py-2.5">
+          <span className="text-sm text-text-sub">{selected.length} ta tanlandi</span>
+          <Button variant="danger" size="sm" onClick={() => setDeleting('bulk')}><Trash2 className="h-4 w-4" /> O'chirish</Button>
+        </div>
       )}
 
-      <UserDialog open={formOpen} onClose={() => setFormOpen(false)} user={editing} />
-      {detail && (
-        <UserDetailDialog
-          user={detail}
-          open={!!detail}
-          onClose={() => setDetail(null)}
-          onEdit={(u) => { setDetail(null); setEditing(u); setFormOpen(true); }}
-        />
+      {isLoading ? (
+        <UsersSkeleton />
+      ) : rows.length === 0 ? (
+        <EmptyState title="Foydalanuvchilar yo'q" description="Yangi xodim qo'shing yoki filtrlarni o'zgartiring." />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[820px] text-sm">
+            <thead>
+              <tr className="border-b border-stroke-sub text-left text-text-sub">
+                {selectMode && (
+                  <th className="w-10 py-3 pl-1">
+                    <button onClick={toggleAll} className="text-icon-sub">{allSelected ? <CheckSquare className="h-4 w-4 text-icon-accent" /> : <Square className="h-4 w-4" />}</button>
+                  </th>
+                )}
+                <th className="w-12 py-3 font-medium">№</th>
+                <th className="py-3 font-medium">Ism Sharifi</th>
+                <th className="py-3 font-medium"><span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#22C55E]" /> Lavozim</span></th>
+                <th className="py-3 font-medium">Rol</th>
+                <th className="py-3 text-right font-medium">Oylik maosh (UZS)</th>
+                <th className="py-3 text-right font-medium">Balans (UZS)</th>
+                <th className="w-20 py-3 text-center font-medium">Active</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((u, i) => (
+                <tr
+                  key={u.id}
+                  onClick={() => navigate(`/users/${u.id}`)}
+                  className="cursor-pointer border-b border-stroke-soft transition-colors hover:bg-bg-elevation-1-alt"
+                >
+                  {selectMode && (
+                    <td className="py-3 pl-1" onClick={(e) => { e.stopPropagation(); toggleSelect(u.id); }}>
+                      {selected.includes(u.id) ? <CheckSquare className="h-4 w-4 text-icon-accent" /> : <Square className="h-4 w-4 text-icon-sub" />}
+                    </td>
+                  )}
+                  <td className="py-3 text-text-soft">{i + 1}</td>
+                  <td className="py-3">
+                    <div className="flex items-center gap-2.5">
+                      <Avatar name={u.fullName} src={fileUrl(u.avatar)} size="sm" />
+                      <span className="font-medium text-text-strong">{u.fullName}</span>
+                    </div>
+                  </td>
+                  <td className="py-3 text-text-sub">{u.position?.name || '—'}</td>
+                  <td className="py-3 text-text-sub">{ROLE_LABELS[u.role]}</td>
+                  <td className="py-3 text-right font-semibold text-text-strong">{moneyUZS(u.fixedSalary)}</td>
+                  <td className="py-3 text-right text-text-sub">{moneyUZS(u.balance)}</td>
+                  <td className="py-3 text-center" onClick={(e) => { e.stopPropagation(); toggleActive(u); }}>
+                    <span className={cn(
+                      'inline-flex h-7 w-7 items-center justify-center rounded-md text-text-white transition-colors',
+                      u.status === 'active' ? 'bg-[#22C55E]' : 'bg-error-strong',
+                    )}>
+                      {u.status === 'active' ? <Check className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
+
+      <UserDialog open={formOpen} onClose={() => setFormOpen(false)} />
       <ConfirmDialog
         open={!!deleting}
         onClose={() => setDeleting(null)}
-        onConfirm={() => del.mutate(deleting.id, { onSuccess: () => { toast.success("O'chirildi"); setDeleting(null); }, onError: (e) => toast.error(apiError(e)) })}
+        onConfirm={confirmDelete}
         loading={del.isPending}
-        message={`"${deleting?.fullName}" ni o'chirmoqchimisiz?`}
+        title="Foydalanuvchini o'chirmoqchimisiz?"
+        message={deleting === 'bulk' ? `${selected.length} ta foydalanuvchi o'chiriladi.` : 'Bu foydalanuvchi tizimdan o\'chiriladi va unga tegishli ma\'lumotlar o\'chishi mumkin.'}
+        confirmText="O'chirish"
       />
     </div>
   );
 }
 
-function UserDialog({ open, onClose, user }) {
-  const isEdit = !!user;
+/** Portals its children into the Topbar's #page-actions slot (navbar). */
+function TopbarActions({ children }) {
+  const [el, setEl] = useState(null);
+  useEffect(() => { setEl(document.getElementById('page-actions')); }, []);
+  return el ? createPortal(children, el) : null;
+}
+
+const EMPTY = {
+  fullName: '', password: '', role: 'employee', positionId: '', fixedSalary: '',
+  phone: '', phone2: '', card: '', card2: '', region: '', district: '',
+  passportSeries: '', passportNumber: '', passportImage: '', avatar: '', link1: '', link2: '',
+};
+
+function UserDialog({ open, onClose }) {
   const { data: positions } = useReference('position');
   const save = useSaveUser();
-  const { register, control, handleSubmit, reset, formState: { errors } } = useForm();
+  const [f, setF] = useState(EMPTY);
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
 
-  useEffect(() => {
-    if (!open) return;
-    reset(
-      user
-        ? { fullName: user.fullName, role: user.role, positionId: user.positionId || '', fixedSalary: fromTiyin(user.fixedSalary), card: formatCard(user.card), status: user.status, password: '' }
-        : { fullName: '', role: 'employee', positionId: '', fixedSalary: '', card: '', status: 'active', password: '' },
-    );
-  }, [open, user, reset]);
+  // Reset when opened
+  const [wasOpen, setWasOpen] = useState(false);
+  if (open && !wasOpen) { setF(EMPTY); setWasOpen(true); }
+  if (!open && wasOpen) setWasOpen(false);
 
-  const onSubmit = (v) => {
-    const payload = {
-      fullName: v.fullName,
-      role: v.role,
-      positionId: v.positionId ? Number(v.positionId) : undefined,
-      fixedSalary: toTiyin(v.fixedSalary || 0),
-      card: v.card || undefined,
-      ...(isEdit ? { status: v.status } : {}),
-      ...(v.password ? { password: v.password } : {}),
-    };
+  const submit = () => {
+    if (!f.fullName.trim()) { toast.error('Ism Sharifini kiriting'); return; }
+    if (!f.password.trim() || f.password.length < 6) { toast.error('Parol kamida 6 ta belgi'); return; }
     save.mutate(
-      { id: user?.id, ...payload },
-      { onSuccess: () => { toast.success(isEdit ? 'Yangilandi' : "Qo'shildi"); onClose(); }, onError: (e) => toast.error(apiError(e)) },
+      {
+        fullName: f.fullName.trim(),
+        password: f.password,
+        role: f.role,
+        positionId: f.positionId ? Number(f.positionId) : undefined,
+        fixedSalary: toTiyin(f.fixedSalary || 0),
+        phone: f.phone || undefined, phone2: f.phone2 || undefined,
+        card: f.card || undefined, card2: f.card2 || undefined,
+        region: f.region || undefined, district: f.district || undefined,
+        passportSeries: f.passportSeries || undefined, passportNumber: f.passportNumber || undefined,
+        passportImage: f.passportImage || undefined, avatar: f.avatar || undefined,
+        link1: f.link1 || undefined, link2: f.link2 || undefined,
+      },
+      { onSuccess: () => { toast.success("Qo'shildi"); onClose(); }, onError: (e) => toast.error(apiError(e)) },
     );
   };
 
@@ -143,133 +249,97 @@ function UserDialog({ open, onClose, user }) {
     <Dialog
       open={open}
       onClose={onClose}
-      title={isEdit ? 'Xodimni tahrirlash' : 'Yangi xodim'}
-      footer={<><Button variant="outline" onClick={onClose}>Bekor</Button><Button onClick={handleSubmit(onSubmit)} loading={save.isPending}>Saqlash</Button></>}
+      onBack={onClose}
+      title="Yangi xodim qo'shish"
+      size="lg"
+      footer={<><Button variant="ghost" onClick={onClose}><X className="h-4 w-4" /> Yopish</Button><Button onClick={submit} loading={save.isPending}><Check className="h-4 w-4" /> Qo'shish</Button></>}
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <FormField label="Ism Familiya (login)" required className="sm:col-span-2" error={errors.fullName && 'Kiriting'}>
-          <Input {...register('fullName', { required: true })} error={errors.fullName} />
+      <p className="-mt-2 mb-4 text-sm text-text-sub">Yangi xodimni tizimga qo'shing va unga tegishli rol hamda maoshni belgilang</p>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <FormField label="Ism Sharifi (login)" required>
+          <Input placeholder="Ism Familiya" value={f.fullName} onChange={(e) => set('fullName', e.target.value)} />
         </FormField>
-        <FormField label="Rol">
-          <Select {...register('role')}>
-            {Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </Select>
+        <FormField label="Parol" required>
+          <PasswordInput placeholder="••••••••" value={f.password} onChange={(e) => set('password', e.target.value)} />
         </FormField>
-        <FormField label="Lavozim">
-          <Select {...register('positionId')}>
-            <option value="">— Tanlang —</option>
-            {(positions || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </Select>
+
+        <FormField label="Telefon raqami">
+          <Input placeholder="+998" value={f.phone} onChange={(e) => set('phone', e.target.value)} />
         </FormField>
-        <FormField label="Fiks oylik (so'm)">
-          <Controller
-            name="fixedSalary"
-            control={control}
-            render={({ field }) => <MoneyInput value={field.value} onChange={field.onChange} placeholder="0" />}
-          />
+        <FormField label="Qo'shimcha raqam">
+          <Input placeholder="Qoshimcha raqam" value={f.phone2} onChange={(e) => set('phone2', e.target.value)} />
         </FormField>
-        <FormField label="Karta raqami" error={errors.card?.message}>
-          <Controller
-            name="card"
-            control={control}
-            rules={{ validate: (val) => !val || cardDigits(val).length === 16 || '16 ta raqam kiriting' }}
-            render={({ field }) => (
-              <Input
-                inputMode="numeric"
-                maxLength={19}
-                placeholder="8600 0000 0000 0000"
-                value={field.value || ''}
-                onChange={(e) => field.onChange(formatCard(e.target.value))}
-                error={errors.card}
-              />
-            )}
-          />
+
+        <FormField label="Karta raqami">
+          <CardInput value={f.card} onChange={(v) => set('card', v)} />
         </FormField>
-        {isEdit && (
-          <FormField label="Status">
-            <Select {...register('status')}>
-              <option value="active">Faol</option>
-              <option value="inactive">Nofaol</option>
+        <FormField label="Ikkinchi karta">
+          <CardInput value={f.card2} onChange={(v) => set('card2', v)} />
+        </FormField>
+
+        <RegionDistrict region={f.region} district={f.district} onRegion={(v) => set('region', v)} onDistrict={(v) => set('district', v)} />
+
+        <FormField label="Passport ma'lumotlari">
+          <div className="flex gap-2">
+            <Input className="w-20 uppercase" maxLength={2} placeholder="AA" value={f.passportSeries} onChange={(e) => set('passportSeries', e.target.value.toUpperCase())} />
+            <Input className="flex-1" placeholder="Raqami" value={f.passportNumber} onChange={(e) => set('passportNumber', e.target.value)} />
+          </div>
+        </FormField>
+        <FormField label="Passport rasmi">
+          <FileUpload value={f.passportImage} onChange={(v) => set('passportImage', v)} accept="image/*,application/pdf" label="Rasm yuklash" />
+        </FormField>
+
+        <div className="flex items-end gap-4 sm:col-span-2">
+          <div>
+            <p className="mb-1.5 text-sm font-medium text-text-sub">Avatar</p>
+            <AvatarUpload value={f.avatar} onChange={(v) => set('avatar', v)} />
+          </div>
+          <FormField label="Lavozimi" className="flex-1">
+            <Select value={f.positionId} onChange={(e) => set('positionId', e.target.value)}>
+              <option value="">Tanlang</option>
+              {(positions || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </Select>
           </FormField>
-        )}
-        <FormField label={isEdit ? "Yangi parol (ixtiyoriy)" : 'Parol'} required={!isEdit} className={isEdit ? '' : 'sm:col-span-2'} error={!isEdit && errors.password && 'Kiriting'}>
-          <PasswordInput placeholder="••••••••" {...register('password', { required: !isEdit })} error={errors.password} />
-        </FormField>
-      </form>
-    </Dialog>
-  );
-}
-
-function UserDetailDialog({ user, open, onClose, onEdit }) {
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title="Xodim ma'lumotlari"
-      size="md"
-      footer={<><Button variant="outline" onClick={onClose}>Yopish</Button><Button onClick={() => onEdit(user)}><Pencil className="h-4 w-4" /> Tahrirlash</Button></>}
-    >
-      <div className="mb-5 flex items-center gap-4">
-        <Avatar name={user.fullName} src={user.avatar} size="lg" />
-        <div>
-          <p className="text-lg font-semibold text-text-strong">{user.fullName}</p>
-          <div className="mt-1 flex items-center gap-2">
-            <Badge tone="info">{ROLE_LABELS[user.role]}</Badge>
-            <Badge tone={user.status === 'active' ? 'success' : 'muted'}>{user.status === 'active' ? 'Faol' : 'Nofaol'}</Badge>
-          </div>
+          <FormField label="Roli" className="flex-1">
+            <Select value={f.role} onChange={(e) => set('role', e.target.value)}>
+              {Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </Select>
+          </FormField>
         </div>
-      </div>
 
-      <div className="space-y-1">
-        <DetailRow icon={Briefcase} label="Lavozim" value={user.position?.name} />
-        <DetailRow icon={Banknote} label="Fiks oylik" value={formatMoney(user.fixedSalary)} />
-        <DetailRow icon={Wallet} label="Balans" value={formatMoney(user.balance)} />
-        <DetailRow icon={CreditCard} label="Karta raqami" value={user.card} mono />
-        <DetailRow icon={ShieldCheck} label="Rol" value={ROLE_LABELS[user.role]} />
-        <DetailRow icon={Calendar} label="Qo'shilgan sana" value={formatDate(user.createdAt)} />
+        <FormField label="Oylik maosh (UZS)" className="sm:col-span-2">
+          <MoneyInput value={f.fixedSalary} onChange={(v) => set('fixedSalary', v)} placeholder="0" />
+        </FormField>
+
+        <FormField label="1.Havola">
+          <Input placeholder="Havola yuklang" value={f.link1} onChange={(e) => set('link1', e.target.value)} />
+        </FormField>
+        <FormField label="2.Havola">
+          <Input placeholder="Havola yuklang" value={f.link2} onChange={(e) => set('link2', e.target.value)} />
+        </FormField>
       </div>
     </Dialog>
   );
 }
 
-/** Content-matching loading skeleton for the users table. */
 function UsersSkeleton() {
-  const headers = ['w-6', 'flex-1', 'w-16', 'w-24', 'w-20', 'w-14', 'w-10'];
   return (
-    <div className="overflow-hidden rounded-lg border border-stroke-sub bg-bg-elevation-1">
-      {/* Header */}
-      <div className="flex items-center gap-4 border-b border-stroke-sub bg-bg-elevation-1-alt px-4 py-3">
-        {headers.map((w, i) => <Skeleton key={i} className={cn('h-3.5', w)} />)}
+    <div className="space-y-1">
+      <div className="flex items-center gap-4 border-b border-stroke-sub py-3">
+        {['w-6', 'flex-1', 'w-24', 'w-20', 'w-28', 'w-28', 'w-12'].map((w, i) => <Skeleton key={i} className={cn('h-3.5', w)} />)}
       </div>
-      {/* Rows */}
-      {Array.from({ length: 6 }).map((_, r) => (
-        <div key={r} className="flex items-center gap-4 border-b border-stroke-soft px-4 py-3.5 last:border-0">
+      {Array.from({ length: 8 }).map((_, r) => (
+        <div key={r} className="flex items-center gap-4 border-b border-stroke-soft py-3.5">
           <Skeleton className="h-4 w-6 shrink-0" />
-          <div className="flex flex-1 items-center gap-2.5">
-            <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
-            <div className="space-y-1.5">
-              <Skeleton className="h-3.5 w-32" />
-              <Skeleton className="h-2.5 w-20" />
-            </div>
-          </div>
-          <Skeleton className="h-5 w-16 shrink-0 rounded-full" />
-          <Skeleton className="h-4 w-24 shrink-0" />
-          <Skeleton className="h-4 w-20 shrink-0" />
-          <Skeleton className="h-5 w-14 shrink-0 rounded-full" />
-          <Skeleton className="h-4 w-10 shrink-0" />
+          <div className="flex flex-1 items-center gap-2.5"><Skeleton className="h-7 w-7 shrink-0 rounded-full" /><Skeleton className="h-3.5 w-40" /></div>
+          <Skeleton className="h-3.5 w-24 shrink-0" />
+          <Skeleton className="h-3.5 w-20 shrink-0" />
+          <Skeleton className="h-3.5 w-28 shrink-0" />
+          <Skeleton className="h-3.5 w-28 shrink-0" />
+          <Skeleton className="h-7 w-7 shrink-0 rounded-md" />
         </div>
       ))}
-    </div>
-  );
-}
-
-function DetailRow({ icon: Icon, label, value, mono }) {
-  return (
-    <div className="flex items-center gap-3 rounded-lg px-1 py-2.5">
-      <Icon className="h-4 w-4 shrink-0 text-icon-soft" />
-      <span className="w-32 shrink-0 text-sm text-text-soft">{label}</span>
-      <span className={`text-sm text-text-strong ${mono ? 'font-mono' : ''}`}>{value || '—'}</span>
     </div>
   );
 }

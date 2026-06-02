@@ -21,7 +21,27 @@
       "Bash(grep -c \"bg-bg-elevation-2\" /tmp/aviora.css)",
       "Bash(grep -co \"\\\\.bg-bg-2[^-]\" /tmp/aviora.css)",
       "Bash(wc -c /tmp/aviora.css)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/react-datepicker/package.json'\\).version\\); const p=require\\('./node_modules/react-datepicker/package.json'\\); console.log\\('peer:', JSON.stringify\\(p.peerDependencies\\)\\)\")",
+      "Bash(powershell -Command \"Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep 2; Write-Output 'restarting'\")",
+      "Bash(node -e \"console.log\\('antd', require\\('./node_modules/antd/package.json'\\).version\\); console.log\\('dayjs', require\\('./node_modules/dayjs/package.json'\\).version\\)\")",
+      "Bash(rm -f frontend/src/components/ui/DatePicker.jsx)",
+      "Bash(npm uninstall *)",
+      "Bash(npx nest *)",
+      "Bash(echo \"=== EXIT: $? ===\")",
+      "Bash(echo \"EXIT: $?\")",
+      "Read(//c/Users/Asadbek/Desktop/**)",
+      "Bash(echo \"BUILD EXIT: $?\")",
+      "Bash(powershell -Command \"if \\(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue\\) {'OK'} else {'STOP'}\")",
+      "Bash(xargs grep -l \"projects\")",
+      "PowerShell(try { $r = Invoke-RestMethod -Uri 'http://localhost:3000/api/auth/login' -Method Post -ContentType 'application/json' -Body '{\"fullName\":\"Asadbek Superadmin\",\"password\":\"Aviora2026!\"}' -TimeoutSec 10; Write-Output \\(\"LOGIN OK -> \" + $r.user.fullName\\) } catch { Write-Output \\(\"LOGIN XATO: \" + $_.Exception.Message\\) })",
+      "Bash(node scripts/google-oauth.js)",
+      "Bash(powershell -Command 'function P\\($p\\){ if \\(Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue\\) {'\\\\''OK'\\\\''} else {'\\\\''STOP'\\\\''} }; \\('\\\\''PG :5433='\\\\'' + \\(P 5433\\) + '\\\\'' | Backend :3000='\\\\'' + \\(P 3000\\) + '\\\\'' | Frontend :5173='\\\\'' + \\(P 5173\\) + '\\\\'' | OAuth :5050='\\\\'' + \\(P 5050\\)\\)')",
+      "Bash(powershell -Command \"if \\(Get-NetTCPConnection -LocalPort 5050 -State Listen -ErrorAction SilentlyContinue\\) {'KUTYAPTI \\(hali Allow bosilmagan\\)'} else {'TUGAGAN'}\")",
+      "PowerShell(Start-Process \"https://accounts.google.com/o/oauth2/v2/auth?access_type=offline&prompt=consent&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcalendar.events&response_type=code&client_id=571124877992-3fj45jg682hm9uhltgjfna791abfvp41.apps.googleusercontent.com&redirect_uri=http%3A%2F%2Flocalhost%3A5050%2Foauth2callback\")",
+      "Bash(node -e \"const p=require\\('./backend/package.json'\\); console.log\\(JSON.stringify\\(p.scripts,null,2\\)\\); console.log\\('prisma seed:', JSON.stringify\\(p.prisma\\)\\)\")",
+      "Bash(powershell -Command 'function P\\($p\\){ if \\(Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue\\) {'\\\\''OK'\\\\''} else {'\\\\''STOP'\\\\''} }; '\\\\''PG :5433='\\\\'' + \\(P 5433\\) + '\\\\'' | Backend :3000='\\\\'' + \\(P 3000\\) + '\\\\'' | Frontend :5173='\\\\'' + \\(P 5173\\)')",
+      "Bash(grep -iE \"REFRESH_TOKEN|refresh_token|Xato|1//\" \"C:\\\\Users\\\\Asadbek\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Asadbek-Desktop-AvioraBoshqaruv\\\\b1a82871-540d-42e0-9c49-4a6b4279d9af\\\\tasks\\\\bdnxj0kse.output\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\Asadbek\\.aviora-pg"

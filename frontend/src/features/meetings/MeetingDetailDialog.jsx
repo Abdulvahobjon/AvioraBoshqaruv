@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Calendar, Clock, ExternalLink, ChevronDown, ChevronUp, Send, CheckCircle2 } from 'lucide-react';
+import { Calendar, Clock, ExternalLink, ChevronDown, ChevronUp, Send, CheckCircle2, Video } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Input';
@@ -71,6 +71,13 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
             {meeting.duration && <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4 text-icon-soft" />{meeting.duration} daqiqa</span>}
             {meeting.link && <a href={meeting.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-text-accent hover:underline"><ExternalLink className="h-4 w-4" />Havola</a>}
           </div>
+
+          {meeting.meetLink && (
+            <a href={meeting.meetLink} target="_blank" rel="noreferrer"
+              className="inline-flex w-fit items-center gap-2 rounded-lg bg-accent-strong px-4 py-2 text-sm font-semibold text-text-white transition-colors hover:bg-accent-sub">
+              <Video className="h-4 w-4" /> Google Meet'ga kirish
+            </a>
+          )}
 
           {meeting.content && <p className="rounded-lg bg-bg-elevation-1 p-3 text-sm text-text-sub">{meeting.content}</p>}
 

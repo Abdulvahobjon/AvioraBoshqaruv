@@ -1,6 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api/axios';
 
+/** Role-aware dashboard summary (all stats computed server-side). */
+export function useDashboard() {
+  return useQuery({ queryKey: ['dashboard'], queryFn: async () => (await api.get('/dashboard')).data });
+}
+
 export function useProjectsReport(params = {}) {
   return useQuery({ queryKey: ['report-projects', params], queryFn: async () => (await api.get('/reports/projects', { params })).data });
 }

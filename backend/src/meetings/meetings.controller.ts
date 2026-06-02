@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { MeetingsService } from './meetings.service';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
@@ -10,8 +10,8 @@ export class MeetingsController {
   constructor(private readonly meetings: MeetingsService) {}
 
   @Get()
-  findAll(@CurrentUser() user: AuthUser) {
-    return this.meetings.findAll(user);
+  findAll(@CurrentUser() user: AuthUser, @Query() q: any) {
+    return this.meetings.findAll(user, q);
   }
 
   @Get(':id')
@@ -22,6 +22,11 @@ export class MeetingsController {
   @Post()
   create(@Body() dto: any, @CurrentUser() user: AuthUser) {
     return this.meetings.create(dto, user);
+  }
+
+  @Patch(':id')
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: any, @CurrentUser() user: AuthUser) {
+    return this.meetings.update(id, dto, user);
   }
 
   /** Finish meeting: body { attendedUserIds: number[] } */
