@@ -93,7 +93,9 @@ export class MeetingsService {
         uid,
         title: dto.title || 'Yig\'ilish',
         projectId,
-        link: dto.link ?? null,
+        // Foydalanuvchi qo'lda havola kiritsa — shu havola saqlanadi (probel bo'lsa null).
+        // null bo'lsa, quyida avtomatik Google Meet ochiladi.
+        link: typeof dto.link === 'string' && dto.link.trim() ? dto.link.trim() : null,
         content: dto.content ?? null,
         duration: dto.duration ? Number(dto.duration) : null,
         penaltyPercent: dto.penaltyPercent != null && dto.penaltyPercent !== '' ? Number(dto.penaltyPercent) : null,
@@ -161,7 +163,7 @@ export class MeetingsService {
     const data: any = {};
     if (dto.title !== undefined) data.title = dto.title;
     if (dto.projectId !== undefined) data.projectId = dto.projectId ? Number(dto.projectId) : null;
-    if (dto.link !== undefined) data.link = dto.link || null;
+    if (dto.link !== undefined) data.link = typeof dto.link === 'string' && dto.link.trim() ? dto.link.trim() : null;
     if (dto.content !== undefined) data.content = dto.content || null;
     if (dto.duration !== undefined) data.duration = dto.duration ? Number(dto.duration) : null;
     if (dto.penaltyPercent !== undefined) data.penaltyPercent = dto.penaltyPercent !== '' && dto.penaltyPercent != null ? Number(dto.penaltyPercent) : null;

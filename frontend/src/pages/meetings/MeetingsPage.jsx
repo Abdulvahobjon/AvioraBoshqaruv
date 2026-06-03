@@ -28,6 +28,9 @@ import { MeetingStatusBadge } from '@/features/meetings/MeetingStatusBadge';
 
 const hasFilters = (f) => Object.values(f).some(Boolean);
 
+// Faqat Google Meet havolalari qabul qilinadi (masalan: https://meet.google.com/bxy-rcft-jat)
+const MEET_LINK_RE = /^https:\/\/meet\.google\.com\/[\w-]+/i;
+
 /** Ishtirokchilar avatarlarini zич (overlapping) ko'rsatadi; ortig'ini "+N" qiladi. */
 function AvatarStack({ people = [], max = 4 }) {
   if (!people.length) return <span className="text-text-soft">—</span>;
@@ -87,8 +90,8 @@ export function MeetingsPage() {
       render: (r) => (
         <span className="inline-flex items-center gap-2">
           <span className="font-medium text-text-strong">{r.title}</span>
-          {r.meetLink && (
-            <a href={r.meetLink} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title="Google Meet'ga kirish" className="text-accent-strong hover:text-accent-sub">
+          {(r.meetLink || r.link) && (
+            <a href={r.meetLink || r.link} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title="Yig'ilish havolasiga kirish" className="text-accent-strong hover:text-accent-sub">
               <Video className="h-4 w-4" />
             </a>
           )}
@@ -278,7 +281,7 @@ function MeetingDialog({ open, onClose, meeting }) {
       title: v.title,
       penaltyPercent: v.penaltyPercent === '' ? null : Number(v.penaltyPercent),
       projectId: v.projectId ? Number(v.projectId) : null,
-      link: v.link || null,
+      link: v.link?.trim() || null,
       content: v.content || null,
       duration: v.duration ? Number(v.duration) : null,
       startAt: v.startAt,
@@ -293,7 +296,10 @@ function MeetingDialog({ open, onClose, meeting }) {
     }
   };
 
-  const copyLink = () => { navigator.clipboard?.writeText(created.meetLink); toast.success('Havola nusxalandi'); };
+  // Ko'rsatiladigan havola: backend yaratgan Meet (meetLink) yoki foydalanuvchi qo'lda kiritgan (link).
+  const shownLink = created?.meetLink || created?.link || null;
+  const isManualLink = !!(created && !created.meetLink && created.link);
+  const copyLink = () => { navigator.clipboard?.writeText(shownLink); toast.success('Havola nusxalandi'); };
 
   return (
     <Dialog
@@ -323,13 +329,15 @@ function MeetingDialog({ open, onClose, meeting }) {
             <p className="text-lg font-semibold text-text-strong">Yig'ilish yaratildi</p>
             <p className="text-sm text-text-sub">"{created.title}" muvaffaqiyatli qo'shildi</p>
           </div>
-          {created.meetLink ? (
+          {shownLink ? (
             <div className="w-full max-w-md">
-              <p className="mb-1.5 text-left text-sm font-medium text-text-sub">Google Meet havolasi</p>
+              <p className="mb-1.5 text-left text-sm font-medium text-text-sub">
+                {isManualLink ? 'Siz kiritgan havola' : 'Google Meet havolasi'}
+              </p>
               <div className="flex items-center gap-2">
-                <Input readOnly value={created.meetLink} className="flex-1 font-mono text-xs" />
+                <Input readOnly value={shownLink} className="flex-1 font-mono text-xs" />
                 <Button variant="outline" onClick={copyLink} title="Nusxalash"><Copy className="h-4 w-4" /></Button>
-                <a href={created.meetLink} target="_blank" rel="noreferrer"><Button><Video className="h-4 w-4" /> Kirish</Button></a>
+                <a href={shownLink} target="_blank" rel="noreferrer"><Button><Video className="h-4 w-4" /> Kirish</Button></a>
               </div>
             </div>
           ) : (
@@ -353,8 +361,16 @@ function MeetingDialog({ open, onClose, meeting }) {
             <FormField label="Jarima foizi (%)">
               <Input type="number" min="0" max="100" placeholder="0" {...register('penaltyPercent')} />
             </FormField>
-            <FormField label="Havolasi" className="sm:col-span-2" hint="Bo'sh qoldirsangiz, tizim avtomatik Google Meet havolasi ochib beradi.">
-              <Input placeholder="https://meet.google.com/...  (ixtiyoriy)" {...register('link')} />
+            <FormField label="Havolasi" className="sm:col-span-2" error={errors.link?.message} hint="Bo'sh qoldirsangiz, tizim avtomatik Google Meet havolasi ochib beradi.">
+              <Input
+                placeholder="https://meet.google.com/...  (ixtiyoriy)"
+                error={errors.link}
+                {...register('link', {
+                  validate: (val) =>
+                    !val || !val.trim() || MEET_LINK_RE.test(val.trim()) ||
+                    "Faqat https://meet.google.com/... ko'rinishidagi havola kiriting",
+                })}
+              />
             </FormField>
             <FormField label="Tavsifi" className="sm:col-span-2">
               <Textarea placeholder="Tavsifi yozing..." {...register('content')} />

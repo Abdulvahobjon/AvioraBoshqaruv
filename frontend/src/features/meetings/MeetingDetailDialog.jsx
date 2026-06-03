@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Calendar, Clock, ExternalLink, ChevronDown, ChevronUp, Send, CheckCircle2, Video, Copy } from 'lucide-react';
+import { Calendar, Clock, ChevronDown, ChevronUp, Send, CheckCircle2, Video, Copy } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Input';
@@ -31,7 +31,9 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
   const canFinish = !!meeting && !meeting.finishedAt && !!onFinish &&
     (meeting.createdBy === myId || ['superadmin', 'admin'].includes(role));
 
-  const copyMeet = () => { navigator.clipboard?.writeText(meeting.meetLink); toast.success('Havola nusxalandi'); };
+  // Kirish havolasi: backend yaratgan Meet (meetLink) yoki foydalanuvchi qo'lda kiritgan (link).
+  const joinLink = meeting?.meetLink || meeting?.link || null;
+  const copyMeet = () => { navigator.clipboard?.writeText(joinLink); toast.success('Havola nusxalandi'); };
 
   const send = () => {
     if (!reason.trim()) { toast.error('Sabab kiriting'); return; }
@@ -71,17 +73,13 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
           <div className="flex flex-wrap gap-4 text-sm text-text-sub">
             <span className="inline-flex items-center gap-1.5"><Calendar className="h-4 w-4 text-icon-soft" />{formatDate(meeting.startAt, true)}</span>
             {meeting.duration && <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4 text-icon-soft" />{meeting.duration} daqiqa</span>}
-            {/* "Havola" faqat qo'lda kiritilgan va Meet havolasidan FARQLI bo'lsa ko'rsatiladi (takror bo'lmasligi uchun). */}
-            {meeting.link && meeting.link !== meeting.meetLink && (
-              <a href={meeting.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-text-accent hover:underline"><ExternalLink className="h-4 w-4" />Havola</a>
-            )}
           </div>
 
-          {meeting.meetLink && (
+          {joinLink && (
             <div className="flex flex-wrap items-center gap-2">
-              <a href={meeting.meetLink} target="_blank" rel="noreferrer"
+              <a href={joinLink} target="_blank" rel="noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg bg-accent-strong px-4 py-2 text-sm font-semibold text-text-white transition-colors hover:bg-accent-sub">
-                <Video className="h-4 w-4" /> Google Meet'ga kirish
+                <Video className="h-4 w-4" /> {meeting.meetLink ? "Google Meet'ga kirish" : 'Yig\'ilish havolasiga kirish'}
               </a>
               <Button variant="outline" size="icon" onClick={copyMeet} title="Havolani nusxalash"><Copy className="h-4 w-4" /></Button>
             </div>
