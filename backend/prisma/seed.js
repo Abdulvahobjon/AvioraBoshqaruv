@@ -14,6 +14,15 @@ const PASSWORD = process.env.SEED_DEFAULT_PASSWORD || 'Aviora2026!';
 const sum = (uzs) => BigInt(Math.round(uzs * 100));
 
 async function main() {
+  // ── Idempotentlik: DB allaqachon seed qilingan bo'lsa, qaytadan urinmaymiz ──
+  // (startup buyrug'i har konteyner ishga tushganda seed'ni chaqiradi; aks holda
+  //  unique constraint xatosi bilan yiqilib, backend umuman ko'tarilmaydi.)
+  const existingUsers = await prisma.user.count();
+  if (existingUsers > 0) {
+    console.log(`ℹ️  Seed o'tkazib yuborildi — bazada allaqachon ${existingUsers} ta foydalanuvchi bor.`);
+    return;
+  }
+
   console.log('🌱 Seeding...');
   const passwordHash = await bcrypt.hash(PASSWORD, 10);
 
