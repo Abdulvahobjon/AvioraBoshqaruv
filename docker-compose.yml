@@ -1,7 +1,10 @@
 # ─────────────────────────────────────────────────────────
 #  AVIORA — Server deploy (Docker Compose)
-#  Frontend → 9000 · Backend → 9001 · Postgres → ichki (tashqariga ochilmaydi)
-#  Server IP: 157.180.46.214  (o'zingiznikiga tekshiring!)
+#  Reverse-proxy: serverdagi MAVJUD host nginx (80/443 band).
+#  Frontend → https://boshqaruv.aviorahr.uz      (host nginx → 127.0.0.1:9000)
+#  Backend  → https://apiboshqaruv.aviorahr.uz   (host nginx → 127.0.0.1:9001)
+#  Postgres → faqat ichki tarmoq (host portga chiqmaydi).
+#  SSL: certbot (Let's Encrypt) host nginx orqali.
 #  Ishga tushirish:  docker compose up -d --build
 # ─────────────────────────────────────────────────────────
 services:
@@ -39,7 +42,7 @@ services:
       JWT_REFRESH_EXPIRES: 7d
       PORT: 3000
       NODE_ENV: production
-      CORS_ORIGIN: http://157.180.46.214:9000
+      CORS_ORIGIN: https://boshqaruv.aviorahr.uz
       UPLOAD_DIR: uploads
       SEED_DEFAULT_PASSWORD: Aviora2026!
       # ── Google Meet (ixtiyoriy — yoqmoqchi bo'lsangiz izohni oching va to'ldiring) ──
@@ -50,8 +53,9 @@ services:
       # GOOGLE_REFRESH_TOKEN_ASOSITLLM: "1//0..."
     volumes:
       - aviora_uploads:/app/uploads
+    # Faqat localhost'ga ochamiz — host nginx 127.0.0.1:9001 orqali ulanadi (tashqaridan to'g'ridan-to'g'ri kirib bo'lmaydi)
     ports:
-      - "9001:3000"
+      - "127.0.0.1:9001:3000"
     command: sh -c "npx prisma migrate deploy && npm run prisma:seed && node dist/main.js"
 
   frontend:
@@ -59,13 +63,14 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://157.180.46.214:9001
+        VITE_API_URL: https://apiboshqaruv.aviorahr.uz
     container_name: aviora-frontend
     restart: unless-stopped
     depends_on:
       - backend
+    # Faqat localhost'ga ochamiz — host nginx 127.0.0.1:9000 orqali ulanadi
     ports:
-      - "9000:80"
+      - "127.0.0.1:9000:80"
 
 volumes:
   aviora_pg_data:
