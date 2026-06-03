@@ -1,8 +1,9 @@
 # ─────────────────────────────────────────────────────────
 #  AVIORA — Server deploy (Docker Compose)
 #  Reverse-proxy: serverdagi MAVJUD host nginx (80/443 band).
-#  Frontend → https://boshqaruv.aviorahr.uz      (host nginx → 127.0.0.1:9000)
-#  Backend  → https://apiboshqaruv.aviorahr.uz   (host nginx → 127.0.0.1:9001)
+#  BITTA DOMEN, path orqali ajratilgan:
+#  Frontend → https://avioraerp.asosit.uz        (host nginx → 127.0.0.1:9000)
+#  Backend  → https://avioraerp.asosit.uz/api    (host nginx → 127.0.0.1:9001)
 #  Postgres → faqat ichki tarmoq (host portga chiqmaydi).
 #  SSL: certbot (Let's Encrypt) host nginx orqali.
 #  Ishga tushirish:  docker compose up -d --build
@@ -42,7 +43,7 @@ services:
       JWT_REFRESH_EXPIRES: 7d
       PORT: 3000
       NODE_ENV: production
-      CORS_ORIGIN: https://boshqaruv.aviorahr.uz
+      CORS_ORIGIN: https://avioraerp.asosit.uz
       UPLOAD_DIR: uploads
       SEED_DEFAULT_PASSWORD: Aviora2026!
       # ── Google Meet (ixtiyoriy — yoqmoqchi bo'lsangiz izohni oching va to'ldiring) ──
@@ -63,7 +64,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: https://apiboshqaruv.aviorahr.uz
+        VITE_API_URL: https://avioraerp.asosit.uz
     container_name: aviora-frontend
     restart: unless-stopped
     depends_on:
