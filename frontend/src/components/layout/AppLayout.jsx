@@ -5,7 +5,9 @@ import { cn } from '@/lib/utils/cn';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { useUiStore } from '@/store/uiStore';
+import { useAuthStore } from '@/store/authStore';
 import { useNotificationSocket } from '@/features/notifications/notificationsApi';
+import { useMe } from '@/features/auth/authApi';
 
 export function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -13,6 +15,8 @@ export function AppLayout() {
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const setCollapsed = useUiStore((s) => s.setSidebarCollapsed);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
+  const token = useAuthStore((s) => s.accessToken);
+  useMe(!!token); // foydalanuvchi profili/roli har sessiyada qayta tekshiriladi (admin rolni o'zgartirsa yangilanadi)
   useNotificationSocket(); // real-time bildirishnomalar
 
   return (

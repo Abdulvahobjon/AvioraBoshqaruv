@@ -1,21 +1,21 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Calendar, Clock, ExternalLink, ChevronDown, ChevronUp, Send, CheckCircle2, Video } from 'lucide-react';
+import { Calendar, Clock, ExternalLink, ChevronDown, ChevronUp, Send, CheckCircle2, Video, Copy } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { cn } from '@/lib/utils/cn';
 import { formatDate } from '@/lib/utils/format';
 import { apiError } from '@/lib/api/axios';
 import { useAuthStore } from '@/store/authStore';
 import { useMeeting, useSubmitReason } from './meetingsApi';
+import { MeetingStatusBadge } from './MeetingStatusBadge';
 
 function attendanceMeta(a) {
-  if (a.attended) return { label: 'Qatnashdi', tone: 'info' };
-  if (a.absenceReason) return { label: 'Qatnashmadi | Sababli', tone: 'success' };
+  if (a.attended) return { label: 'Qatnashdi', tone: 'success' };
+  if (a.absenceReason) return { label: 'Qatnashmadi | Sababli', tone: 'warning' };
   return { label: 'Qatnashmadi | Sababsiz', tone: 'error' };
 }
 
@@ -30,6 +30,8 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
   // Creator (or admin) can finish a meeting that isn't finished yet.
   const canFinish = !!meeting && !meeting.finishedAt && !!onFinish &&
     (meeting.createdBy === myId || ['superadmin', 'admin'].includes(role));
+
+  const copyMeet = () => { navigator.clipboard?.writeText(meeting.meetLink); toast.success('Havola nusxalandi'); };
 
   const send = () => {
     if (!reason.trim()) { toast.error('Sabab kiriting'); return; }
@@ -58,10 +60,10 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
       ) : (
         <div className="space-y-5">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-lg font-semibold text-text-strong">{meeting.title}</h3>
               {meeting.uid && <Badge tone="muted">{meeting.uid}</Badge>}
-              {meeting.finishedAt ? <Badge tone="success">Yakunlangan</Badge> : <Badge tone="warning">Rejada</Badge>}
+              <MeetingStatusBadge meeting={meeting} />
             </div>
             <p className="mt-1 text-sm text-text-sub">{meeting.project?.name || 'Umumiy yig\'ilish'}</p>
           </div>
@@ -69,14 +71,20 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
           <div className="flex flex-wrap gap-4 text-sm text-text-sub">
             <span className="inline-flex items-center gap-1.5"><Calendar className="h-4 w-4 text-icon-soft" />{formatDate(meeting.startAt, true)}</span>
             {meeting.duration && <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4 text-icon-soft" />{meeting.duration} daqiqa</span>}
-            {meeting.link && <a href={meeting.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-text-accent hover:underline"><ExternalLink className="h-4 w-4" />Havola</a>}
+            {/* "Havola" faqat qo'lda kiritilgan va Meet havolasidan FARQLI bo'lsa ko'rsatiladi (takror bo'lmasligi uchun). */}
+            {meeting.link && meeting.link !== meeting.meetLink && (
+              <a href={meeting.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-text-accent hover:underline"><ExternalLink className="h-4 w-4" />Havola</a>
+            )}
           </div>
 
           {meeting.meetLink && (
-            <a href={meeting.meetLink} target="_blank" rel="noreferrer"
-              className="inline-flex w-fit items-center gap-2 rounded-lg bg-accent-strong px-4 py-2 text-sm font-semibold text-text-white transition-colors hover:bg-accent-sub">
-              <Video className="h-4 w-4" /> Google Meet'ga kirish
-            </a>
+            <div className="flex flex-wrap items-center gap-2">
+              <a href={meeting.meetLink} target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-lg bg-accent-strong px-4 py-2 text-sm font-semibold text-text-white transition-colors hover:bg-accent-sub">
+                <Video className="h-4 w-4" /> Google Meet'ga kirish
+              </a>
+              <Button variant="outline" size="icon" onClick={copyMeet} title="Havolani nusxalash"><Copy className="h-4 w-4" /></Button>
+            </div>
           )}
 
           {meeting.content && <p className="rounded-lg bg-bg-1 p-3 text-sm text-text-sub">{meeting.content}</p>}
@@ -128,24 +136,6 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
               })}
               {!meeting.attendance.length && <p className="text-sm text-text-soft">Ishtirokchilar yo'q</p>}
             </div>
-          </div>
-
-          <div className="flex items-center justify-between border-t border-stroke-sub pt-4">
-            <span className="text-sm text-text-sub">Tugatildimi?</span>
-            {canFinish ? (
-              <button
-                type="button"
-                onClick={() => onFinish(meeting.id)}
-                title="Yig'ilishni yakunlash"
-                className="h-6 w-11 rounded-full bg-bg-3 p-0.5 transition-colors hover:bg-bg-3-alt"
-              >
-                <span className="block h-5 w-5 rounded-full bg-white transition-transform" />
-              </button>
-            ) : (
-              <span className={cn('h-6 w-11 rounded-full p-0.5 transition-colors', meeting.finishedAt ? 'bg-accent-strong' : 'bg-bg-3')}>
-                <span className={cn('block h-5 w-5 rounded-full bg-white transition-transform', meeting.finishedAt && 'translate-x-5')} />
-              </span>
-            )}
           </div>
         </div>
       )}

@@ -27,6 +27,13 @@ function hhmmToMinutes(v) {
   const [h, m] = v.split(':').map(Number);
   return (h || 0) * 60 + (m || 0);
 }
+// Saqlangan ISO (UTC) ni <input type="datetime-local"> uchun LOKAL "YYYY-MM-DDTHH:mm" ga.
+function isoToLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const p = (x) => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 
 export function TaskFormDialog({ open, onClose, task }) {
   const isEdit = !!task;
@@ -49,7 +56,7 @@ export function TaskFormDialog({ open, onClose, task }) {
             status: task.status, priority: task.priority, type: task.type,
             assigneeId: task.assigneeId || '', positionId: task.positionId || '',
             sprint: task.sprint || '', price: fromTiyin(task.price), penaltyPercent: task.penaltyPercent || '',
-            deadline: task.deadline ? task.deadline.slice(0, 16) : '', estimated: minutesToHHMM(task.estimatedMinutes),
+            deadline: isoToLocalInput(task.deadline), estimated: minutesToHHMM(task.estimatedMinutes),
           }
         : {
             projectId: '', title: '', description: '', status: 'todo', priority: 'medium', type: 'feature',
@@ -73,7 +80,8 @@ export function TaskFormDialog({ open, onClose, task }) {
       sprint: v.sprint ? Number(v.sprint) : undefined,
       price: toTiyin(v.price || 0),
       penaltyPercent: v.penaltyPercent ? Number(v.penaltyPercent) : undefined,
-      deadline: v.deadline || undefined,
+      // Lokal vaqtni absolyut ISO (UTC) ga aylantiramiz — backend to'g'ri saqlaydi (±5 soat siljish yo'q).
+      deadline: v.deadline ? new Date(v.deadline).toISOString() : undefined,
       estimatedMinutes: hhmmToMinutes(v.estimated),
     };
     try {

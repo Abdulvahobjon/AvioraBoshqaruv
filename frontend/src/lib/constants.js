@@ -119,10 +119,10 @@ export const AUDIT_ACTION = {
 
 // Badge tone -> token-asosli klasslar
 export const TONE_CLASSES = {
-  success: 'bg-bg-2 text-text-accent',
+  success: 'bg-success-soft text-success-strong',
   info: 'bg-accent-disabled text-accent-strong',
   error: 'bg-error-soft text-error-strong',
-  warning: 'bg-bg-2-alt text-text-strong',
+  warning: 'bg-warning-soft text-warning-strong',
   neutral: 'bg-bg-2 text-text-sub',
   muted: 'bg-bg-1-alt text-text-soft',
 };

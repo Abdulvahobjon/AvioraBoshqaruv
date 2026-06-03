@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export interface JwtPayload {
   sub: number;
   role: string;
+  tv?: number; // tokenVersion (refresh tokenni bekor qilish uchun)
 }
 
 @Injectable()

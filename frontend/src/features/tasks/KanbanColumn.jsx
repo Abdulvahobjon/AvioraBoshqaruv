@@ -1,22 +1,19 @@
 import { Droppable } from '@hello-pangea/dnd';
-import { Plus, MoreHorizontal } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { TaskCard } from './TaskCard';
 
 /** Trello-style list: fixed-width grey column with a header, a droppable card area and an add footer. */
 export function KanbanColumn({ column, tasks, onCardClick, onAddCard, canAdd }) {
   return (
-    <div className="flex h-full min-w-0 flex-1 flex-col rounded-xl bg-bg-2">
+    <div className="flex h-full min-w-[260px] flex-1 flex-col rounded-xl bg-bg-2">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5">
         <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: column.dot }} />
         <span className="truncate text-sm font-semibold text-text-strong">{column.label}</span>
-        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-bg-3 px-1.5 text-xs font-semibold text-text-sub">
+        <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-bg-3 px-1.5 text-xs font-semibold text-text-sub">
           {tasks.length}
         </span>
-        <button className="ml-auto rounded p-1 text-icon-soft transition-colors hover:bg-bg-3" title="Amallar">
-          <MoreHorizontal className="h-4 w-4" />
-        </button>
       </div>
 
       {/* Droppable card area */}

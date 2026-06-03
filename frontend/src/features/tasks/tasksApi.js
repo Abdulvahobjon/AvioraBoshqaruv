@@ -23,7 +23,7 @@ export function useTasks(filters = {}) {
 
 export function useTask(id) {
   return useQuery({
-    queryKey: ['task', id],
+    queryKey: ['task', Number(id)],
     enabled: !!id,
     queryFn: async () => {
       const { data } = await api.get(`/tasks/${id}`);
@@ -80,7 +80,7 @@ export function useReviewTask() {
     },
     onSuccess: (_d, vars) => {
       invalidateLists(qc);
-      qc.invalidateQueries({ queryKey: ['task', String(vars.id)] });
+      qc.invalidateQueries({ queryKey: ['task', Number(vars.id)] });
     },
   });
 }
@@ -92,7 +92,7 @@ export function useAddComment() {
       const { data } = await api.post(`/tasks/${id}/comments`, { body });
       return data;
     },
-    onSuccess: (_d, vars) => qc.invalidateQueries({ queryKey: ['task', String(vars.id)] }),
+    onSuccess: (_d, vars) => qc.invalidateQueries({ queryKey: ['task', Number(vars.id)] }),
   });
 }
 
@@ -107,7 +107,7 @@ export function useUploadFile() {
       });
       return data;
     },
-    onSuccess: (_d, vars) => qc.invalidateQueries({ queryKey: ['task', String(vars.id)] }),
+    onSuccess: (_d, vars) => qc.invalidateQueries({ queryKey: ['task', Number(vars.id)] }),
   });
 }
 

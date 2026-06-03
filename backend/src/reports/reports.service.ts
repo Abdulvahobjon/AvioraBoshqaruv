@@ -28,6 +28,15 @@ export class ReportsService {
     return w;
   }
 
+  /**
+   * UZS kursini BIR MARTA olib, sinxron konverter qaytaradi (N+1 await oldini olish).
+   * Currency faqat UZS/USD, shuning uchun bitta USD kurs yetarli.
+   */
+  private async uzsConverter() {
+    const usdRate = BigInt(await this.currencies.getRate('USD'));
+    return (amount: bigint, code: string) => (code === 'USD' ? amount * usdRate : amount);
+  }
+
   /** Per-project budget: price vs shares vs profit (all in UZS). */
   async projects(r: Range) {
     const projects = await this.prisma.project.findMany({
@@ -36,11 +45,12 @@ export class ReportsService {
       orderBy: { createdAt: 'desc' },
     });
 
+    const toUzs = await this.uzsConverter();
     const rows: any[] = [];
     for (const p of projects) {
-      const priceUzs = await this.currencies.toUzs(p.price, p.currency);
+      const priceUzs = toUzs(p.price, p.currency);
       let sharesUzs = 0n;
-      for (const m of p.members) sharesUzs += await this.currencies.toUzs(m.shareAmount, m.shareCurrency);
+      for (const m of p.members) sharesUzs += toUzs(m.shareAmount, m.shareCurrency);
       const profitUzs = priceUzs - sharesUzs;
       rows.push({
         id: p.id,
@@ -62,9 +72,10 @@ export class ReportsService {
 
   /** Company finance summary: income (client payments) vs expenses vs payroll → net. */
   async finance(r: Range) {
+    const toUzs = await this.uzsConverter();
     const payments = await this.prisma.clientPayment.findMany({ where: this.dateWhere(r, 'date') });
     let income = 0n;
-    for (const p of payments) income += await this.currencies.toUzs(p.amount, p.currency);
+    for (const p of payments) income += toUzs(p.amount, p.currency);
 
     const expenses = await this.prisma.expense.findMany({ where: this.dateWhere(r, 'date') });
     const expenseTotal = expenses.reduce((a, e) => a + e.amountUzs, 0n);
@@ -79,7 +90,7 @@ export class ReportsService {
       select: { price: true, currency: true },
     });
     let expectedIncome = 0n;
-    for (const p of pendingProjects) expectedIncome += await this.currencies.toUzs(p.price, p.currency);
+    for (const p of pendingProjects) expectedIncome += toUzs(p.price, p.currency);
 
     const net = income - expenseTotal - payrollTotal;
     return {
@@ -167,6 +178,7 @@ export class ReportsService {
       orderBy: { fullName: 'asc' },
     });
 
+    const toUzs = await this.uzsConverter();
     let rows: any[] = [];
     for (const u of users) {
       const tasks = { todo: 0, in_progress: 0, overdue: 0, done: 0, production: 0, checked: 0, rejected: 0 };
@@ -180,7 +192,7 @@ export class ReportsService {
       }
 
       let reqTotal = 0n;
-      for (const r of u.financeRequests) reqTotal += await this.currencies.toUzs(r.amount, r.currency);
+      for (const r of u.financeRequests) reqTotal += toUzs(r.amount, r.currency);
       const payrollTotal = u.payrolls.reduce((a, p) => a + p.total, 0n);
 
       rows.push({
@@ -248,7 +260,8 @@ export class ReportsService {
           where: { date: { gte: start, lt: end } },
           select: { amount: true, currency: true },
         });
-        for (const p of payments) sum += await this.currencies.toUzs(p.amount, p.currency);
+        const toUzs = await this.uzsConverter();
+        for (const p of payments) sum += toUzs(p.amount, p.currency);
       }
       out.push({
         month: `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, '0')}`,

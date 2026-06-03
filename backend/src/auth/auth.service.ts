@@ -32,7 +32,7 @@ export class AuthService {
     }
 
     await this.audit.record({ userId: user.id, entity: 'Auth', action: 'LOGIN', ip });
-    const tokens = await this.issueTokens({ sub: user.id, role: user.role });
+    const tokens = await this.issueTokens({ sub: user.id, role: user.role, tv: user.tokenVersion });
     return { ...tokens, user: this.publicUser(user) };
   }
 
@@ -47,7 +47,9 @@ export class AuthService {
     }
     const user = await this.prisma.user.findFirst({ where: { id: payload.sub, status: 'active' } });
     if (!user) throw new UnauthorizedException('Foydalanuvchi topilmadi');
-    return this.issueTokens({ sub: user.id, role: user.role });
+    // tokenVersion mos kelmasa — token bekor qilingan (parol o'zgargan / chiqilgan).
+    if ((payload.tv ?? 0) !== user.tokenVersion) throw new UnauthorizedException('Refresh token bekor qilingan');
+    return this.issueTokens({ sub: user.id, role: user.role, tv: user.tokenVersion });
   }
 
   async me(userId: number) {
@@ -66,7 +68,8 @@ export class AuthService {
     if (!ok) throw new BadRequestException('Joriy parol noto\'g\'ri');
 
     const passwordHash = await bcrypt.hash(dto.newPassword, 10);
-    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+    // tokenVersion oshadi → eski refresh tokenlar darhol bekor bo'ladi.
+    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash, tokenVersion: { increment: 1 } } });
     await this.audit.record({ userId, entity: 'User', entityId: userId, action: 'CHANGE_PASSWORD', ip });
     return { message: 'Parol o\'zgartirildi' };
   }

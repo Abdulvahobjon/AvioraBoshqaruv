@@ -6,9 +6,12 @@ import { Skeleton } from '@/components/ui/Skeleton';
 export function StatCard({ icon: Icon, label, value, hint, tone = 'accent', loading = false, className, to }) {
   const iconTones = {
     accent: 'bg-accent-disabled text-accent-strong',
-    success: 'bg-bg-2 text-text-accent',
+    success: 'bg-success-soft text-success-strong',
+    warning: 'bg-warning-soft text-warning-strong',
     error: 'bg-error-soft text-error-strong',
+    info: 'bg-accent-disabled text-accent-strong',
     neutral: 'bg-bg-2 text-text-sub',
+    muted: 'bg-bg-1-alt text-text-soft',
   };
 
   if (loading) {

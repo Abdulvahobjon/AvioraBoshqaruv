@@ -4,6 +4,7 @@ import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-vali
 
 export class CreateFinanceRequestDto {
   @ApiProperty({ description: 'Summa (tiyin)' })
+  @IsInt({ message: 'Summa butun (tiyin) bo\'lsin' })
   @Min(1, { message: 'Summa 0 dan katta bo\'lsin' })
   amount: number;
 

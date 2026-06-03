@@ -9,11 +9,14 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
+// Socket CORS — HTTP bilan bir xil aniq ro'yxat (process.env, decorator yuklanish vaqtida).
+const WS_ORIGINS = (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',').map((o) => o.trim()).filter(Boolean);
+
 /**
  * Socket.io gateway. Clients connect with `auth.token` (JWT access token).
  * Each user joins a room `user:<id>`; server emits notifications to that room.
  */
-@WebSocketGateway({ cors: { origin: true, credentials: true } })
+@WebSocketGateway({ cors: { origin: WS_ORIGINS, credentials: true } })
 export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
   private readonly logger = new Logger('WS');

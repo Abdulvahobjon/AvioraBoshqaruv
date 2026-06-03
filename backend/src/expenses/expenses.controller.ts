@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query,
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ExpensesService } from './expenses.service';
+import { CreateExpenseDto, UpdateExpenseDto } from './dto/expense.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 
@@ -18,12 +19,12 @@ export class ExpensesController {
   }
 
   @Post()
-  create(@Body() dto: any, @CurrentUser() user: AuthUser, @Req() req: Request) {
+  create(@Body() dto: CreateExpenseDto, @CurrentUser() user: AuthUser, @Req() req: Request) {
     return this.expenses.create(dto, user, req.ip);
   }
 
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: any, @CurrentUser() user: AuthUser, @Req() req: Request) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateExpenseDto, @CurrentUser() user: AuthUser, @Req() req: Request) {
     return this.expenses.update(id, dto, user, req.ip);
   }
 

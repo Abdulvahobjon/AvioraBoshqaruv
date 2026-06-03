@@ -4,7 +4,7 @@ import { io } from 'socket.io-client';
 import { toast } from 'sonner';
 import { FolderOpen, Wallet, CalendarClock, AlertTriangle, Bell } from 'lucide-react';
 import { api } from '@/lib/api/axios';
-import { useAuthStore } from '@/store/authStore';
+import { getAuth, useAuthStore } from '@/store/authStore';
 import { formatMoney } from '@/lib/utils/format';
 
 /**
@@ -85,13 +85,18 @@ export function notifLink(n) {
 
 /** Connects to the Socket.io gateway and refreshes notifications on push. */
 export function useNotificationSocket() {
-  const token = useAuthStore((s) => s.accessToken);
+  // Faqat auth bor/yo'qligiga bog'lanamiz (token qiymatiga emas) — token-refresh socket'ni uzmaydi.
+  const isAuthed = useAuthStore((s) => !!s.accessToken);
   const qc = useQueryClient();
 
   useEffect(() => {
-    if (!token) return;
+    if (!isAuthed) return;
     const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-    const socket = io(base, { auth: { token }, transports: ['websocket'] });
+    const socket = io(base, {
+      transports: ['websocket'],
+      // Token har ulanish/qayta-ulanishda store'dan yangi o'qiladi.
+      auth: (cb) => cb({ token: getAuth().accessToken }),
+    });
 
     socket.on('notification', (n) => {
       toast.info(describeNotification(n).title);
@@ -99,5 +104,5 @@ export function useNotificationSocket() {
     });
 
     return () => socket.disconnect();
-  }, [token, qc]);
+  }, [isAuthed, qc]);
 }

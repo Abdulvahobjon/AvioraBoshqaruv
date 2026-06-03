@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -48,13 +48,16 @@ export class UsersService {
     if (q.search) {
       where.fullName = { contains: q.search, mode: 'insensitive' };
     }
+    // Faqat ruxsat etilgan ustunlar bo'yicha saralash (noto'g'ri ustun Prisma 500 beradi).
+    const sortCol = ['fullName', 'createdAt', 'role', 'fixedSalary', 'balance'].includes(q.sortBy as string) ? (q.sortBy as string) : 'createdAt';
+    const sortDir = q.sortOrder === 'asc' ? 'asc' : 'desc';
     const [items, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
         select: userSelect,
         skip: (q.page - 1) * q.limit,
         take: q.limit,
-        orderBy: { [q.sortBy || 'createdAt']: q.sortOrder },
+        orderBy: { [sortCol]: sortDir },
       }),
       this.prisma.user.count({ where }),
     ]);
@@ -67,7 +70,11 @@ export class UsersService {
     return user;
   }
 
-  async create(dto: CreateUserDto, actorId: number, ip?: string) {
+  async create(dto: CreateUserDto, actorId: number, actorRole: string, ip?: string) {
+    // Privilege escalation himoyasi: faqat superadmin 'superadmin' rolini bera oladi.
+    if (dto.role === 'superadmin' && actorRole !== 'superadmin') {
+      throw new ForbiddenException('Faqat superadmin superadmin rolini bera oladi');
+    }
     const exists = await this.prisma.user.findFirst({ where: { fullName: dto.fullName } });
     if (exists) throw new BadRequestException('Bu login allaqachon mavjud');
 
@@ -87,9 +94,15 @@ export class UsersService {
     return user;
   }
 
-  async update(id: number, dto: UpdateUserDto, actorId: number, ip?: string) {
+  async update(id: number, dto: UpdateUserDto, actorId: number, actorRole: string, ip?: string) {
     const before = await this.prisma.user.findFirst({ where: { id }, select: userSelect });
     if (!before) throw new NotFoundException('Foydalanuvchi topilmadi');
+
+    // Privilege escalation himoyasi (superadmin bo'lmaganlar uchun):
+    if (actorRole !== 'superadmin') {
+      if (before.role === 'superadmin') throw new ForbiddenException('Superadmin foydalanuvchini faqat superadmin tahrirlay oladi');
+      if (dto.role === 'superadmin') throw new ForbiddenException('Faqat superadmin superadmin rolini bera oladi');
+    }
 
     const data: any = {};
     if (dto.fullName !== undefined) data.fullName = dto.fullName;
@@ -97,7 +110,10 @@ export class UsersService {
     if (dto.positionId !== undefined) data.positionId = dto.positionId;
     if (dto.fixedSalary !== undefined) data.fixedSalary = BigInt(dto.fixedSalary);
     if (dto.status !== undefined) data.status = dto.status;
-    if (dto.password) data.passwordHash = await bcrypt.hash(dto.password, 10);
+    if (dto.password) {
+      data.passwordHash = await bcrypt.hash(dto.password, 10);
+      data.tokenVersion = { increment: 1 }; // parol reset qilinsa eski refresh tokenlar bekor bo'ladi
+    }
     for (const f of PROFILE_FIELDS) {
       if ((dto as any)[f] !== undefined) data[f] = (dto as any)[f] || null;
     }
@@ -111,9 +127,13 @@ export class UsersService {
     return user;
   }
 
-  async remove(id: number, actorId: number, ip?: string) {
+  async remove(id: number, actorId: number, actorRole: string, ip?: string) {
     const user = await this.prisma.user.findFirst({ where: { id } });
     if (!user) throw new NotFoundException('Foydalanuvchi topilmadi');
+    // Superadmin foydalanuvchini faqat superadmin o'chira oladi.
+    if (actorRole !== 'superadmin' && user.role === 'superadmin') {
+      throw new ForbiddenException('Superadmin foydalanuvchini faqat superadmin o\'chira oladi');
+    }
     await this.prisma.user.delete({ where: { id } }); // soft delete via middleware
     await this.audit.record({ userId: actorId, entity: 'User', entityId: id, action: 'DELETE', ip, oldValue: { fullName: user.fullName } });
     return { message: 'Foydalanuvchi o\'chirildi' };

@@ -33,7 +33,8 @@ export function ClientDetailPage() {
 
   if (!client) return <EmptyState fill title="Mijoz topilmadi" />;
 
-  const s = client.stats;
+  const s = client.stats || {};
+  const projects = client.projects || [];
   const pieData = Object.entries(s.typeBreakdown || {}).map(([name, value]) => ({ name, value }));
 
   return (
@@ -100,13 +101,13 @@ export function ClientDetailPage() {
 
         {/* Projects list */}
         <Card className="lg:col-span-2">
-          <CardHeader><CardTitle>Loyihalar ({client.projects.length})</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Loyihalar ({projects.length})</CardTitle></CardHeader>
           <CardContent>
-            {client.projects.length === 0 ? (
+            {projects.length === 0 ? (
               <EmptyState title="Loyihalar yo'q" description="Bu mijoz uchun hali loyiha yaratilmagan." />
             ) : (
               <div className="space-y-2">
-                {client.projects.map((p) => (
+                {projects.map((p) => (
                   <div
                     key={p.id}
                     onClick={() => navigate(`/projects/${p.id}`)}

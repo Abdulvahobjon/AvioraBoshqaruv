@@ -17,6 +17,9 @@ export class ClientsService {
   async findAll(q: PaginationDto & { regionId?: number; status?: string; managerId?: number }) {
     const page = Number(q.page) || 1;
     const limit = Number(q.limit) || 20;
+    // Faqat ruxsat etilgan ustunlar bo'yicha saralash (aks holda Prisma 500 beradi).
+    const sortCol = ['name', 'createdAt', 'status'].includes(q.sortBy as string) ? (q.sortBy as string) : 'createdAt';
+    const sortDir = q.sortOrder === 'asc' ? 'asc' : 'desc';
     const where: any = {};
     if (q.search) {
       where.OR = [
@@ -39,7 +42,7 @@ export class ClientsService {
         },
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: { [q.sortBy || 'createdAt']: q.sortOrder || 'desc' },
+        orderBy: { [sortCol]: sortDir },
       }),
       this.prisma.client.count({ where }),
     ]);

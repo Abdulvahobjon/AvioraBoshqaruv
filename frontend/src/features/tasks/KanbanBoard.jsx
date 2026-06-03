@@ -30,7 +30,8 @@ export function KanbanBoard({ tasks, onCardClick, onAddCard, canAdd }) {
   return (
     <DragDropContext onDragEnd={onDragEnd}>
       <div className="h-[calc(100vh-150px)] overflow-hidden rounded-xl bg-bg-1 p-2.5">
-        <div className="flex h-full gap-2">
+        {/* Mobil/planshetda ustunlar siqilmasin — gorizontal scroll bilan to'liq ko'rinadi. */}
+        <div className="flex h-full gap-2 overflow-x-auto scrollbar-none">
           {KANBAN_COLUMNS.map((col) => (
             <KanbanColumn
               key={col.status}

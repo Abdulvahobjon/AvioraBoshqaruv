@@ -49,8 +49,7 @@ const server = http.createServer(async (req, res) => {
       console.log('\n✅ REFRESH_TOKEN:\n');
       console.log(tokens.refresh_token);
       console.log('\nShu qiymatni .env ga qo\'ying:');
-      console.log('  • asositllm@gmail.com      →  GOOGLE_REFRESH_TOKEN_ASOSITLLM');
-      console.log('  • abdulvahob0714@gmail.com →  GOOGLE_REFRESH_TOKEN_ABDULVAHOB\n');
+      console.log('  • asositllm@gmail.com  →  GOOGLE_REFRESH_TOKEN_ASOSITLLM\n');
     }
   } catch (e) {
     res.writeHead(500); res.end('Xato: ' + (e.message || ''));

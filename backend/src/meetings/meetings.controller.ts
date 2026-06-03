@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { MeetingsService } from './meetings.service';
+import { CreateMeetingDto, UpdateMeetingDto } from './dto/meeting.dto';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('meetings')
@@ -15,17 +16,17 @@ export class MeetingsController {
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.meetings.findOne(id);
+  findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser) {
+    return this.meetings.findOne(id, user);
   }
 
   @Post()
-  create(@Body() dto: any, @CurrentUser() user: AuthUser) {
+  create(@Body() dto: CreateMeetingDto, @CurrentUser() user: AuthUser) {
     return this.meetings.create(dto, user);
   }
 
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: any, @CurrentUser() user: AuthUser) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateMeetingDto, @CurrentUser() user: AuthUser) {
     return this.meetings.update(id, dto, user);
   }
 

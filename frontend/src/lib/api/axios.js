@@ -40,6 +40,7 @@ api.interceptors.response.use(
         return new Promise((resolve, reject) => {
           queue.push({ resolve, reject });
         }).then((token) => {
+          original._retry = true; // qayta urinishda yana 401 bo'lsa refresh siklini boshlamasin
           original.headers.Authorization = `Bearer ${token}`;
           return api(original);
         });
@@ -60,7 +61,7 @@ api.interceptors.response.use(
       } catch (e) {
         processQueue(e, null);
         useAuthStore.getState().logout();
-        return Promise.reject(e);
+        return Promise.reject(error); // asl so'rov xatosini qaytaramiz (refresh xatosini emas)
       } finally {
         isRefreshing = false;
       }

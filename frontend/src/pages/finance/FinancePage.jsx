@@ -22,9 +22,17 @@ export function FinancePage() {
 
   const { data: balance, isLoading: balanceLoading } = useBalance();
   const action = useRequestAction();
+  const [pending, setPending] = useState(null); // { id, action } — amaldagi so'rov (dubl-bosishdan himoya)
 
-  const doAction = (id, act, okMsg) =>
-    action.mutate({ id, action: act }, { onSuccess: () => toast.success(okMsg), onError: (e) => toast.error(apiError(e)) });
+  const doAction = (id, act, okMsg) => {
+    if (action.isPending) return; // bir vaqtda faqat bitta amal
+    setPending({ id, action: act });
+    action.mutate({ id, action: act }, {
+      onSuccess: () => toast.success(okMsg),
+      onError: (e) => toast.error(apiError(e)),
+      onSettled: () => setPending(null),
+    });
+  };
 
   const tabs = [
     { value: 'mine', label: "Mening so'rovlarim" },
@@ -39,15 +47,15 @@ export function FinancePage() {
         actions={<Button onClick={() => setDialogOpen(true)}><Plus className="h-4 w-4" /> So'rov yuborish</Button>}
       />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <StatCard icon={Wallet} label="Mavjud balans" value={formatMoney(balance?.balance)} tone="accent" loading={balanceLoading} />
         <StatCard icon={Clock} label="Pending (tasdiqlanmagan)" value={formatMoney(balance?.pending)} tone="neutral" hint="To'langan, tasdiq kutilmoqda" loading={balanceLoading} />
       </div>
 
       <Tabs tabs={tabs} value={tab} onChange={setTab} className="mb-4" />
 
-      {tab === 'mine' && <MyRequests doAction={doAction} loading={action.isPending} />}
-      {tab === 'manage' && isAccountant && <ManageRequests doAction={doAction} loading={action.isPending} />}
+      {tab === 'mine' && <MyRequests doAction={doAction} pending={pending} busy={action.isPending} />}
+      {tab === 'manage' && isAccountant && <ManageRequests doAction={doAction} pending={pending} busy={action.isPending} />}
       {tab === 'ledger' && isAccountant && <LedgerTab />}
 
       <RequestDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />
@@ -59,7 +67,7 @@ function StatusBadge({ status }) {
   return <Badge tone={FINANCE_STATUS[status]?.tone}>{FINANCE_STATUS[status]?.label}</Badge>;
 }
 
-function MyRequests({ doAction, loading }) {
+function MyRequests({ doAction, pending, busy }) {
   const { data, isLoading } = useRequests();
   const columns = [
     { key: 'createdAt', header: 'Sana', render: (r) => formatDate(r.createdAt) },
@@ -70,7 +78,8 @@ function MyRequests({ doAction, loading }) {
     {
       key: 'actions', header: '',
       render: (r) => r.status === 'paid' ? (
-        <Button size="sm" onClick={() => doAction(r.id, 'confirm', 'Tasdiqlandi')} loading={loading}>
+        <Button size="sm" onClick={() => doAction(r.id, 'confirm', 'Tasdiqlandi')}
+          loading={pending?.id === r.id && pending?.action === 'confirm'} disabled={busy}>
           <CheckCircle2 className="h-4 w-4" /> Tasdiqlash
         </Button>
       ) : null,
@@ -79,7 +88,7 @@ function MyRequests({ doAction, loading }) {
   return <DataTable columns={columns} data={data} loading={isLoading} emptyTitle="So'rovlar yo'q" emptyDescription="Yangi so'rov yuborish uchun yuqoridagi tugmani bosing." />;
 }
 
-function ManageRequests({ doAction, loading }) {
+function ManageRequests({ doAction, pending, busy }) {
   const { data, isLoading } = useRequests();
   const columns = [
     { key: 'user', header: 'Xodim', render: (r) => r.user?.fullName },
@@ -92,8 +101,10 @@ function ManageRequests({ doAction, loading }) {
       key: 'actions', header: '',
       render: (r) => r.status === 'pending' ? (
         <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-          <Button size="sm" onClick={() => doAction(r.id, 'pay', "To'landi")} loading={loading}><Send className="h-4 w-4" /> To'lash</Button>
-          <Button size="sm" variant="ghost" className="text-error-strong" onClick={() => doAction(r.id, 'reject', 'Rad etildi')}><XCircle className="h-4 w-4" /></Button>
+          <Button size="sm" onClick={() => doAction(r.id, 'pay', "To'landi")}
+            loading={pending?.id === r.id && pending?.action === 'pay'} disabled={busy}><Send className="h-4 w-4" /> To'lash</Button>
+          <Button size="sm" variant="ghost" className="text-error-strong" onClick={() => doAction(r.id, 'reject', 'Rad etildi')}
+            loading={pending?.id === r.id && pending?.action === 'reject'} disabled={busy}><XCircle className="h-4 w-4" /></Button>
         </div>
       ) : null,
     },
@@ -104,6 +115,18 @@ function ManageRequests({ doAction, loading }) {
 function LedgerTab() {
   const { data, isLoading } = useLedger();
   const reverse = useReverseLedger();
+  const [reversingId, setReversingId] = useState(null);
+
+  const doReverse = (id) => {
+    if (reverse.isPending) return; // dubl-bosishdan himoya
+    setReversingId(id);
+    reverse.mutate({ id }, {
+      onSuccess: () => toast.success('Teskari yozuv qo\'shildi'),
+      onError: (e) => toast.error(apiError(e)),
+      onSettled: () => setReversingId(null),
+    });
+  };
+
   const columns = [
     { key: 'createdAt', header: 'Sana', render: (r) => formatDate(r.createdAt, true) },
     { key: 'user', header: 'Xodim', render: (r) => r.user?.fullName || '—' },
@@ -117,7 +140,7 @@ function LedgerTab() {
     {
       key: 'actions', header: '',
       render: (r) => !r.isReversal ? (
-        <Button size="sm" variant="ghost" onClick={() => reverse.mutate({ id: r.id }, { onSuccess: () => toast.success('Teskari yozuv qo\'shildi'), onError: (e) => toast.error(apiError(e)) })}>
+        <Button size="sm" variant="ghost" onClick={() => doReverse(r.id)} loading={reversingId === r.id} disabled={reverse.isPending}>
           <RotateCcw className="h-4 w-4" /> Teskari
         </Button>
       ) : <Badge tone="muted">Teskari</Badge>,

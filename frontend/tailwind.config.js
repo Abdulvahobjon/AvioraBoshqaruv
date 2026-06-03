@@ -55,6 +55,18 @@ export default {
           soft: 'var(--error-soft)',
           disabled: 'var(--error-disabled)',
         },
+        success: {
+          strong: 'var(--success-strong)',
+          sub: 'var(--success-sub)',
+          soft: 'var(--success-soft)',
+          disabled: 'var(--success-disabled)',
+        },
+        warning: {
+          strong: 'var(--warning-strong)',
+          sub: 'var(--warning-sub)',
+          soft: 'var(--warning-soft)',
+          disabled: 'var(--warning-disabled)',
+        },
       },
       borderColor: {
         DEFAULT: 'var(--stroke-sub)',

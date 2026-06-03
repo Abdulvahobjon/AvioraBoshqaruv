@@ -177,10 +177,20 @@ export class TasksService {
     await this.assertProjectAccess(existing.projectId, user);
 
     const prevAssignee = existing.assigneeId;
-    const data: any = { ...dto };
+    // Faqat ruxsat etilgan maydonlar (projectId/uid/createdBy kabilar yozilmaydi).
+    const data: any = {};
+    if (dto.title !== undefined) data.title = dto.title;
+    if (dto.description !== undefined) data.description = dto.description;
+    if (dto.assigneeId !== undefined) data.assigneeId = dto.assigneeId;
+    if (dto.status !== undefined) data.status = dto.status;
+    if (dto.priority !== undefined) data.priority = dto.priority;
+    if (dto.type !== undefined) data.type = dto.type;
+    if (dto.positionId !== undefined) data.positionId = dto.positionId;
+    if (dto.estimatedMinutes !== undefined) data.estimatedMinutes = dto.estimatedMinutes;
+    if (dto.sprint !== undefined) data.sprint = dto.sprint;
+    if (dto.penaltyPercent !== undefined) data.penaltyPercent = dto.penaltyPercent;
     if (dto.deadline !== undefined) data.deadline = dto.deadline ? new Date(dto.deadline) : null;
     if (dto.price !== undefined) data.price = BigInt(dto.price);
-    delete data.projectId;
 
     const task = await this.prisma.task.update({ where: { id }, data, include: this.taskInclude });
     await this.audit.record({ userId: user.id, entity: 'Task', entityId: id, action: 'UPDATE', ip });

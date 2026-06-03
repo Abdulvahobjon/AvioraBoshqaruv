@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
-import { Plus, X, UserPlus, Eye, CheckCircle2, Trash2, Check, Video, Search, Filter, Copy, Pencil } from 'lucide-react';
+import { Plus, X, UserPlus, Eye, CheckCircle2, Trash2, Video, Search, Filter, Copy, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
@@ -10,12 +10,11 @@ import { Input, Textarea, Select } from '@/components/ui/Input';
 import { FormField } from '@/components/ui/FormField';
 import { DateTimeBox } from '@/components/ui/DateTimeBox';
 import { Avatar } from '@/components/ui/Avatar';
-import { Badge } from '@/components/ui/Badge';
 import { Switch } from '@/components/ui/Switch';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { cn } from '@/lib/utils/cn';
-import { formatDate } from '@/lib/utils/format';
+import { formatDate, deadlineInfo } from '@/lib/utils/format';
 import { apiError } from '@/lib/api/axios';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAuthStore } from '@/store/authStore';
@@ -25,8 +24,26 @@ import { useMeetings, useCreateMeeting, useUpdateMeeting, useDeleteMeeting } fro
 import { ParticipantPicker } from '@/features/meetings/ParticipantPicker';
 import { MeetingDetailDialog } from '@/features/meetings/MeetingDetailDialog';
 import { AttendanceDialog } from '@/features/meetings/AttendanceDialog';
+import { MeetingStatusBadge } from '@/features/meetings/MeetingStatusBadge';
 
 const hasFilters = (f) => Object.values(f).some(Boolean);
+
+/** Ishtirokchilar avatarlarini zич (overlapping) ko'rsatadi; ortig'ini "+N" qiladi. */
+function AvatarStack({ people = [], max = 4 }) {
+  if (!people.length) return <span className="text-text-soft">—</span>;
+  const shown = people.slice(0, max);
+  const rest = people.length - shown.length;
+  return (
+    <div className="flex items-center" title={people.map((p) => p.fullName).join(', ')}>
+      <div className="flex -space-x-2">
+        {shown.map((p) => (
+          <Avatar key={p.id} name={p.fullName} src={p.avatar} size="sm" className="ring-2 ring-bg-1" />
+        ))}
+      </div>
+      {rest > 0 && <span className="ml-2 text-xs font-medium text-text-soft">+{rest}</span>}
+    </div>
+  );
+}
 
 export function MeetingsPage() {
   const user = useAuthStore((s) => s.user);
@@ -80,16 +97,23 @@ export function MeetingsPage() {
     },
     { key: 'creator', header: 'Tashkilotchi', render: (r) => r.creator?.fullName || '—' },
     { key: 'project', header: 'Loyiha', render: (r) => r.project?.name || 'Umumiy' },
-    { key: 'startAt', header: 'Boshlanish vaqti', render: (r) => formatDate(r.startAt, true) },
-    { key: 'status', header: 'Holati', render: (r) => <Badge tone={r.finishedAt ? 'success' : 'warning'}>{r.finishedAt ? 'Yakunlangan' : 'Rejada'}</Badge> },
     {
-      key: 'finished', header: 'Tugatildimi?', className: 'text-center',
-      render: (r) => (
-        <span className={cn('inline-flex h-7 w-7 items-center justify-center rounded-md text-text-white', r.finishedAt ? 'bg-[#22C55E]' : 'bg-error-strong')}>
-          {r.finishedAt ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
-        </span>
-      ),
+      key: 'startAt', header: 'Boshlanish vaqti',
+      render: (r) => {
+        const info = !r.finishedAt ? deadlineInfo(r.startAt) : null;
+        return (
+          <div className="leading-tight">
+            <div className="whitespace-nowrap text-text-strong">{formatDate(r.startAt, true)}</div>
+            {info && <div className={cn('text-xs', info.overdue ? 'text-error-strong' : 'text-text-soft')}>{info.text}</div>}
+          </div>
+        );
+      },
     },
+    {
+      key: 'participants', header: 'Ishtirokchilar',
+      render: (r) => <AvatarStack people={(r.attendance || []).map((a) => a.user).filter(Boolean)} />,
+    },
+    { key: 'status', header: 'Holati', render: (r) => <MeetingStatusBadge meeting={r} /> },
     {
       key: 'actions', header: '', className: 'w-12',
       render: (r) => {
@@ -294,7 +318,7 @@ function MeetingDialog({ open, onClose, meeting }) {
     >
       {created ? (
         <div className="flex flex-col items-center gap-4 py-6 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-bg-2 text-[#22C55E]"><CheckCircle2 className="h-8 w-8" /></span>
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-success-soft text-success-strong"><CheckCircle2 className="h-8 w-8" /></span>
           <div>
             <p className="text-lg font-semibold text-text-strong">Yig'ilish yaratildi</p>
             <p className="text-sm text-text-sub">"{created.title}" muvaffaqiyatli qo'shildi</p>
@@ -329,8 +353,8 @@ function MeetingDialog({ open, onClose, meeting }) {
             <FormField label="Jarima foizi (%)">
               <Input type="number" min="0" max="100" placeholder="0" {...register('penaltyPercent')} />
             </FormField>
-            <FormField label="Havolasi" className="sm:col-span-2">
-              <Input placeholder="Bo'sh qoldirsangiz Google Meet avtomatik yaratiladi" {...register('link')} />
+            <FormField label="Havolasi" className="sm:col-span-2" hint="Bo'sh qoldirsangiz, tizim avtomatik Google Meet havolasi ochib beradi.">
+              <Input placeholder="https://meet.google.com/...  (ixtiyoriy)" {...register('link')} />
             </FormField>
             <FormField label="Tavsifi" className="sm:col-span-2">
               <Textarea placeholder="Tavsifi yozing..." {...register('content')} />

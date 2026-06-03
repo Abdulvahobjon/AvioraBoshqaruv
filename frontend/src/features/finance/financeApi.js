@@ -45,6 +45,9 @@ export function useReverseLedger() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, note }) => (await api.post(`/finance/ledger/${id}/reverse`, { note })).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['ledger'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ledger'] });
+      qc.invalidateQueries({ queryKey: ['balance'] }); // teskari yozuv balansni o'zgartiradi
+    },
   });
 }

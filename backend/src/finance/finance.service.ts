@@ -79,7 +79,9 @@ export class FinanceService {
     if (req.status !== 'pending') throw new BadRequestException('Faqat kutilayotgan so\'rovni to\'lash mumkin');
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const u = await tx.financeRequest.update({ where: { id }, data: { status: 'paid', paidAt: new Date() } });
+      // Atomik holat almashinuvi: faqat hali 'pending' bo'lsa to'laymiz — parallel ikki to'lov dubl ledger yozmaydi.
+      const res = await tx.financeRequest.updateMany({ where: { id, status: 'pending' }, data: { status: 'paid', paidAt: new Date() } });
+      if (res.count === 0) throw new BadRequestException('Faqat kutilayotgan so\'rovni to\'lash mumkin');
       await tx.ledgerEntry.create({
         data: {
           requestId: id, userId: req.userId, amount: req.amount,
@@ -87,7 +89,7 @@ export class FinanceService {
           note: `To'lov: ${req.reason}`,
         },
       });
-      return u;
+      return tx.financeRequest.findFirst({ where: { id } });
     });
     await this.audit.record({ userId: actor.id, entity: 'FinanceRequest', entityId: id, action: 'PAY', ip });
     await this.notifications.notify(req.userId, 'request_paid', { requestId: id, amount: req.amount.toString() });
@@ -102,13 +104,15 @@ export class FinanceService {
     if (req.status !== 'paid') throw new BadRequestException('Faqat to\'langan so\'rovni tasdiqlash mumkin');
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const u = await tx.financeRequest.update({ where: { id }, data: { status: 'closed', confirmedAt: new Date() } });
+      // Atomik: faqat hali 'paid' bo'lsa yopamiz — parallel ikki tasdiq balansni ikki marta kamaytirmaydi.
+      const res = await tx.financeRequest.updateMany({ where: { id, status: 'paid' }, data: { status: 'closed', confirmedAt: new Date() } });
+      if (res.count === 0) throw new BadRequestException('Faqat to\'langan so\'rovni tasdiqlash mumkin');
       // Salary withdrawals reduce the user's owed balance.
       if (req.type === 'salary') {
         const uzs = await this.currencies.toUzs(req.amount, req.currency);
         await tx.user.update({ where: { id: req.userId }, data: { balance: { decrement: uzs } } });
       }
-      return u;
+      return tx.financeRequest.findFirst({ where: { id } });
     });
     await this.audit.record({ userId: user.id, entity: 'FinanceRequest', entityId: id, action: 'CONFIRM', ip });
     return updated;
@@ -121,7 +125,10 @@ export class FinanceService {
     const req = await this.prisma.financeRequest.findFirst({ where: { id } });
     if (!req) throw new NotFoundException('So\'rov topilmadi');
     if (req.status !== 'pending') throw new BadRequestException('Faqat kutilayotgan so\'rovni rad etish mumkin');
-    const updated = await this.prisma.financeRequest.update({ where: { id }, data: { status: 'rejected' } });
+    // Atomik: faqat hali 'pending' bo'lsa rad etamiz (dubl-bosish bir marta ishlaydi).
+    const res = await this.prisma.financeRequest.updateMany({ where: { id, status: 'pending' }, data: { status: 'rejected' } });
+    if (res.count === 0) throw new BadRequestException('Faqat kutilayotgan so\'rovni rad etish mumkin');
+    const updated = await this.prisma.financeRequest.findFirst({ where: { id } });
     await this.audit.record({ userId: actor.id, entity: 'FinanceRequest', entityId: id, action: 'REJECT', ip });
     await this.notifications.notify(req.userId, 'request_rejected', { requestId: id });
     return updated;
@@ -163,6 +170,9 @@ export class FinanceService {
     const entry = await this.prisma.ledgerEntry.findFirst({ where: { id: entryId } });
     if (!entry) throw new NotFoundException('Yozuv topilmadi');
     if (entry.isReversal) throw new BadRequestException('Teskari yozuvni qayta teskari qilib bo\'lmaydi');
+    // Bir yozuvni faqat bir marta teskari qilish mumkin (dubl-bosishdan himoya).
+    const already = await this.prisma.ledgerEntry.findFirst({ where: { reversedEntryId: entry.id } });
+    if (already) throw new BadRequestException('Bu yozuv allaqachon teskari qilingan');
 
     const reversal = await this.prisma.ledgerEntry.create({
       data: {

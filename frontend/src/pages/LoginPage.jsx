@@ -38,6 +38,7 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-bg-1 p-4">
       <button
         onClick={toggle}
+        aria-label="Mavzuni almashtirish"
         className="fixed right-4 top-4 rounded-md p-2 text-icon-sub hover:bg-bg-2"
       >
         {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}

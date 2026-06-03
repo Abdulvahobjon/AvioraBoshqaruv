@@ -22,6 +22,7 @@ export class ProjectMemberDto {
   roleInProject: ProjectRole;
 
   @ApiProperty({ description: 'Ulush summasi (tiyin)' })
+  @IsInt()
   @Min(0)
   shareAmount: number;
 
@@ -63,6 +64,7 @@ export class CreateProjectDto {
   status?: ProjectStatus;
 
   @ApiProperty({ description: 'Summa (tiyin)' })
+  @IsInt()
   @Min(0)
   price: number;
 

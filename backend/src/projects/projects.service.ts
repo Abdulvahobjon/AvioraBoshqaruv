@@ -31,6 +31,9 @@ export class ProjectsService {
 
     const page = Number(q.page) || 1;
     const limit = Number(q.limit) || 20;
+    // Faqat ruxsat etilgan ustunlar bo'yicha saralash (noto'g'ri ustun Prisma 500 beradi).
+    const sortCol = ['name', 'createdAt', 'price', 'deadline', 'status', 'progressPercent'].includes(q.sortBy) ? q.sortBy : 'createdAt';
+    const sortDir = q.sortOrder === 'asc' ? 'asc' : 'desc';
 
     const [items, total] = await Promise.all([
       this.prisma.project.findMany({
@@ -42,7 +45,7 @@ export class ProjectsService {
         },
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: { [q.sortBy || 'createdAt']: q.sortOrder || 'desc' },
+        orderBy: { [sortCol]: sortDir },
       }),
       this.prisma.project.count({ where }),
     ]);
@@ -151,10 +154,16 @@ export class ProjectsService {
     });
     for (const m of members) {
       const uzs = await this.currencies.toUzs(m.shareAmount, m.shareCurrency);
-      await this.prisma.$transaction([
-        this.prisma.user.update({ where: { id: m.userId }, data: { balance: { increment: uzs } } }),
-        this.prisma.projectMember.update({ where: { id: m.id }, data: { paidToBalance: true } }),
-        this.prisma.ledgerEntry.create({
+      await this.prisma.$transaction(async (tx) => {
+        // Atomik "claim": ulushni faqat hali to'lanmagan bo'lsagina belgilab olamiz.
+        // Parallel ikkita "completed" o'tkazish bir a'zoni ikki marta kreditlamasligini kafolatlaydi.
+        const claim = await tx.projectMember.updateMany({
+          where: { id: m.id, paidToBalance: false },
+          data: { paidToBalance: true },
+        });
+        if (claim.count === 0) return; // boshqa so'rov allaqachon kreditlagan
+        await tx.user.update({ where: { id: m.userId }, data: { balance: { increment: uzs } } });
+        await tx.ledgerEntry.create({
           data: {
             userId: m.userId,
             amount: uzs,
@@ -162,8 +171,8 @@ export class ProjectsService {
             direction: 'credit',
             note: `Loyiha ulushi (project #${projectId})`,
           },
-        }),
-      ]);
+        });
+      });
     }
   }
 

@@ -24,6 +24,7 @@ export class CreateUserDto {
 
   @ApiPropertyOptional({ description: 'Fiks oylik (tiyin)' })
   @IsOptional()
+  @IsInt()
   @Min(0)
   fixedSalary?: number;
 

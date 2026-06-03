@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { PageLoader } from '@/components/shared/PageLoader';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { MoneyInput } from '@/components/ui/MoneyInput';
 import { FormField } from '@/components/ui/FormField';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
@@ -92,7 +93,7 @@ export function UserDetailPage() {
           <Input value={f.fullName} onChange={(e) => set('fullName', e.target.value)} />
         </FormField>
         <FormField label="Parol (yangi, ixtiyoriy)">
-          <Input placeholder="O'zgartirish uchun kiriting" value={f.password} onChange={(e) => set('password', e.target.value)} />
+          <PasswordInput placeholder="O'zgartirish uchun kiriting" value={f.password} onChange={(e) => set('password', e.target.value)} />
         </FormField>
         <FormField label="Oylik maosh (UZS)">
           <MoneyInput value={f.fixedSalary} onChange={(v) => set('fixedSalary', v)} />
@@ -144,7 +145,7 @@ export function UserDetailPage() {
         <FormField label="1.Havola">
           <Input placeholder="Github havola" value={f.link1} onChange={(e) => set('link1', e.target.value)} />
         </FormField>
-        <FormField label={<span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-[#22C55E]" /> Lavozimi</span>}>
+        <FormField label="Lavozimi">
           <Select value={f.positionId} onChange={(e) => set('positionId', e.target.value)}>
             <option value="">Tanlang</option>
             {(positions || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -153,7 +154,7 @@ export function UserDetailPage() {
         <FormField label="2.Havola">
           <Input placeholder="Github havola" value={f.link2} onChange={(e) => set('link2', e.target.value)} />
         </FormField>
-        <FormField label={<span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-error-strong" /> Roli</span>}>
+        <FormField label="Roli">
           <Select value={f.role} onChange={(e) => set('role', e.target.value)}>
             {Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </Select>

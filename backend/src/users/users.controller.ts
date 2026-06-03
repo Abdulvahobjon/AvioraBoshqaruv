@@ -12,7 +12,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { Roles } from '../common/decorators/roles.decorator';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 
 const uploadStorage = diskStorage({
   destination: process.env.UPLOAD_DIR || 'uploads',
@@ -49,17 +49,17 @@ export class UsersController {
   }
 
   @Post()
-  create(@Body() dto: CreateUserDto, @CurrentUser('id') actorId: number, @Req() req: Request) {
-    return this.users.create(dto, actorId, req.ip);
+  create(@Body() dto: CreateUserDto, @CurrentUser() actor: AuthUser, @Req() req: Request) {
+    return this.users.create(dto, actor.id, actor.role, req.ip);
   }
 
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateUserDto, @CurrentUser('id') actorId: number, @Req() req: Request) {
-    return this.users.update(id, dto, actorId, req.ip);
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateUserDto, @CurrentUser() actor: AuthUser, @Req() req: Request) {
+    return this.users.update(id, dto, actor.id, actor.role, req.ip);
   }
 
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') actorId: number, @Req() req: Request) {
-    return this.users.remove(id, actorId, req.ip);
+  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() actor: AuthUser, @Req() req: Request) {
+    return this.users.remove(id, actor.id, actor.role, req.ip);
   }
 }

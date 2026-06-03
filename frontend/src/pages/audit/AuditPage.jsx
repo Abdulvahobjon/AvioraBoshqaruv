@@ -66,9 +66,7 @@ export function AuditPage() {
                   <Badge tone={AUDIT_ACTION[log.action]?.tone || 'neutral'}>{AUDIT_ACTION[log.action]?.label || log.action}</Badge>
                   <span className="text-sm text-text-sub">{log.entity}{log.entityId ? ` #${log.entityId}` : ''}</span>
                   {log.flagged && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-error-soft px-2 py-0.5 text-xs text-error-strong">
-                      <ShieldAlert className="h-3 w-3" /> Shubhali
-                    </span>
+                    <Badge tone="error" className="gap-1"><ShieldAlert className="h-3 w-3" /> Shubhali</Badge>
                   )}
                 </div>
                 <p className="mt-1 text-xs text-text-soft">{formatDate(log.createdAt, true)}{log.ip ? ` · ${log.ip}` : ''}</p>

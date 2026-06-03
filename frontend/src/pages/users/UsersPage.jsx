@@ -11,9 +11,8 @@ import { MoneyInput } from '@/components/ui/MoneyInput';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 import { FormField } from '@/components/ui/FormField';
 import { Avatar } from '@/components/ui/Avatar';
-import { Skeleton } from '@/components/ui/Skeleton';
+import { DataTable } from '@/components/shared/DataTable';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { EmptyState } from '@/components/shared/EmptyState';
 import { cn } from '@/lib/utils/cn';
 import { ROLE_LABELS } from '@/lib/constants';
 import { toTiyin } from '@/lib/utils/format';
@@ -82,6 +81,51 @@ export function UsersPage() {
 
   const pill = 'h-10 rounded-full px-4';
 
+  const columns = [
+    ...(selectMode ? [{
+      key: 'select', className: 'w-10',
+      header: (
+        <button onClick={toggleAll} aria-label="Barchasini tanlash" className="text-icon-sub">
+          {allSelected ? <CheckSquare className="h-4 w-4 text-icon-accent" /> : <Square className="h-4 w-4" />}
+        </button>
+      ),
+      render: (u) => (
+        <button onClick={(e) => { e.stopPropagation(); toggleSelect(u.id); }} aria-label="Tanlash">
+          {selected.includes(u.id) ? <CheckSquare className="h-4 w-4 text-icon-accent" /> : <Square className="h-4 w-4 text-icon-sub" />}
+        </button>
+      ),
+    }] : []),
+    { key: 'idx', header: '№', className: 'w-12', render: (_u, i) => <span className="text-text-soft">{i + 1}</span> },
+    {
+      key: 'name', header: 'Ism Sharifi',
+      render: (u) => (
+        <div className="flex items-center gap-2.5">
+          <Avatar name={u.fullName} src={fileUrl(u.avatar)} size="sm" />
+          <span className="font-medium text-text-strong">{u.fullName}</span>
+        </div>
+      ),
+    },
+    { key: 'position', header: 'Lavozim', render: (u) => <span className="text-text-sub">{u.position?.name || '—'}</span> },
+    { key: 'role', header: 'Rol', render: (u) => <span className="text-text-sub">{ROLE_LABELS[u.role]}</span> },
+    { key: 'salary', header: 'Oylik maosh (UZS)', className: 'text-right', cellClassName: 'text-right', render: (u) => <span className="font-semibold text-text-strong">{moneyUZS(u.fixedSalary)}</span> },
+    { key: 'balance', header: 'Balans (UZS)', className: 'text-right', cellClassName: 'text-right', render: (u) => <span className="text-text-sub">{moneyUZS(u.balance)}</span> },
+    {
+      key: 'status', header: 'Active', className: 'w-20 text-center', cellClassName: 'text-center',
+      render: (u) => (
+        <button
+          onClick={(e) => { e.stopPropagation(); toggleActive(u); }}
+          aria-label={u.status === 'active' ? 'Faolsizlantirish' : 'Faollashtirish'}
+          className={cn(
+            'inline-flex h-7 w-7 items-center justify-center rounded-md text-text-white transition-colors',
+            u.status === 'active' ? 'bg-success-strong' : 'bg-error-strong',
+          )}
+        >
+          {u.status === 'active' ? <Check className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
+        </button>
+      ),
+    },
+  ];
+
   return (
     <div>
       {/* "Yangi xodim" lives in the top navbar; "Tanlash" stays here. */}
@@ -125,66 +169,14 @@ export function UsersPage() {
         </div>
       )}
 
-      {isLoading ? (
-        <UsersSkeleton />
-      ) : rows.length === 0 ? (
-        <EmptyState fill title="Foydalanuvchilar yo'q" description="Yangi xodim qo'shing yoki filtrlarni o'zgartiring." />
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] text-sm">
-            <thead>
-              <tr className="border-b border-stroke-sub text-left text-text-sub">
-                {selectMode && (
-                  <th className="w-10 py-3 pl-1">
-                    <button onClick={toggleAll} className="text-icon-sub">{allSelected ? <CheckSquare className="h-4 w-4 text-icon-accent" /> : <Square className="h-4 w-4" />}</button>
-                  </th>
-                )}
-                <th className="w-12 py-3 font-medium">№</th>
-                <th className="py-3 font-medium">Ism Sharifi</th>
-                <th className="py-3 font-medium"><span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#22C55E]" /> Lavozim</span></th>
-                <th className="py-3 font-medium">Rol</th>
-                <th className="py-3 text-right font-medium">Oylik maosh (UZS)</th>
-                <th className="py-3 text-right font-medium">Balans (UZS)</th>
-                <th className="w-20 py-3 text-center font-medium">Active</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((u, i) => (
-                <tr
-                  key={u.id}
-                  onClick={() => navigate(`/users/${u.id}`)}
-                  className="cursor-pointer border-b border-stroke-soft transition-colors hover:bg-bg-1-alt"
-                >
-                  {selectMode && (
-                    <td className="py-3 pl-1" onClick={(e) => { e.stopPropagation(); toggleSelect(u.id); }}>
-                      {selected.includes(u.id) ? <CheckSquare className="h-4 w-4 text-icon-accent" /> : <Square className="h-4 w-4 text-icon-sub" />}
-                    </td>
-                  )}
-                  <td className="py-3 text-text-soft">{i + 1}</td>
-                  <td className="py-3">
-                    <div className="flex items-center gap-2.5">
-                      <Avatar name={u.fullName} src={fileUrl(u.avatar)} size="sm" />
-                      <span className="font-medium text-text-strong">{u.fullName}</span>
-                    </div>
-                  </td>
-                  <td className="py-3 text-text-sub">{u.position?.name || '—'}</td>
-                  <td className="py-3 text-text-sub">{ROLE_LABELS[u.role]}</td>
-                  <td className="py-3 text-right font-semibold text-text-strong">{moneyUZS(u.fixedSalary)}</td>
-                  <td className="py-3 text-right text-text-sub">{moneyUZS(u.balance)}</td>
-                  <td className="py-3 text-center" onClick={(e) => { e.stopPropagation(); toggleActive(u); }}>
-                    <span className={cn(
-                      'inline-flex h-7 w-7 items-center justify-center rounded-md text-text-white transition-colors',
-                      u.status === 'active' ? 'bg-[#22C55E]' : 'bg-error-strong',
-                    )}>
-                      {u.status === 'active' ? <Check className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        data={rows}
+        loading={isLoading}
+        onRowClick={(u) => navigate(`/users/${u.id}`)}
+        emptyTitle="Foydalanuvchilar yo'q"
+        emptyDescription="Yangi xodim qo'shing yoki filtrlarni o'zgartiring."
+      />
 
       <UserDialog open={formOpen} onClose={() => setFormOpen(false)} />
       <ConfirmDialog
@@ -323,23 +315,3 @@ function UserDialog({ open, onClose }) {
   );
 }
 
-function UsersSkeleton() {
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-4 border-b border-stroke-sub py-3">
-        {['w-6', 'flex-1', 'w-24', 'w-20', 'w-28', 'w-28', 'w-12'].map((w, i) => <Skeleton key={i} className={cn('h-3.5', w)} />)}
-      </div>
-      {Array.from({ length: 8 }).map((_, r) => (
-        <div key={r} className="flex items-center gap-4 border-b border-stroke-soft py-3.5">
-          <Skeleton className="h-4 w-6 shrink-0" />
-          <div className="flex flex-1 items-center gap-2.5"><Skeleton className="h-7 w-7 shrink-0 rounded-full" /><Skeleton className="h-3.5 w-40" /></div>
-          <Skeleton className="h-3.5 w-24 shrink-0" />
-          <Skeleton className="h-3.5 w-20 shrink-0" />
-          <Skeleton className="h-3.5 w-28 shrink-0" />
-          <Skeleton className="h-3.5 w-28 shrink-0" />
-          <Skeleton className="h-7 w-7 shrink-0 rounded-md" />
-        </div>
-      ))}
-    </div>
-  );
-}

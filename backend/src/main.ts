@@ -24,12 +24,14 @@ async function bootstrap() {
   app.useStaticAssets(join(process.cwd(), uploadDir), { prefix: '/uploads/' });
 
   app.setGlobalPrefix('api');
-  // CORS_ORIGIN may be a comma-separated list. Also allow any *.vercel.app preview.
+  // CORS_ORIGIN — vergul bilan ajratilgan ANIQ ro'yxat (wildcard yo'q).
+  // Yangi front-end manzili bo'lsa, uni CORS_ORIGIN ga qo'shing.
   const corsEnv = config.get<string>('CORS_ORIGIN', 'http://localhost:5173');
   const allowedOrigins = corsEnv.split(',').map((o) => o.trim()).filter(Boolean);
   app.enableCors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin)) {
+      // origin yo'q (Postman/server-to-server) yoki aniq ro'yxatda bo'lsa ruxsat.
+      if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
         callback(null, false);

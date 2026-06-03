@@ -8,10 +8,10 @@ export function Topbar({ onMenuClick, onCollapseToggle }) {
   const bc = breadcrumbForPath(pathname);
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-stroke-sub bg-bg-base px-4">
-      <button className="rounded-md p-2 text-icon-sub hover:bg-bg-1-alt lg:hidden" onClick={onMenuClick}>
+      <button aria-label="Menyuni ochish" className="rounded-md p-2 text-icon-sub hover:bg-bg-1-alt lg:hidden" onClick={onMenuClick}>
         <Menu className="h-5 w-5" />
       </button>
-      <button className="hidden rounded-md p-2 text-icon-sub hover:bg-bg-1-alt lg:block" onClick={onCollapseToggle}>
+      <button aria-label="Yon panelni yig'ish/ochish" className="hidden rounded-md p-2 text-icon-sub hover:bg-bg-1-alt lg:block" onClick={onCollapseToggle}>
         <Menu className="h-5 w-5" />
       </button>
 

@@ -33,7 +33,7 @@ export function TaskDetailDialog({ taskId, projectId, open, onClose, onEdit }) {
   const [confirmDel, setConfirmDel] = useState(false);
 
   const submitComment = () => {
-    if (!comment.trim()) return;
+    if (!comment.trim() || addComment.isPending) return; // dubl-bosish/Enter takrorini bloklash
     addComment.mutate({ id: taskId, body: comment.trim() }, {
       onSuccess: () => setComment(''),
       onError: (e) => toast.error(apiError(e)),

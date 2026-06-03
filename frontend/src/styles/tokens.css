@@ -13,6 +13,8 @@
   --stroke-strong:#D0D5E2; --stroke-sub:#E2E6F2; --stroke-soft:#EEF1F7; --stroke-accent:#526ED3; --stroke-white:#FFFFFF;
   --icon-strong:#1A1D2E; --icon-sub:#5B6078; --icon-soft:#9AA1B5; --icon-disable:#C5CAD8; --icon-white:#FFFFFF; --icon-accent:#526ED3; --icon-in-white:#FFFFFF; --icon-in-black:#000000;
   --error-strong:#E02D2D; --error-sub:#FA5252; --error-soft:#FFF2F2; --error-disabled:#F8D7DA;
+  --success-strong:#16A34A; --success-sub:#22C55E; --success-soft:#E9F9EF; --success-disabled:#CDEFD8;
+  --warning-strong:#B45309; --warning-sub:#F59E0B; --warning-soft:#FEF6E7; --warning-disabled:#FBE2BC;
 }
 
 /* ── DARK MODE ── */
@@ -25,4 +27,7 @@
   --stroke-strong:#30363D; --stroke-sub:#262C36; --stroke-soft:#21262D; --stroke-accent:#7F95E6; --stroke-white:#FFFFFF;
   --icon-strong:#FFFFFF; --icon-sub:#C2C8E0; --icon-soft:#8E95B5; --icon-disable:#5C627D; --icon-white:#FFFFFF; --icon-accent:#7F95E6; --icon-in-white:#FFFFFF; --icon-in-black:#000000;
   --error-strong:#E02D2D; --error-sub:#FA5252; --error-soft:#FFF2F2; --error-disabled:#F8D7DA;
+  /* success/warning: badge'lar uchun och fon + to'yingan matn (error kabi ikkala rejimda bir xil) */
+  --success-strong:#1F9D57; --success-sub:#22C55E; --success-soft:#15281D; --success-disabled:#CDEFD8;
+  --warning-strong:#E0A33B; --warning-sub:#F59E0B; --warning-soft:#2A2212; --warning-disabled:#FBE2BC;
 }

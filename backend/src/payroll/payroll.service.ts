@@ -68,7 +68,10 @@ export class PayrollService {
     const p = await this.prisma.payroll.findFirst({ where: { id } });
     if (!p) throw new NotFoundException('Topilmadi');
     if (p.status !== 'draft') throw new BadRequestException('Faqat draft holatdagini tayyorlash mumkin');
-    return this.prisma.payroll.update({ where: { id }, data: { status: 'ready' }, include: this.include });
+    // Atomik: faqat hali 'draft' bo'lsa o'tkazamiz (dubl-bosish bir marta ishlaydi).
+    const res = await this.prisma.payroll.updateMany({ where: { id, status: 'draft' }, data: { status: 'ready' } });
+    if (res.count === 0) throw new BadRequestException('Faqat draft holatdagini tayyorlash mumkin');
+    return this.prisma.payroll.findFirst({ where: { id }, include: this.include });
   }
 
   /** Accountant pays the salary portion → credits balance + ledger (shares already credited at completion). */
@@ -79,12 +82,14 @@ export class PayrollService {
     if (p.status !== 'ready') throw new BadRequestException('Faqat "tayyor" holatdagini to\'lash mumkin');
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const u = await tx.payroll.update({ where: { id }, data: { status: 'paid', paidAt: new Date() } });
+      // Atomik: faqat hali 'ready' bo'lsa to'laymiz — parallel ikki to'lov balansga ikki marta qo'shmaydi.
+      const res = await tx.payroll.updateMany({ where: { id, status: 'ready' }, data: { status: 'paid', paidAt: new Date() } });
+      if (res.count === 0) throw new BadRequestException('Faqat "tayyor" holatdagini to\'lash mumkin');
       await tx.user.update({ where: { id: p.userId }, data: { balance: { increment: p.fixedAmount } } });
       await tx.ledgerEntry.create({
         data: { userId: p.userId, amount: p.fixedAmount, type: 'salary', direction: 'credit', note: `Oylik ${p.month}` },
       });
-      return u;
+      return tx.payroll.findFirst({ where: { id }, include: this.include });
     });
     await this.audit.record({ userId: actor.id, entity: 'Payroll', entityId: id, action: 'PAY', ip });
     await this.notifications.notify(p.userId, 'payroll_paid', { month: p.month, amount: p.fixedAmount.toString() });
@@ -96,7 +101,10 @@ export class PayrollService {
     if (!p) throw new NotFoundException('Topilmadi');
     if (p.userId !== user.id) throw new ForbiddenException('Bu oylik sizniki emas');
     if (p.status !== 'paid') throw new BadRequestException('Faqat to\'langanni tasdiqlash mumkin');
-    const updated = await this.prisma.payroll.update({ where: { id }, data: { status: 'closed', confirmedAt: new Date() }, include: this.include });
+    // Atomik: faqat hali 'paid' bo'lsa yopamiz (dubl-bosish bir marta ishlaydi).
+    const res = await this.prisma.payroll.updateMany({ where: { id, status: 'paid' }, data: { status: 'closed', confirmedAt: new Date() } });
+    if (res.count === 0) throw new BadRequestException('Faqat to\'langanni tasdiqlash mumkin');
+    const updated = await this.prisma.payroll.findFirst({ where: { id }, include: this.include });
     await this.audit.record({ userId: user.id, entity: 'Payroll', entityId: id, action: 'CONFIRM', ip });
     return updated;
   }

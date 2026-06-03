@@ -48,7 +48,7 @@ export function ExpensesPage() {
         actions={<Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" /> Yangi xarajat</Button>}
       />
       <div className="mb-6 grid grid-cols-1 sm:max-w-xs">
-        <StatCard icon={Receipt} label="Jami xarajat (so'm)" value={formatMoney(data?.totalUzs)} tone="error" />
+        <StatCard icon={Receipt} label="Jami xarajat (so'm)" value={formatMoney(data?.totalUzs)} tone="error" loading={isLoading} />
       </div>
       <DataTable columns={columns} data={data?.items} loading={isLoading} emptyTitle="Xarajatlar yo'q" emptyDescription="Birinchi xarajatni qo'shing." />
 

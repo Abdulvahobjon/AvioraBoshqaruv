@@ -40,7 +40,7 @@ export function useSaveUser() {
       (id ? await api.patch(`/users/${id}`, payload) : await api.post('/users', payload)).data,
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ['users'] });
-      if (vars.id) qc.invalidateQueries({ queryKey: ['user', vars.id] });
+      if (vars.id) qc.invalidateQueries({ queryKey: ['user', String(vars.id)] });
     },
   });
 }

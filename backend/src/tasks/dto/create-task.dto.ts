@@ -59,6 +59,7 @@ export class CreateTaskDto {
 
   @ApiPropertyOptional({ description: 'Vazifa narxi (tiyin)' })
   @IsOptional()
+  @IsInt()
   @Min(0)
   price?: number;
 

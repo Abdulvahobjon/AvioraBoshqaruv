@@ -29,7 +29,7 @@ export function TaskCard({ task, index, onClick }) {
           <div className="mb-1 flex items-center gap-1">
             {priority && <Badge tone={priority.tone} className="px-2 py-0 text-[11px]">{priority.label}</Badge>}
             {task.reopenedCount > 0 && (
-              <span className="ml-auto inline-flex items-center gap-0.5 text-[11px] text-[#F59E0B]" title="Qayta ochilgan">
+              <span className="ml-auto inline-flex items-center gap-0.5 text-[11px] text-warning-strong" title="Qayta ochilgan">
                 <RotateCcw className="h-3 w-3" />{task.reopenedCount}
               </span>
             )}
