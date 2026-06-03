@@ -50,7 +50,14 @@
       "Read(//c/Users/Asadbek/.claude/projects/c--Users-Asadbek-Desktop-AvioraBoshqaruv/memory/**)",
       "Bash(curl -s -o /dev/null http://localhost:3000/api/docs)",
       "Bash(curl -s -o /dev/null -w \"login HTTP: %{http_code}\\\\n\" -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"fullName\":\"Asadbek Superadmin\",\"password\":\"Aviora2026!\"}')",
-      "Bash(npm --workspace frontend run build)"
+      "Bash(npm --workspace frontend run build)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":5433\")",
+      "Bash(C:\\\\Users\\\\Asadbek\\\\.aviora-pg\\\\pgsql\\\\bin\\\\pg_ctl.exe *)",
+      "mcp__ide__getDiagnostics",
+      "PowerShell(npm *)",
+      "PowerShell($conn = Test-NetConnection -ComputerName localhost -Port 5433 -WarningAction SilentlyContinue; if \\($conn.TcpTestSucceeded\\) { \"Postgres ALLAQACHON ishlayapti \\(port 5433\\)\" } else { \"Postgres ishlamayapti, ishga tushiramiz\" })",
+      "PowerShell(try { $f = Invoke-WebRequest -Uri \"http://localhost:5173\" -UseBasicParsing -TimeoutSec 5; \"Frontend 5173: ✅ HTTP $\\($f.StatusCode\\)\" } catch { \"Frontend 5173: ❌ javob bermadi\" })"
     ],
     "additionalDirectories": [
       "C:\\Users\\Asadbek\\.aviora-pg"

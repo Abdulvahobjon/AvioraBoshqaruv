@@ -46,12 +46,14 @@ services:
       CORS_ORIGIN: https://avioraerp.asosit.uz
       UPLOAD_DIR: uploads
       SEED_DEFAULT_PASSWORD: Aviora2026!
-      # ── Google Meet (ixtiyoriy — yoqmoqchi bo'lsangiz izohni oching va to'ldiring) ──
-      # GOOGLE_CLIENT_ID: "571124877992-...apps.googleusercontent.com"
-      # GOOGLE_CLIENT_SECRET: "GOCSPX-..."
-      # GOOGLE_REDIRECT_URI: "http://157.180.46.214:5050/oauth2callback"
-      # GOOGLE_TIMEZONE: "Asia/Tashkent"
-      # GOOGLE_REFRESH_TOKEN_ASOSITLLM: "1//0..."
+    # ── Google Meet (Calendar API) ──
+    # Sirlar git'ga kommit qilinmaydi. Serverda `google-meet.env` faylini yarating
+    # (namuna: google-meet.env.example) va GOOGLE_* qiymatlarni to'ldiring.
+    # Fayl bo'lmasa backend baribir ishlaydi, faqat Meet havolasi yaratilmaydi
+    # (required: false — Docker Compose v2.24+ kerak).
+    env_file:
+      - path: ./google-meet.env
+        required: false
     volumes:
       - aviora_uploads:/app/uploads
     # Faqat localhost'ga ochamiz — host nginx 127.0.0.1:9001 orqali ulanadi (tashqaridan to'g'ridan-to'g'ri kirib bo'lmaydi)

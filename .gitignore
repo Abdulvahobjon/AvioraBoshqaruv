@@ -15,6 +15,9 @@ build/
 .env.*.local
 !.env.example
 
+# Production secrets (server'da yaratiladi, kommit qilinmaydi)
+google-meet.env
+
 # Prisma
 backend/prisma/*.db
 
