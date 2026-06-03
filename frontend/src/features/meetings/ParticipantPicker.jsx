@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils/cn';
  * Participant selection modal (step 2 of meeting creation).
  * users: [{ id, fullName, avatar, position }]; value: selected id array; onConfirm(ids).
  */
-export function ParticipantPicker({ open, onClose, users = [], value = [], onConfirm }) {
+export function ParticipantPicker({ open, onClose, users = [], value = [], onConfirm, title = "Yig'ilishga qatnashchilar" }) {
   const [selected, setSelected] = useState([]);
   const [search, setSearch] = useState('');
 
@@ -36,7 +36,7 @@ export function ParticipantPicker({ open, onClose, users = [], value = [], onCon
       open={open}
       onClose={onClose}
       onBack={onClose}
-      title="Yig'ilishga qatnashchilar"
+      title={title}
       size="md"
       footer={
         <div className="flex w-full items-center justify-between">
@@ -70,7 +70,7 @@ export function ParticipantPicker({ open, onClose, users = [], value = [], onCon
               onClick={() => toggle(u.id)}
               className={cn(
                 'flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors',
-                checked ? 'border-stroke-accent bg-accent-disabled/40' : 'border-stroke-soft hover:bg-bg-elevation-1-alt',
+                checked ? 'border-stroke-accent bg-accent-disabled/40' : 'border-stroke-soft hover:bg-bg-1-alt',
               )}
             >
               <span

@@ -309,7 +309,7 @@ function MeetingDialog({ open, onClose, meeting }) {
               </div>
             </div>
           ) : (
-            <p className="rounded-lg bg-bg-elevation-1 px-4 py-2 text-sm text-text-soft">
+            <p className="rounded-lg bg-bg-1 px-4 py-2 text-sm text-text-soft">
               Google Meet havolasi yaratilmadi (Google akkaunt sozlanmagan). Yig'ilish saqlandi.
             </p>
           )}
@@ -372,7 +372,7 @@ function MeetingDialog({ open, onClose, meeting }) {
                 <div className="space-y-3">
                   <div className="flex flex-wrap gap-2">
                     {selectedUsers.map((u) => (
-                      <span key={u.id} className="inline-flex items-center gap-2 rounded-full bg-bg-elevation-2 py-1 pl-1 pr-2.5 text-sm">
+                      <span key={u.id} className="inline-flex items-center gap-2 rounded-full bg-bg-2 py-1 pl-1 pr-2.5 text-sm">
                         <Avatar name={u.fullName} src={u.avatar} size="sm" />
                         <span className="text-text-strong">{u.fullName}</span>
                         <button type="button" onClick={() => setParticipants((p) => p.filter((x) => x !== u.id))} className="text-icon-soft hover:text-error-strong">

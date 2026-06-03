@@ -57,14 +57,14 @@ function CalendarPopover({ value, onChange, onClose, anchorRef, dropUp }) {
       style={{ minWidth: 260, ...(dropUp ? { bottom: '100%', marginBottom: 4 } : { top: '100%', marginTop: 4 }) }}
     >
       <div className="mb-2 flex items-center justify-between px-1">
-        <button type="button" onClick={prevMonth} className="flex h-7 w-7 items-center justify-center rounded-lg text-icon-sub hover:bg-bg-elevation-1">
+        <button type="button" onClick={prevMonth} className="flex h-7 w-7 items-center justify-center rounded-lg text-icon-sub hover:bg-bg-1">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" /></svg>
         </button>
-        <button type="button" onClick={() => setShowYearMonth((s) => !s)} className="flex items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-bg-elevation-1">
+        <button type="button" onClick={() => setShowYearMonth((s) => !s)} className="flex items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-bg-1">
           <span className="text-sm font-bold text-text-strong">{MONTH_NAMES[viewMonth]} {viewYear}</span>
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className={`text-text-soft transition-transform ${showYearMonth ? 'rotate-180' : ''}`}><path d="M6 9l6 6 6-6" /></svg>
         </button>
-        <button type="button" onClick={nextMonth} className="flex h-7 w-7 items-center justify-center rounded-lg text-icon-sub hover:bg-bg-elevation-1">
+        <button type="button" onClick={nextMonth} className="flex h-7 w-7 items-center justify-center rounded-lg text-icon-sub hover:bg-bg-1">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>
         </button>
       </div>
@@ -74,13 +74,13 @@ function CalendarPopover({ value, onChange, onClose, anchorRef, dropUp }) {
           <div className="max-h-40 flex-1 overflow-y-auto rounded-xl border border-stroke-sub scrollbar-none">
             {MONTH_NAMES.map((mn, i) => (
               <button key={mn} type="button" onClick={() => { setViewMonth(i); setShowYearMonth(false); }}
-                className={`w-full px-3 py-1.5 text-left text-xs ${i === viewMonth ? 'bg-accent-disabled font-semibold text-accent-strong' : 'text-text-strong hover:bg-bg-elevation-1'}`}>{mn}</button>
+                className={`w-full px-3 py-1.5 text-left text-xs ${i === viewMonth ? 'bg-accent-disabled font-semibold text-accent-strong' : 'text-text-strong hover:bg-bg-1'}`}>{mn}</button>
             ))}
           </div>
           <div className="max-h-40 w-20 overflow-y-auto rounded-xl border border-stroke-sub scrollbar-none">
             {years.map((y) => (
               <button key={y} type="button" onClick={() => { setViewYear(y); setShowYearMonth(false); }}
-                className={`w-full px-3 py-1.5 text-left text-xs ${y === viewYear ? 'bg-accent-disabled font-semibold text-accent-strong' : 'text-text-strong hover:bg-bg-elevation-1'}`}>{y}</button>
+                className={`w-full px-3 py-1.5 text-left text-xs ${y === viewYear ? 'bg-accent-disabled font-semibold text-accent-strong' : 'text-text-strong hover:bg-bg-1'}`}>{y}</button>
             ))}
           </div>
         </div>
@@ -97,14 +97,14 @@ function CalendarPopover({ value, onChange, onClose, anchorRef, dropUp }) {
                 className={`h-8 w-8 rounded-full text-xs font-medium transition-colors
                   ${isSelected(d) ? 'bg-accent-strong text-white'
                     : isToday(d) ? 'border-2 border-accent-strong text-accent-strong hover:bg-accent-disabled'
-                    : 'text-text-strong hover:bg-bg-elevation-1'}`}>{d}</button>
+                    : 'text-text-strong hover:bg-bg-1'}`}>{d}</button>
             ) : null}
           </div>
         ))}
       </div>
 
       <div className="mt-2 flex items-center justify-between border-t border-stroke-soft pt-2">
-        <button type="button" onClick={() => { onChange(''); onClose(); }} className="rounded-lg px-2 py-1 text-xs text-text-soft hover:bg-bg-elevation-1 hover:text-accent-sub">Tozalash</button>
+        <button type="button" onClick={() => { onChange(''); onClose(); }} className="rounded-lg px-2 py-1 text-xs text-text-soft hover:bg-bg-1 hover:text-accent-sub">Tozalash</button>
         <button type="button" onClick={() => { const t = new Date(); onChange(`${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`); onClose(); }}
           className="rounded-lg px-2 py-1 text-xs font-semibold text-accent-strong hover:bg-accent-disabled">Bugun</button>
       </div>
@@ -132,11 +132,11 @@ function MonthPopover({ value, onChange, onClose, anchorRef, dropUp }) {
     <div ref={popRef} className="absolute z-[9999] select-none rounded-2xl border border-stroke-sub bg-bg-base p-3 shadow-elevated"
       style={{ minWidth: 240, ...(dropUp ? { bottom: '100%', marginBottom: 4 } : { top: '100%', marginTop: 4 }) }}>
       <div className="mb-2 flex items-center justify-between px-1">
-        <button type="button" onClick={() => setViewYear((y) => y - 1)} className="flex h-7 w-7 items-center justify-center rounded-lg text-icon-sub hover:bg-bg-elevation-1">
+        <button type="button" onClick={() => setViewYear((y) => y - 1)} className="flex h-7 w-7 items-center justify-center rounded-lg text-icon-sub hover:bg-bg-1">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" /></svg>
         </button>
         <span className="text-sm font-bold text-text-strong">{viewYear}</span>
-        <button type="button" onClick={() => setViewYear((y) => y + 1)} className="flex h-7 w-7 items-center justify-center rounded-lg text-icon-sub hover:bg-bg-elevation-1">
+        <button type="button" onClick={() => setViewYear((y) => y + 1)} className="flex h-7 w-7 items-center justify-center rounded-lg text-icon-sub hover:bg-bg-1">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>
         </button>
       </div>
@@ -145,12 +145,12 @@ function MonthPopover({ value, onChange, onClose, anchorRef, dropUp }) {
           const isSel = selected && selected.y === viewYear && selected.m === i;
           return (
             <button key={mn} type="button" onClick={() => select(i)}
-              className={`rounded-lg py-2 text-xs font-medium transition-colors ${isSel ? 'bg-accent-strong text-white' : 'text-text-strong hover:bg-bg-elevation-1'}`}>{mn.slice(0, 4)}</button>
+              className={`rounded-lg py-2 text-xs font-medium transition-colors ${isSel ? 'bg-accent-strong text-white' : 'text-text-strong hover:bg-bg-1'}`}>{mn.slice(0, 4)}</button>
           );
         })}
       </div>
       <div className="mt-2 flex items-center justify-between border-t border-stroke-soft pt-2">
-        <button type="button" onClick={() => { onChange(''); onClose(); }} className="rounded-lg px-2 py-1 text-xs text-text-soft hover:bg-bg-elevation-1 hover:text-accent-sub">Tozalash</button>
+        <button type="button" onClick={() => { onChange(''); onClose(); }} className="rounded-lg px-2 py-1 text-xs text-text-soft hover:bg-bg-1 hover:text-accent-sub">Tozalash</button>
         <button type="button" onClick={() => { const t = new Date(); onChange(`${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}`); onClose(); }}
           className="rounded-lg px-2 py-1 text-xs font-semibold text-accent-strong hover:bg-accent-disabled">Bu oy</button>
       </div>
@@ -193,7 +193,7 @@ function TimePopover({ value, onChange, onClose, anchorRef, dropUp }) {
           <div ref={hourRef} className="h-44 overflow-y-auto rounded-xl border border-stroke-sub scroll-smooth scrollbar-none">
             {Array.from({ length: 24 }, (_, i) => (
               <button key={i} type="button" onClick={() => selectHour(i)}
-                className={`w-full py-1.5 text-center text-sm transition-colors ${i === hour ? 'bg-accent-strong font-bold text-white' : 'text-text-strong hover:bg-bg-elevation-1'}`}>{String(i).padStart(2, '0')}</button>
+                className={`w-full py-1.5 text-center text-sm transition-colors ${i === hour ? 'bg-accent-strong font-bold text-white' : 'text-text-strong hover:bg-bg-1'}`}>{String(i).padStart(2, '0')}</button>
             ))}
           </div>
         </div>
@@ -202,13 +202,13 @@ function TimePopover({ value, onChange, onClose, anchorRef, dropUp }) {
           <div ref={minRef} className="h-44 overflow-y-auto rounded-xl border border-stroke-sub scroll-smooth scrollbar-none">
             {Array.from({ length: 60 }, (_, i) => (
               <button key={i} type="button" onClick={() => selectMin(i)}
-                className={`w-full py-1.5 text-center text-sm transition-colors ${i === min ? 'bg-accent-strong font-bold text-white' : 'text-text-strong hover:bg-bg-elevation-1'}`}>{String(i).padStart(2, '0')}</button>
+                className={`w-full py-1.5 text-center text-sm transition-colors ${i === min ? 'bg-accent-strong font-bold text-white' : 'text-text-strong hover:bg-bg-1'}`}>{String(i).padStart(2, '0')}</button>
             ))}
           </div>
         </div>
       </div>
       <div className="mt-2 flex items-center justify-between border-t border-stroke-soft pt-2">
-        <button type="button" onClick={() => { setHour(0); setMin(0); onChange('00:00'); onClose(); }} className="rounded-lg px-2 py-1 text-xs text-text-soft hover:bg-bg-elevation-1 hover:text-accent-sub">Tozalash</button>
+        <button type="button" onClick={() => { setHour(0); setMin(0); onChange('00:00'); onClose(); }} className="rounded-lg px-2 py-1 text-xs text-text-soft hover:bg-bg-1 hover:text-accent-sub">Tozalash</button>
         <button type="button" onClick={() => { const n = new Date(); setHour(n.getHours()); setMin(n.getMinutes()); apply(n.getHours(), n.getMinutes()); onClose(); }}
           className="rounded-lg px-2 py-1 text-xs font-semibold text-accent-strong hover:bg-accent-disabled">Hozir</button>
       </div>

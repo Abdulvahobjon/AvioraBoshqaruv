@@ -119,7 +119,7 @@ export function UsersPage() {
 
       {/* Bulk action bar */}
       {selectMode && selected.length > 0 && (
-        <div className="mb-3 flex items-center justify-between rounded-lg border border-stroke-sub bg-bg-elevation-1 px-4 py-2.5">
+        <div className="mb-3 flex items-center justify-between rounded-lg border border-stroke-sub bg-bg-1 px-4 py-2.5">
           <span className="text-sm text-text-sub">{selected.length} ta tanlandi</span>
           <Button variant="danger" size="sm" onClick={() => setDeleting('bulk')}><Trash2 className="h-4 w-4" /> O'chirish</Button>
         </div>
@@ -128,7 +128,7 @@ export function UsersPage() {
       {isLoading ? (
         <UsersSkeleton />
       ) : rows.length === 0 ? (
-        <EmptyState title="Foydalanuvchilar yo'q" description="Yangi xodim qo'shing yoki filtrlarni o'zgartiring." />
+        <EmptyState fill title="Foydalanuvchilar yo'q" description="Yangi xodim qo'shing yoki filtrlarni o'zgartiring." />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] text-sm">
@@ -153,7 +153,7 @@ export function UsersPage() {
                 <tr
                   key={u.id}
                   onClick={() => navigate(`/users/${u.id}`)}
-                  className="cursor-pointer border-b border-stroke-soft transition-colors hover:bg-bg-elevation-1-alt"
+                  className="cursor-pointer border-b border-stroke-soft transition-colors hover:bg-bg-1-alt"
                 >
                   {selectMode && (
                     <td className="py-3 pl-1" onClick={(e) => { e.stopPropagation(); toggleSelect(u.id); }}>

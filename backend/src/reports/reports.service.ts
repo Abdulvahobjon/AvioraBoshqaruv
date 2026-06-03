@@ -110,6 +110,116 @@ export class ReportsService {
     }));
   }
 
+  // ─────────────── XODIM BO'YICHA HISOBOT ───────────────
+
+  private numFrom(q: any, key: string): number | undefined {
+    const v = q[key];
+    return v !== undefined && v !== '' && v !== null ? Number(v) : undefined;
+  }
+  private inRange(v: number, from?: number, to?: number) {
+    if (from !== undefined && v < from) return false;
+    if (to !== undefined && v > to) return false;
+    return true;
+  }
+  private parseIds(v: any): number[] {
+    if (!v) return [];
+    return String(v).split(',').map((x) => Number(x.trim())).filter((x) => Number.isFinite(x) && x > 0);
+  }
+
+  /** Xodim bo'yicha keng hisobot: maosh, balans, loyiha/vazifa/yig'ilish/so'rov agregatlari. */
+  async employeeReport(q: any) {
+    const where: any = { deletedAt: null };
+    const ids = this.parseIds(q.userIds);
+    if (ids.length) where.id = { in: ids };
+    if (q.positionId) where.positionId = Number(q.positionId);
+    if (q.region) where.region = q.region;
+    if (q.search) where.fullName = { contains: q.search, mode: 'insensitive' };
+    if (q.joinedFrom || q.joinedTo) {
+      where.createdAt = {};
+      if (q.joinedFrom) where.createdAt.gte = new Date(q.joinedFrom);
+      if (q.joinedTo) where.createdAt.lte = new Date(q.joinedTo);
+    }
+    const salaryFrom = this.numFrom(q, 'salaryFrom');
+    const salaryTo = this.numFrom(q, 'salaryTo');
+    if (salaryFrom !== undefined || salaryTo !== undefined) {
+      where.fixedSalary = {};
+      if (salaryFrom !== undefined) where.fixedSalary.gte = BigInt(Math.round(salaryFrom * 100));
+      if (salaryTo !== undefined) where.fixedSalary.lte = BigInt(Math.round(salaryTo * 100));
+    }
+    const balanceFrom = this.numFrom(q, 'balanceFrom');
+    const balanceTo = this.numFrom(q, 'balanceTo');
+    if (balanceFrom !== undefined || balanceTo !== undefined) {
+      where.balance = {};
+      if (balanceFrom !== undefined) where.balance.gte = BigInt(Math.round(balanceFrom * 100));
+      if (balanceTo !== undefined) where.balance.lte = BigInt(Math.round(balanceTo * 100));
+    }
+
+    const users = await this.prisma.user.findMany({
+      where,
+      include: {
+        position: { select: { name: true } },
+        _count: { select: { projectMembers: true } },
+        assignedTasks: { where: { deletedAt: null }, select: { status: true } },
+        meetingAttendance: { select: { attended: true, absenceReason: true } },
+        financeRequests: { select: { amount: true, currency: true } },
+        payrolls: { select: { total: true } },
+      },
+      orderBy: { fullName: 'asc' },
+    });
+
+    let rows: any[] = [];
+    for (const u of users) {
+      const tasks = { todo: 0, in_progress: 0, overdue: 0, done: 0, production: 0, checked: 0, rejected: 0 };
+      for (const t of u.assignedTasks) tasks[t.status] = (tasks[t.status] || 0) + 1;
+
+      let mAttended = 0, mExcused = 0, mUnexcused = 0;
+      for (const a of u.meetingAttendance) {
+        if (a.attended) mAttended++;
+        else if (a.absenceReason && a.absenceReason.trim()) mExcused++;
+        else mUnexcused++;
+      }
+
+      let reqTotal = 0n;
+      for (const r of u.financeRequests) reqTotal += await this.currencies.toUzs(r.amount, r.currency);
+      const payrollTotal = u.payrolls.reduce((a, p) => a + p.total, 0n);
+
+      rows.push({
+        id: u.id,
+        fullName: u.fullName,
+        position: u.position?.name || '—',
+        region: u.region || '—',
+        district: u.district || '—',
+        phone: u.phone || '—',
+        fixedSalary: n(u.fixedSalary),
+        balance: n(u.balance),
+        projectsCount: u._count.projectMembers,
+        tasksTotal: u.assignedTasks.length,
+        tasks,
+        meetingsTotal: u.meetingAttendance.length,
+        meetingsAttended: mAttended,
+        meetingsExcused: mExcused,
+        meetingsUnexcused: mUnexcused,
+        requestsCount: u.financeRequests.length,
+        requestsTotal: n(reqTotal),
+        payrollTotal: n(payrollTotal),
+      });
+    }
+
+    // Agregat (sanoq) oralig'i bo'yicha filtrlar
+    const projF = this.numFrom(q, 'projectsFrom'), projT = this.numFrom(q, 'projectsTo');
+    const taskF = this.numFrom(q, 'tasksFrom'), taskT = this.numFrom(q, 'tasksTo');
+    const meetF = this.numFrom(q, 'meetingsFrom'), meetT = this.numFrom(q, 'meetingsTo');
+    const reqF = this.numFrom(q, 'requestsFrom'), reqT = this.numFrom(q, 'requestsTo');
+    rows = rows.filter((r) =>
+      this.inRange(r.projectsCount, projF, projT) &&
+      this.inRange(r.tasksTotal, taskF, taskT) &&
+      this.inRange(r.meetingsTotal, meetF, meetT) &&
+      this.inRange(r.requestsCount, reqF, reqT),
+    );
+
+    return { rows, count: rows.length };
+  }
+
   // ─────────────── DASHBOARD (rolga qarab, hammasi DB'dan) ───────────────
 
   /** Rolga mos bosh sahifa ma'lumotlari. Hamma sanoq/statistika serverda hisoblanadi. */

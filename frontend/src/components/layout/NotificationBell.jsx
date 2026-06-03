@@ -66,7 +66,7 @@ export function NotificationBell() {
           <div>
             {groups.map(([day, list]) => (
               <div key={day}>
-                <div className="sticky top-0 bg-bg-elevation-1 px-5 py-1.5 text-xs font-medium text-text-soft">{day}</div>
+                <div className="sticky top-0 bg-bg-1 px-5 py-1.5 text-xs font-medium text-text-soft">{day}</div>
                 {list.map((n) => {
                   const d = describeNotification(n);
                   const Icon = d.icon;
@@ -74,9 +74,9 @@ export function NotificationBell() {
                     <button
                       key={n.id}
                       onClick={() => onItemClick(n)}
-                      className={cn('flex w-full items-start gap-3 border-b border-stroke-soft px-5 py-3 text-left transition-colors hover:bg-bg-elevation-1-alt', !n.isRead && 'bg-bg-elevation-1/60')}
+                      className={cn('flex w-full items-start gap-3 border-b border-stroke-soft px-5 py-3 text-left transition-colors hover:bg-bg-1-alt', !n.isRead && 'bg-bg-1/60')}
                     >
-                      <span className="relative mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg-elevation-2 text-icon-accent">
+                      <span className="relative mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg-2 text-icon-accent">
                         <Icon className="h-4 w-4" />
                         {!n.isRead && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-error-strong ring-2 ring-bg-base" />}
                       </span>

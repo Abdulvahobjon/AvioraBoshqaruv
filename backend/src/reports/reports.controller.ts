@@ -30,13 +30,32 @@ export class ReportsController {
     return this.reports.employees();
   }
 
-  /** Export: type=projects|employees, format=xlsx|pdf */
+  @Get('employee-report')
+  employeeReport(@Query() q: any) {
+    return this.reports.employeeReport(q);
+  }
+
+  /** Export: type=projects|employees|employee-report, format=xlsx|pdf|csv */
   @Get('export')
   async export(@Query() q: any, @Res() res: Response) {
-    const type = q.type === 'employees' ? 'employees' : 'projects';
-    const format = q.format === 'pdf' ? 'pdf' : 'xlsx';
+    const type = q.type || 'projects';
+    const format = ['pdf', 'csv'].includes(q.format) ? q.format : 'xlsx';
 
     const { columns, rows, title } = await this.buildDataset(type, q);
+
+    if (format === 'csv') {
+      const esc = (v: any) => {
+        const s = String(v ?? '');
+        return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const header = columns.map((c) => esc(c.header)).join(';');
+      const body = rows.map((r) => columns.map((c) => esc(r[c.key])).join(';')).join('\n');
+      const csv = '﻿' + header + '\n' + body; // BOM → Excel UTF-8
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${type}-report.csv"`);
+      res.end(csv);
+      return;
+    }
 
     if (format === 'xlsx') {
       const wb = new ExcelJS.Workbook();
@@ -78,6 +97,42 @@ export class ReportsController {
   }
 
   private async buildDataset(type: string, q: any) {
+    if (type === 'employee-report') {
+      const { rows } = await this.reports.employeeReport(q);
+      return {
+        title: 'Xodimlar bo\'yicha hisobot',
+        columns: [
+          { header: 'Ism Sharifi', key: 'fullName', width: 26 },
+          { header: 'Lavozim', key: 'position', width: 18 },
+          { header: 'Viloyat', key: 'region', width: 16 },
+          { header: 'Tuman', key: 'district', width: 16 },
+          { header: 'Telefon', key: 'phone', width: 16 },
+          { header: 'Oylik maoshi (UZS)', key: 'fixedSalary', width: 18 },
+          { header: 'Balans (UZS)', key: 'balance', width: 16 },
+          { header: 'Loyihalar', key: 'projectsCount', width: 11 },
+          { header: 'Vazifalar: Jami', key: 'tasksTotal', width: 13 },
+          { header: 'Qilish kerak', key: 't_todo', width: 12 },
+          { header: 'Jarayonda', key: 't_in_progress', width: 11 },
+          { header: 'Muddati o\'tgan', key: 't_overdue', width: 13 },
+          { header: 'Bajarilgan', key: 't_done', width: 11 },
+          { header: 'Ishga tushirilgan', key: 't_production', width: 15 },
+          { header: 'Tekshirilgan', key: 't_checked', width: 12 },
+          { header: 'Rad etilgan', key: 't_rejected', width: 11 },
+          { header: 'Yig\'ilishlar: Jami', key: 'meetingsTotal', width: 15 },
+          { header: 'Qatnashgan', key: 'meetingsAttended', width: 12 },
+          { header: 'Qatnashmagan (sababli)', key: 'meetingsExcused', width: 20 },
+          { header: 'Qatnashmagan (sababsiz)', key: 'meetingsUnexcused', width: 21 },
+          { header: 'So\'rovlar soni', key: 'requestsCount', width: 13 },
+          { header: 'So\'rovlar summasi (UZS)', key: 'requestsTotal', width: 20 },
+          { header: 'Ish haqi (UZS)', key: 'payrollTotal', width: 16 },
+        ],
+        rows: rows.map((r) => ({
+          ...r,
+          t_todo: r.tasks.todo, t_in_progress: r.tasks.in_progress, t_overdue: r.tasks.overdue,
+          t_done: r.tasks.done, t_production: r.tasks.production, t_checked: r.tasks.checked, t_rejected: r.tasks.rejected,
+        })),
+      };
+    }
     if (type === 'employees') {
       const data = await this.reports.employees();
       return {

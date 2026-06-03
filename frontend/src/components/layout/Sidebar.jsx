@@ -24,7 +24,7 @@ export function Sidebar({ collapsed, mobileOpen, onMobileClose, onExpand }) {
         onClick={collapsed ? () => onExpand?.() : undefined}
         title={collapsed ? 'Ochish uchun bosing' : undefined}
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex flex-col border-r border-stroke-sub bg-bg-elevation-1 transition-all duration-200',
+          'fixed inset-y-0 left-0 z-40 flex flex-col border-r border-stroke-sub bg-bg-1 transition-all duration-200',
           collapsed ? 'w-[68px] cursor-pointer' : 'w-64',
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
         )}
@@ -76,8 +76,8 @@ function SideLink({ item, collapsed, nested, onMobileClose }) {
           'flex items-center gap-3 rounded-md text-sm font-medium transition-colors',
           collapsed ? 'justify-center px-0 py-2.5' : nested ? 'px-3 py-2' : 'px-3 py-2.5',
           isActive
-            ? nested ? 'bg-bg-elevation-2 text-text-accent' : 'bg-accent-strong text-text-white'
-            : 'text-text-sub hover:bg-bg-elevation-2 hover:text-text-strong',
+            ? nested ? 'bg-bg-2 text-text-accent' : 'bg-accent-strong text-text-white'
+            : 'text-text-sub hover:bg-bg-2 hover:text-text-strong',
         )
       }
       title={collapsed ? item.label : undefined}
@@ -130,7 +130,7 @@ function NavGroup({ group, open, onToggle, location, onMobileClose }) {
           'flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors',
           hasActive
             ? 'bg-accent-strong text-text-white'
-            : 'text-text-sub hover:bg-bg-elevation-2 hover:text-text-strong',
+            : 'text-text-sub hover:bg-bg-2 hover:text-text-strong',
         )}
       >
         <group.icon className="h-5 w-5 shrink-0" />
@@ -236,7 +236,7 @@ function UserBlock({ user, collapsed, onNavigate }) {
       <button
         ref={btnRef}
         onClick={collapsed ? undefined : openMenu}
-        className={cn('flex w-full items-center gap-2.5 rounded-lg p-2 transition-colors hover:bg-bg-elevation-2', collapsed && 'justify-center')}
+        className={cn('flex w-full items-center gap-2.5 rounded-lg p-2 transition-colors hover:bg-bg-2', collapsed && 'justify-center')}
         title={collapsed ? user?.fullName : undefined}
       >
         <Avatar name={user?.fullName} src={user?.avatar} size="md" />

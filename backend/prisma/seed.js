@@ -163,11 +163,13 @@ async function main() {
     ],
   });
 
-  // ── Todos ──
-  await prisma.todo.createMany({
+  // ── Kundalik rejalar (daily plans) ──
+  const today = new Date();
+  const todayDate = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+  await prisma.dailyPlan.createMany({
     data: [
-      { userId: emp1.id, title: 'Kod review qilish', isDone: false },
-      { userId: emp1.id, title: 'Hujjatlarni yangilash', isDone: true },
+      { userId: emp1.id, title: 'Kod review qilish', description: 'PR larni ko\'rib chiqish', date: todayDate, time: '10:00', priority: 'high', isDone: false },
+      { userId: emp1.id, title: 'Hujjatlarni yangilash', date: todayDate, time: '15:30', priority: 'medium', isDone: true },
     ],
   });
 

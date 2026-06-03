@@ -69,8 +69,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         params.args.data = { ...(params.args.data || {}), deletedAt: new Date() };
       }
 
-      // Exclude soft-deleted from reads (unless caller explicitly asks)
-      if (['findFirst', 'findMany', 'count'].includes(params.action)) {
+      // Exclude soft-deleted from reads (unless caller explicitly asks).
+      // groupBy/aggregate ham qamrab olinadi — aks holda statistika o'chirilgan yozuvlarni sanaydi.
+      if (['findFirst', 'findMany', 'count', 'aggregate', 'groupBy'].includes(params.action)) {
         params.args = params.args || {};
         params.args.where = params.args.where || {};
         if (params.args.where.deletedAt === undefined) {

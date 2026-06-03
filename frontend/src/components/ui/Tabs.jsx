@@ -19,7 +19,7 @@ export function Tabs({ tabs, value, onChange, className }) {
             {t.icon && <t.icon className="h-4 w-4" />}
             {t.label}
             {t.badge != null && (
-              <span className="ml-1 rounded-full bg-bg-elevation-2 px-1.5 text-xs text-text-sub">{t.badge}</span>
+              <span className="ml-1 rounded-full bg-bg-2 px-1.5 text-xs text-text-sub">{t.badge}</span>
             )}
             {active && (
               <motion.span

@@ -42,7 +42,15 @@
       "Bash(node -e \"const p=require\\('./backend/package.json'\\); console.log\\(JSON.stringify\\(p.scripts,null,2\\)\\); console.log\\('prisma seed:', JSON.stringify\\(p.prisma\\)\\)\")",
       "Bash(powershell -Command 'function P\\($p\\){ if \\(Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue\\) {'\\\\''OK'\\\\''} else {'\\\\''STOP'\\\\''} }; '\\\\''PG :5433='\\\\'' + \\(P 5433\\) + '\\\\'' | Backend :3000='\\\\'' + \\(P 3000\\) + '\\\\'' | Frontend :5173='\\\\'' + \\(P 5173\\)')",
       "Bash(grep -iE \"REFRESH_TOKEN|refresh_token|Xato|1//\" \"C:\\\\Users\\\\Asadbek\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Asadbek-Desktop-AvioraBoshqaruv\\\\b1a82871-540d-42e0-9c49-4a6b4279d9af\\\\tasks\\\\bdnxj0kse.output\")",
-      "Bash(node -e \"const c=require\\('crypto'\\); console.log\\('ACCESS='+c.randomBytes\\(32\\).toString\\('hex'\\)\\); console.log\\('REFRESH='+c.randomBytes\\(32\\).toString\\('hex'\\)\\)\")"
+      "Bash(node -e \"const c=require\\('crypto'\\); console.log\\('ACCESS='+c.randomBytes\\(32\\).toString\\('hex'\\)\\); console.log\\('REFRESH='+c.randomBytes\\(32\\).toString\\('hex'\\)\\)\")",
+      "Bash(npm --workspace backend run start:dev)",
+      "Bash(cd /c/Users/Asadbek/Desktop/AvioraBoshqaruv && grep -n \"PASSWORD =\\\\|login\\\\b\" backend/prisma/seed.js | head; echo \"---login dto---\"; cat backend/src/auth/dto/login.dto.ts)",
+      "Read(//c/c/Users/Asadbek/Desktop/AvioraBoshqaruv/backend/prisma/**)",
+      "PowerShell(Write-Output \"=== NODE PROCESSES ===\"; Get-Process node -ErrorAction SilentlyContinue | Select-Object Id, @{n='CmdLine';e={\\(Get-CimInstance Win32_Process -Filter \"ProcessId=$\\($_.Id\\)\"\\).CommandLine}} | Format-Table -AutoSize -Wrap; Write-Output \"=== PORTS \\(3000 backend, 5173 frontend, 5433 db\\) ===\"; foreach \\($p in 3000,5173,5433\\) { $c = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { Write-Output \"Port $p : LISTENING\" } else { Write-Output \"Port $p : not listening\" } })",
+      "Read(//c/Users/Asadbek/.claude/projects/c--Users-Asadbek-Desktop-AvioraBoshqaruv/memory/**)",
+      "Bash(curl -s -o /dev/null http://localhost:3000/api/docs)",
+      "Bash(curl -s -o /dev/null -w \"login HTTP: %{http_code}\\\\n\" -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"fullName\":\"Asadbek Superadmin\",\"password\":\"Aviora2026!\"}')",
+      "Bash(npm --workspace frontend run build)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Asadbek\\.aviora-pg"

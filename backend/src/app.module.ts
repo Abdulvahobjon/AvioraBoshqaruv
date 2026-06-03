@@ -17,7 +17,7 @@ import { PayrollModule } from './payroll/payroll.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { ReportsModule } from './reports/reports.module';
 import { MeetingsModule } from './meetings/meetings.module';
-import { TodosModule } from './todos/todos.module';
+import { DailyPlansModule } from './daily-plans/daily-plans.module';
 import { CronModule } from './cron/cron.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -41,7 +41,7 @@ import { RolesGuard } from './common/guards/roles.guard';
     ExpensesModule,
     ReportsModule,
     MeetingsModule,
-    TodosModule,
+    DailyPlansModule,
     CronModule,
   ],
   providers: [

@@ -79,7 +79,7 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
             </a>
           )}
 
-          {meeting.content && <p className="rounded-lg bg-bg-elevation-1 p-3 text-sm text-text-sub">{meeting.content}</p>}
+          {meeting.content && <p className="rounded-lg bg-bg-1 p-3 text-sm text-text-sub">{meeting.content}</p>}
 
           {/* Attendance */}
           <div>
@@ -142,7 +142,7 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
                 <span className="block h-5 w-5 rounded-full bg-white transition-transform" />
               </button>
             ) : (
-              <span className={cn('h-6 w-11 rounded-full p-0.5 transition-colors', meeting.finishedAt ? 'bg-accent-strong' : 'bg-bg-elevation-3')}>
+              <span className={cn('h-6 w-11 rounded-full p-0.5 transition-colors', meeting.finishedAt ? 'bg-accent-strong' : 'bg-bg-3')}>
                 <span className={cn('block h-5 w-5 rounded-full bg-white transition-transform', meeting.finishedAt && 'translate-x-5')} />
               </span>
             )}

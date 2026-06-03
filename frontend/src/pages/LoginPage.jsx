@@ -35,7 +35,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg-elevation-1 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-bg-1 p-4">
       <button
         onClick={toggle}
         className="fixed right-4 top-4 rounded-md p-2 text-icon-sub hover:bg-bg-2"

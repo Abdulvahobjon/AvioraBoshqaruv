@@ -192,7 +192,7 @@ export function TaskFormDialog({ open, onClose, task }) {
         <div className="sm:col-span-2">
           <p className="mb-2 text-sm font-medium text-text-sub">Qo'shimcha fayllar</p>
           <div className="flex flex-wrap gap-3">
-            <label className="flex h-16 w-44 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-stroke-accent text-sm text-text-accent hover:bg-bg-elevation-1-alt">
+            <label className="flex h-16 w-44 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-stroke-accent text-sm text-text-accent hover:bg-bg-1-alt">
               <Paperclip className="h-4 w-4" /> Fayl yuklash
               <input type="file" multiple className="hidden" onChange={(e) => setFiles((prev) => [...prev, ...Array.from(e.target.files || [])])} />
             </label>

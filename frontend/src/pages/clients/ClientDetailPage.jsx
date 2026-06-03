@@ -31,7 +31,7 @@ export function ClientDetailPage() {
     );
   }
 
-  if (!client) return <EmptyState title="Mijoz topilmadi" />;
+  if (!client) return <EmptyState fill title="Mijoz topilmadi" />;
 
   const s = client.stats;
   const pieData = Object.entries(s.typeBreakdown || {}).map(([name, value]) => ({ name, value }));
@@ -110,7 +110,7 @@ export function ClientDetailPage() {
                   <div
                     key={p.id}
                     onClick={() => navigate(`/projects/${p.id}`)}
-                    className="flex cursor-pointer items-center justify-between rounded-lg border border-stroke-soft p-3 hover:bg-bg-elevation-1-alt"
+                    className="flex cursor-pointer items-center justify-between rounded-lg border border-stroke-soft p-3 hover:bg-bg-1-alt"
                   >
                     <div className="min-w-0">
                       <p className="truncate font-medium text-text-strong">{p.name}</p>

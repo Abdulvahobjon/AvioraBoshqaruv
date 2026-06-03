@@ -8,6 +8,7 @@ export function ComingSoonPage({ title }) {
     <div>
       <PageHeader title={title} />
       <EmptyState
+        fill
         icon={Construction}
         title="Tez orada"
         description="Bu modul keyingi bosqichlarda to'liq ishlab chiqiladi (Kanban, Moliya, Hisobotlar va h.k.)."

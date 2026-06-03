@@ -199,7 +199,7 @@ model User {
   financeRequests  FinanceRequest[]
   ledgerEntries    LedgerEntry[]
   payrolls         Payroll[]
-  todos            Todo[]
+  dailyPlans       DailyPlan[]
   auditLogs        AuditLog[]
   notifications    Notification[]
 
@@ -515,18 +515,30 @@ model Expense {
   @@map("expenses")
 }
 
-// ─────────────── TODO ───────────────
+// ─────────────── KUNDALIK REJALAR (DAILY PLANS) ───────────────
 
-model Todo {
-  id        Int      @id @default(autoincrement())
-  userId    Int      @map("user_id")
-  title     String
-  isDone    Boolean  @default(false) @map("is_done")
-  createdAt DateTime @default(now()) @map("created_at")
+enum DailyPlanPriority {
+  low
+  medium
+  high
+}
+
+model DailyPlan {
+  id          Int               @id @default(autoincrement())
+  userId      Int               @map("user_id")
+  title       String
+  description String?
+  date        DateTime          @db.Date
+  time        String? // "HH:MM" (ixtiyoriy)
+  priority    DailyPlanPriority @default(medium)
+  isDone      Boolean           @default(false) @map("is_done")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id])
 
-  @@map("todos")
+  @@index([userId, date])
+  @@map("daily_plans")
 }
 
 // ─────────────── AUDIT ───────────────

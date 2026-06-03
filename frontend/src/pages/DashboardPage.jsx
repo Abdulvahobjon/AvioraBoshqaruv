@@ -117,7 +117,7 @@ function AdminDashboard() {
           <CardHeader><CardTitle>So'nggi loyihalar</CardTitle></CardHeader>
           <CardContent className="space-y-2">
             {(data.recentProjects || []).map((p) => (
-              <Link key={p.id} to={`/projects/${p.id}`} className="flex items-center justify-between rounded-lg border border-stroke-soft p-2.5 transition-colors hover:bg-bg-elevation-1-alt">
+              <Link key={p.id} to={`/projects/${p.id}`} className="flex items-center justify-between rounded-lg border border-stroke-soft p-2.5 transition-colors hover:bg-bg-1-alt">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-text-strong">{p.name}</p>
                   <p className="text-xs text-text-soft">{formatDate(p.deadline)}</p>
@@ -161,7 +161,7 @@ function AccountantDashboard() {
           <CardHeader><CardTitle>To'lov kutayotgan so'rovlar</CardTitle></CardHeader>
           <CardContent className="space-y-2">
             {pending.slice(0, 8).map((r) => (
-              <Link key={r.id} to="/finance" className="flex items-center justify-between rounded-lg border border-stroke-soft p-3 transition-colors hover:bg-bg-elevation-1-alt">
+              <Link key={r.id} to="/finance" className="flex items-center justify-between rounded-lg border border-stroke-soft p-3 transition-colors hover:bg-bg-1-alt">
                 <div>
                   <p className="text-sm font-medium text-text-strong">{r.user?.fullName}</p>
                   <p className="text-xs text-text-soft">{r.reason}</p>
@@ -199,7 +199,7 @@ function EmployeeDashboard() {
           <CardHeader><CardTitle className="flex items-center gap-2"><ListChecks className="h-4 w-4" /> Loyihalarim</CardTitle></CardHeader>
           <CardContent className="space-y-2">
             {(data.myProjects || []).map((p) => (
-              <Link key={p.id} to={`/projects/${p.id}`} className="flex items-center justify-between rounded-lg border border-stroke-soft p-2.5 transition-colors hover:bg-bg-elevation-1-alt">
+              <Link key={p.id} to={`/projects/${p.id}`} className="flex items-center justify-between rounded-lg border border-stroke-soft p-2.5 transition-colors hover:bg-bg-1-alt">
                 <p className="truncate text-sm font-medium text-text-strong">{p.name}</p>
                 <Badge tone={PROJECT_STATUS[p.status]?.tone}>{PROJECT_STATUS[p.status]?.label}</Badge>
               </Link>

@@ -18,8 +18,9 @@ const MeetingsPage = lazyPage(() => import('@/pages/meetings/MeetingsPage'), 'Me
 const FinancePage = lazyPage(() => import('@/pages/finance/FinancePage'), 'FinancePage');
 const PayrollPage = lazyPage(() => import('@/pages/payroll/PayrollPage'), 'PayrollPage');
 const ExpensesPage = lazyPage(() => import('@/pages/expenses/ExpensesPage'), 'ExpensesPage');
-const ReportsPage = lazyPage(() => import('@/pages/reports/ReportsPage'), 'ReportsPage');
-const TodosPage = lazyPage(() => import('@/pages/todos/TodosPage'), 'TodosPage');
+const EmployeeReportPage = lazyPage(() => import('@/pages/reports/EmployeeReportPage'), 'EmployeeReportPage');
+const ReportComingSoon = lazyPage(() => import('@/pages/reports/ReportComingSoon'), 'ReportComingSoon');
+const DailyPlansPage = lazyPage(() => import('@/pages/daily-plans/DailyPlansPage'), 'DailyPlansPage');
 const AuditPage = lazyPage(() => import('@/pages/audit/AuditPage'), 'AuditPage');
 const UsersPage = lazyPage(() => import('@/pages/users/UsersPage'), 'UsersPage');
 const UserDetailPage = lazyPage(() => import('@/pages/users/UserDetailPage'), 'UserDetailPage');
@@ -50,8 +51,13 @@ export const router = createBrowserRouter([
       { path: 'finance', element: S(<FinancePage />) },
       { path: 'payroll', element: <RequireRole roles={['superadmin', 'admin', 'accountant', 'manager', 'employee']}>{S(<PayrollPage />)}</RequireRole> },
       { path: 'expenses', element: <RequireRole roles={['superadmin', 'admin', 'accountant']}>{S(<ExpensesPage />)}</RequireRole> },
-      { path: 'reports', element: S(<ReportsPage />) },
-      { path: 'todos', element: S(<TodosPage />) },
+      { path: 'reports', element: <Navigate to="/reports/employees" replace /> },
+      { path: 'reports/employees', element: <RequireRole roles={['superadmin', 'admin', 'manager', 'accountant']}>{S(<EmployeeReportPage />)}</RequireRole> },
+      { path: 'reports/projects', element: <RequireRole roles={['superadmin', 'admin', 'manager', 'accountant']}>{S(<ReportComingSoon title="Loyiha bo'yicha hisobot" />)}</RequireRole> },
+      { path: 'reports/expenses', element: <RequireRole roles={['superadmin', 'admin', 'accountant']}>{S(<ReportComingSoon title="Xarajat so'rovlari bo'yicha hisobot" />)}</RequireRole> },
+      { path: 'reports/payroll', element: <RequireRole roles={['superadmin', 'admin', 'accountant']}>{S(<ReportComingSoon title="Ish haqi bo'yicha hisobot" />)}</RequireRole> },
+      { path: 'reports/tasks', element: <RequireRole roles={['superadmin', 'admin', 'manager']}>{S(<ReportComingSoon title="Vazifalar bo'yicha hisobot" />)}</RequireRole> },
+      { path: 'daily-plans', element: S(<DailyPlansPage />) },
       { path: 'audit', element: <RequireRole roles={['superadmin', 'admin', 'accountant']}>{S(<AuditPage />)}</RequireRole> },
       { path: 'users', element: <RequireRole roles={['superadmin', 'admin']}>{S(<UsersPage />)}</RequireRole> },
       { path: 'users/:id', element: <RequireRole roles={['superadmin', 'admin']}>{S(<UserDetailPage />)}</RequireRole> },

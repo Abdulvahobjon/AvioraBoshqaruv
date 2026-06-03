@@ -77,7 +77,7 @@ export function TaskDetailDialog({ taskId, projectId, open, onClose, onEdit }) {
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={TASK_STATUS[task.status]?.tone}>{TASK_STATUS[task.status]?.label}</Badge>
               <Badge tone={TASK_PRIORITY[task.priority]?.tone}>{TASK_PRIORITY[task.priority]?.label}</Badge>
-              <span className="rounded bg-bg-elevation-2 px-2 py-0.5 text-xs text-text-sub">{TASK_TYPE[task.type]}</span>
+              <span className="rounded bg-bg-2 px-2 py-0.5 text-xs text-text-sub">{TASK_TYPE[task.type]}</span>
               {task.reopenedCount > 0 && (
                 <span className="inline-flex items-center gap-1 rounded bg-error-soft px-2 py-0.5 text-xs text-error-strong">
                   <RotateCcw className="h-3 w-3" /> {task.reopenedCount} marta qaytarilgan
@@ -95,7 +95,7 @@ export function TaskDetailDialog({ taskId, projectId, open, onClose, onEdit }) {
             {task.description && (
               <div>
                 <p className="mb-1 text-xs font-medium text-text-soft">Tavsif</p>
-                <p className="whitespace-pre-wrap rounded-lg bg-bg-elevation-1 p-3 text-sm text-text-sub">{task.description}</p>
+                <p className="whitespace-pre-wrap rounded-lg bg-bg-1 p-3 text-sm text-text-sub">{task.description}</p>
               </div>
             )}
 
@@ -118,7 +118,7 @@ export function TaskDetailDialog({ taskId, projectId, open, onClose, onEdit }) {
               <div className="space-y-1">
                 {(task.files || []).map((f) => (
                   <a key={f.id} href={`${API_BASE}${f.fileUrl}`} target="_blank" rel="noreferrer"
-                    className="flex items-center justify-between rounded-md border border-stroke-soft px-3 py-2 text-sm hover:bg-bg-elevation-1-alt">
+                    className="flex items-center justify-between rounded-md border border-stroke-soft px-3 py-2 text-sm hover:bg-bg-1-alt">
                     <span className="truncate text-text-strong">{f.fileName}</span>
                     <Download className="h-4 w-4 shrink-0 text-icon-soft" />
                   </a>

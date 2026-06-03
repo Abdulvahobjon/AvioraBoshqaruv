@@ -82,7 +82,7 @@ export function UserDetailPage() {
           <AvatarUpload value={f.avatar} onChange={(v) => set('avatar', v)} size="h-24 w-24" />
           <h2 className="text-2xl font-bold text-text-strong">{f.fullName || user.fullName}</h2>
         </div>
-        <button onClick={() => refetch()} title="Yangilash" className="rounded-md p-2 text-icon-sub hover:bg-bg-elevation-1-alt">
+        <button onClick={() => refetch()} title="Yangilash" className="rounded-md p-2 text-icon-sub hover:bg-bg-1-alt">
           <RefreshCw className={`h-5 w-5 ${isFetching ? 'animate-spin' : ''}`} />
         </button>
       </div>

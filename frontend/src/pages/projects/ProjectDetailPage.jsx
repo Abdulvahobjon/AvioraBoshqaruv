@@ -24,7 +24,7 @@ export function ProjectDetailPage() {
   const { data: project, isLoading } = useProject(id);
 
   if (isLoading) return <ProjectDetailSkeleton />;
-  if (!project) return <EmptyState title="Loyiha topilmadi" />;
+  if (!project) return <EmptyState fill title="Loyiha topilmadi" />;
 
   const dl = deadlineInfo(project.deadline);
 
@@ -116,14 +116,14 @@ function ProjectDetailSkeleton() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-3 rounded-lg border border-stroke-sub bg-bg-elevation-1 p-5 lg:col-span-2">
+        <div className="space-y-3 rounded-lg border border-stroke-sub bg-bg-1 p-5 lg:col-span-2">
           <Skeleton className="h-5 w-28" />
           <Skeleton className="h-4 w-full" />
           <Skeleton className="h-4 w-5/6" />
           <Skeleton className="h-4 w-2/3" />
           <Skeleton className="mt-4 h-2 w-full rounded-full" />
         </div>
-        <div className="space-y-4 rounded-lg border border-stroke-sub bg-bg-elevation-1 p-5">
+        <div className="space-y-4 rounded-lg border border-stroke-sub bg-bg-1 p-5">
           <Skeleton className="h-5 w-32" />
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="flex items-center gap-2.5">

@@ -24,22 +24,22 @@ export function DataTable({
 }) {
   if (loading) {
     return (
-      <div className="rounded-lg border border-stroke-sub bg-bg-elevation-1 p-4">
+      <div className="rounded-lg border border-stroke-sub bg-bg-1 p-4">
         <TableSkeleton rows={6} cols={columns.length} />
       </div>
     );
   }
 
   if (!data.length) {
-    return <EmptyState title={emptyTitle} description={emptyDescription} />;
+    return <EmptyState fill title={emptyTitle} description={emptyDescription} />;
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-stroke-sub bg-bg-elevation-1">
+    <div className="overflow-hidden rounded-lg border border-stroke-sub bg-bg-1">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-stroke-sub bg-bg-elevation-1-alt">
+            <tr className="border-b border-stroke-sub bg-bg-1-alt">
               {columns.map((col) => (
                 <th
                   key={col.key}
@@ -69,7 +69,7 @@ export function DataTable({
                 onClick={() => onRowClick?.(row)}
                 className={cn(
                   'border-b border-stroke-soft last:border-0 transition-colors',
-                  onRowClick && 'cursor-pointer hover:bg-bg-elevation-1-alt',
+                  onRowClick && 'cursor-pointer hover:bg-bg-1-alt',
                 )}
               >
                 {columns.map((col) => (

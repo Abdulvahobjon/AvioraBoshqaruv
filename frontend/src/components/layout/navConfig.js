@@ -7,7 +7,7 @@ import {
   Receipt,
   BarChart3,
   ScrollText,
-  CheckSquare,
+  CalendarCheck,
   UserCog,
   Video,
   Banknote,
@@ -46,8 +46,20 @@ export const NAV = [
       { to: '/expenses', label: 'Xarajatlar', icon: Receipt, roles: ['superadmin', 'admin', 'accountant'] },
     ],
   },
-  { type: 'item', to: '/reports', label: 'Hisobotlar', icon: BarChart3, roles: ALL },
-  { type: 'item', to: '/todos', label: 'Eslatmalar', icon: CheckSquare, roles: ALL },
+  {
+    type: 'group',
+    key: 'reports',
+    label: 'Hisobotlar',
+    icon: BarChart3,
+    children: [
+      { to: '/reports/employees', label: "Xodim bo'yicha", icon: UserCog, roles: ['superadmin', 'admin', 'manager', 'accountant'] },
+      { to: '/reports/projects', label: "Loyiha bo'yicha", icon: Briefcase, roles: ['superadmin', 'admin', 'manager', 'accountant'] },
+      { to: '/reports/expenses', label: "Xarajat so'rovlari bo'yicha", icon: Receipt, roles: ['superadmin', 'admin', 'accountant'] },
+      { to: '/reports/payroll', label: "Ish haqi bo'yicha", icon: Banknote, roles: ['superadmin', 'admin', 'accountant'] },
+      { to: '/reports/tasks', label: "Vazifalar bo'yicha", icon: KanbanSquare, roles: ['superadmin', 'admin', 'manager'] },
+    ],
+  },
+  { type: 'item', to: '/daily-plans', label: 'Kundalik rejalar', icon: CalendarCheck, roles: ALL },
   { type: 'item', to: '/audit', label: 'Audit', icon: ScrollText, roles: ['superadmin', 'admin', 'accountant'] },
 ];
 

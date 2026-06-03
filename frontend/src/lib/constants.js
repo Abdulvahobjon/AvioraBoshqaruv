@@ -72,6 +72,13 @@ export const CURRENCIES = [
   { value: 'USD', label: 'dollar (USD)' },
 ];
 
+// ── Kundalik rejalar (Daily plans) ──
+export const DAILY_PLAN_PRIORITY = {
+  low: { label: 'Past', tone: 'muted', dot: '#6B7280' },
+  medium: { label: "O'rta", tone: 'info', dot: '#3B82F6' },
+  high: { label: 'Yuqori', tone: 'warning', dot: '#F59E0B' },
+};
+
 // ── Moliya so'rovi ──
 export const FINANCE_STATUS = {
   pending: { label: 'Kutilmoqda', tone: 'warning' },
