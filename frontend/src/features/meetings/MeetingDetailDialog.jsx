@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Calendar, Clock, ChevronDown, ChevronUp, Send, CheckCircle2, Video, Copy } from 'lucide-react';
+import { Calendar, Clock, ChevronDown, ChevronUp, Send, CheckCircle2, Video, Copy, RefreshCw } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Input';
@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { formatDate } from '@/lib/utils/format';
 import { apiError } from '@/lib/api/axios';
 import { useAuthStore } from '@/store/authStore';
-import { useMeeting, useSubmitReason } from './meetingsApi';
+import { useMeeting, useSubmitReason, useRegenerateMeetLink } from './meetingsApi';
 import { MeetingStatusBadge } from './MeetingStatusBadge';
 
 function attendanceMeta(a) {
@@ -24,16 +24,26 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
   const role = useAuthStore((s) => s.user?.role);
   const { data: meeting, isLoading } = useMeeting(meetingId);
   const submitReason = useSubmitReason();
+  const regenerate = useRegenerateMeetLink();
   const [expanded, setExpanded] = useState(null);
   const [reason, setReason] = useState('');
 
   // Creator (or admin) can finish a meeting that isn't finished yet.
-  const canFinish = !!meeting && !meeting.finishedAt && !!onFinish &&
-    (meeting.createdBy === myId || ['superadmin', 'admin'].includes(role));
+  const canManage = !!meeting && (meeting.createdBy === myId || ['superadmin', 'admin'].includes(role));
+  const canFinish = !!meeting && !meeting.finishedAt && !!onFinish && canManage;
 
   // Kirish havolasi: backend yaratgan Meet (meetLink) yoki foydalanuvchi qo'lda kiritgan (link).
   const joinLink = meeting?.meetLink || meeting?.link || null;
   const copyMeet = () => { navigator.clipboard?.writeText(joinLink); toast.success('Havola nusxalandi'); };
+
+  // Havola yaratilmagan bo'lsa (Meet xatosi) tashkilotchi qayta urinishi mumkin.
+  const canRegenerate = canManage && !meeting?.finishedAt && !joinLink;
+  const regenLink = () => {
+    regenerate.mutate(meeting.id, {
+      onSuccess: () => toast.success('Google Meet havolasi yaratildi'),
+      onError: (e) => toast.error(apiError(e, 'Havola yaratilmadi')),
+    });
+  };
 
   const send = () => {
     if (!reason.trim()) { toast.error('Sabab kiriting'); return; }
@@ -82,6 +92,17 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
                 <Video className="h-4 w-4" /> {meeting.meetLink ? "Google Meet'ga kirish" : 'Yig\'ilish havolasiga kirish'}
               </a>
               <Button variant="outline" size="icon" onClick={copyMeet} title="Havolani nusxalash"><Copy className="h-4 w-4" /></Button>
+            </div>
+          )}
+
+          {!joinLink && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-bg-1 px-3 py-2.5">
+              <p className="text-sm text-text-soft">Google Meet havolasi yaratilmagan.</p>
+              {canRegenerate && (
+                <Button variant="outline" size="sm" onClick={regenLink} loading={regenerate.isPending}>
+                  <RefreshCw className="h-4 w-4" /> Havolani qayta yaratish
+                </Button>
+              )}
             </div>
           )}
 

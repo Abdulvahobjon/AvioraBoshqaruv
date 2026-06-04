@@ -75,6 +75,36 @@ Bu `postgres` + `backend` (avtomatik migrate + seed) + `frontend` (nginx) ni ko'
 
 ---
 
+## Google Meet / Calendar integratsiyasi
+
+Yig'ilish yaratilganda **"Havolasi" maydoni bo'sh** qoldirilsa, tizim Google Calendar API
+(OAuth2 + refresh token) orqali **avtomatik Google Meet havolasi** yaratadi va yozuvga saqlaydi
+(`meetLink` + `link`). Havola **qo'lda** kiritilsa, Google'ga murojaat qilinmaydi.
+
+Sozlash uchun `.env` (lokal: `backend/.env`, server: `google-meet.env`) ga quyidagilarni qo'ying:
+
+```env
+GOOGLE_CLIENT_ID="...apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET="GOCSPX-..."
+GOOGLE_REDIRECT_URI="https://developers.google.com/oauthplayground"
+GOOGLE_REFRESH_TOKEN="1//04..."
+GOOGLE_CALENDAR_ID="primary"
+GOOGLE_MEET_TIMEZONE="Asia/Tashkent"
+```
+
+- **Maxfiy kalitlar faqat `.env` da** — kodda hardcode qilinmaydi. `.env` git'ga kommit qilinmaydi.
+- **Token barqarorligi:** Google Cloud Console'da OAuth "consent screen" **"In production"**
+  bo'lsa refresh token **eskirmaydi**. "Testing" rejimida har 7 kunda eskiradi.
+- **Token yangilanganda IKKALA fayl yangilanishi shart:** lokal `backend/.env` **va**
+  serverdagi `google-meet.env` — so'ng `docker compose up -d --build`.
+- **Token sog'ligini tekshirish:** `GET /api/google/health` → `{ ok: true }` yoki `{ ok: false, reason }`
+  (admin/superadmin). Token muammosini erta bilish uchun.
+- **Havola yaratilmay qolsa:** yig'ilish linksiz saqlanadi (ma'lumot yo'qolmaydi); yig'ilish
+  oynasidagi **"Havolani qayta yaratish"** tugmasi orqali (`POST /api/meetings/:id/regenerate-link`)
+  qayta urinish mumkin.
+
+---
+
 ## Test loginlar
 
 Parol (barchasi uchun): **`Aviora2026!`**

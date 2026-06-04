@@ -57,6 +57,17 @@ export function useSubmitReason() {
   });
 }
 
+export function useRegenerateMeetLink() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id) => (await api.post(`/meetings/${id}/regenerate-link`)).data,
+    onSuccess: (_d, id) => {
+      qc.invalidateQueries({ queryKey: ['meetings'] });
+      qc.invalidateQueries({ queryKey: ['meeting', String(id)] });
+    },
+  });
+}
+
 export function useDeleteMeeting() {
   const qc = useQueryClient();
   return useMutation({

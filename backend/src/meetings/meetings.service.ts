@@ -151,6 +151,39 @@ export class MeetingsService {
     }
   }
 
+  /**
+   * Meet havolasini QAYTA yaratish (retry). Avval yaratish muvaffaqiyatsiz bo'lib
+   * yig'ilish linksiz saqlanganda ishlatiladi — ma'lumot yo'qolmaydi.
+   * attachMeet'dan farqi: xatoni YUTMAYDI — toza xabarni foydalanuvchiga qaytaradi.
+   */
+  async regenerateLink(id: number, user: AuthUser) {
+    const meeting = await this.prisma.meeting.findFirst({ where: { id } });
+    if (!meeting) throw new NotFoundException('Yig\'ilish topilmadi');
+    if (!this.canManage(meeting, user)) throw new ForbiddenException('Faqat tashkilotchi havolani qayta yaratadi');
+    if (meeting.finishedAt) throw new BadRequestException('Yakunlangan yig\'ilish uchun havola yaratilmaydi');
+    if (meeting.meetLink) throw new BadRequestException('Bu yig\'ilishda Google Meet havolasi allaqachon mavjud');
+
+    // createMeetEvent xato bo'lsa (sozlanmagan/token/403) toza o'zbekcha exception throw qiladi → frontendga boradi.
+    const start = new Date(meeting.startAt);
+    const end = new Date(start.getTime() + (meeting.duration || 30) * 60000);
+    const r = await this.gcal.createMeetEvent({
+      title: meeting.title || 'Yig\'ilish',
+      description: meeting.content || undefined,
+      startISO: start.toISOString(),
+      endISO: end.toISOString(),
+    });
+    return this.prisma.meeting.update({
+      where: { id },
+      data: {
+        googleEventId: r.googleEventId,
+        meetLink: r.meetLink,
+        meetAccount: MEET_ACCOUNT,
+        ...(r.meetLink ? { link: r.meetLink } : {}),
+      },
+      include: this.include,
+    });
+  }
+
   /** Yig'ilishni tahrirlash (tashkilotchi/admin). Ishtirokchilar va Google Meet eventi ham sinxronlanadi. */
   async update(id: number, dto: any, user: AuthUser) {
     const meeting = await this.prisma.meeting.findFirst({ where: { id }, include: { attendance: true } });

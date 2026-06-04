@@ -47,6 +47,12 @@ export class MeetingsController {
     return this.meetings.setAttendance(id, dto, user);
   }
 
+  /** Meet havolasini qayta yaratish (avval yaratish muvaffaqiyatsiz bo'lsa). */
+  @Post(':id/regenerate-link')
+  regenerateLink(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser) {
+    return this.meetings.regenerateLink(id, user);
+  }
+
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser) {
     return this.meetings.remove(id, user);
