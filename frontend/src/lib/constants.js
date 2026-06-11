@@ -5,6 +5,14 @@ export const ROLE_LABELS = {
   manager: 'Menejer',
   employee: 'Xodim',
   accountant: 'Buxgalter',
+  auditor: 'Nazoratchi',
+};
+
+// ── Ariza (Application) holatlari ──
+export const APPLICATION_STATUS = {
+  pending: { label: 'Kutilmoqda', tone: 'warning' },
+  accepted: { label: 'Qabul qilindi', tone: 'success' },
+  rejected: { label: 'Rad etildi', tone: 'error' },
 };
 
 // ── Loyiha statuslari ──
@@ -115,6 +123,9 @@ export const AUDIT_ACTION = {
   CHECK: { label: 'Tekshirildi', tone: 'success' },
   GENERATE: { label: 'Hisoblandi', tone: 'info' },
   CHANGE_PASSWORD: { label: 'Parol', tone: 'neutral' },
+  REVIEW: { label: 'Ko\'rib chiqildi', tone: 'info' },
+  RESTORE: { label: 'Tiklandi', tone: 'success' },
+  HARD_DELETE: { label: 'Butunlay o\'chirildi', tone: 'error' },
 };
 
 // Badge tone -> token-asosli klasslar

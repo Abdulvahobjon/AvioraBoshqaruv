@@ -127,7 +127,7 @@ export function UsersPage() {
   ];
 
   return (
-    <div>
+    <div className="flex h-[calc(100vh-6rem)] flex-col sm:h-[calc(100vh-7rem)]">
       {/* "Yangi xodim" lives in the top navbar; "Tanlash" stays here. */}
       <TopbarActions>
         <Button size="sm" onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" /> Yangi xodim</Button>
@@ -169,14 +169,18 @@ export function UsersPage() {
         </div>
       )}
 
-      <DataTable
-        columns={columns}
-        data={rows}
-        loading={isLoading}
-        onRowClick={(u) => navigate(`/users/${u.id}`)}
-        emptyTitle="Foydalanuvchilar yo'q"
-        emptyDescription="Yangi xodim qo'shing yoki filtrlarni o'zgartiring."
-      />
+      <div className="min-h-0 flex-1">
+        <DataTable
+          columns={columns}
+          data={rows}
+          loading={isLoading}
+          onRowClick={(u) => navigate(`/users/${u.id}`)}
+          emptyTitle="Foydalanuvchilar yo'q"
+          emptyDescription="Yangi xodim qo'shing yoki filtrlarni o'zgartiring."
+          transparent
+          fill
+        />
+      </div>
 
       <UserDialog open={formOpen} onClose={() => setFormOpen(false)} />
       <ConfirmDialog

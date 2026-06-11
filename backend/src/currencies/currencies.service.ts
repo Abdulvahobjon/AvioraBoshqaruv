@@ -37,7 +37,12 @@ export class CurrenciesService {
     const cached = this.cache.get(code);
     if (cached && Date.now() - cached.at < this.TTL) return cached.rate;
     const cur = await this.prisma.currencyRate.findUnique({ where: { code } });
-    const rate = cur?.rateToUzs ?? 1;
+    // Kurs topilmasa JIM 1 ga tenglashtirmaymiz — aks holda USD summa so'mga 1:1
+    // aylanib, moliyaviy hisob jimgina buziladi. Aniq xato beramiz.
+    if (!cur || !cur.rateToUzs || cur.rateToUzs < 1) {
+      throw new NotFoundException(`${code} uchun valyuta kursi sozlanmagan. Sozlamalar → Valyutalar bo'limidan kursni kiriting.`);
+    }
+    const rate = cur.rateToUzs;
     this.cache.set(code, { rate, at: Date.now() });
     return rate;
   }

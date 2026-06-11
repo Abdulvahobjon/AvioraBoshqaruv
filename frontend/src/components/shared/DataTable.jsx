@@ -21,25 +21,43 @@ export function DataTable({
   onPageChange,
   emptyTitle,
   emptyDescription,
+  transparent = false, // shaffof fon — kartochka emas, sahifa foni ko'rinadi
+  fill = false, // bo'limning to'liq balandligini egallaydi (ichki scroll bilan)
 }) {
+  // Tashqi konteyner: shaffof rejimda fon/ramka olib tashlanadi; fill rejimida flex-column.
+  const shell = cn(
+    'overflow-hidden rounded-lg',
+    transparent ? 'border-0 bg-transparent' : 'border border-stroke-sub bg-bg-1',
+    fill && 'flex h-full flex-col',
+  );
+
   if (loading) {
     return (
-      <div className="rounded-lg border border-stroke-sub bg-bg-1 p-4">
+      <div className={cn(shell, !transparent && 'p-4')}>
         <TableSkeleton rows={6} cols={columns.length} />
       </div>
     );
   }
 
   if (!data.length) {
-    return <EmptyState fill title={emptyTitle} description={emptyDescription} />;
+    return (
+      <div className={fill ? 'flex h-full flex-col' : undefined}>
+        <EmptyState fill title={emptyTitle} description={emptyDescription} />
+      </div>
+    );
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-stroke-sub bg-bg-1">
-      <div className="overflow-x-auto">
+    <div className={shell}>
+      <div className={cn('overflow-x-auto', fill && 'min-h-0 flex-1 overflow-y-auto')}>
         <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-stroke-sub bg-bg-1-alt">
+          <thead className={cn(fill && 'sticky top-0 z-10')}>
+            <tr
+              className={cn(
+                'border-b border-stroke-sub',
+                transparent ? 'bg-transparent backdrop-blur' : 'bg-bg-1-alt',
+              )}
+            >
               {columns.map((col) => (
                 <th
                   key={col.key}

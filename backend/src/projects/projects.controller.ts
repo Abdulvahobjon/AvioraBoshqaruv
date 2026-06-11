@@ -18,6 +18,12 @@ export class ProjectsController {
     return this.projects.findAll(user, q);
   }
 
+  @Get('trash')
+  @Roles('superadmin', 'admin')
+  trash() {
+    return this.projects.trash();
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser) {
     return this.projects.findOne(id, user);
@@ -33,6 +39,12 @@ export class ProjectsController {
   @Roles('superadmin', 'admin')
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateProjectDto, @CurrentUser() user: AuthUser, @Req() req: Request) {
     return this.projects.update(id, dto, user, req.ip);
+  }
+
+  @Post(':id/restore')
+  @Roles('superadmin', 'admin')
+  restore(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser, @Req() req: Request) {
+    return this.projects.restore(id, user, req.ip);
   }
 
   @Delete(':id')

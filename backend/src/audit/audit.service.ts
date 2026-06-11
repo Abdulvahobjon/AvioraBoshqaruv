@@ -9,6 +9,7 @@ interface AuditParams {
   ip?: string | null;
   oldValue?: any;
   newValue?: any;
+  flagged?: boolean; // qo'lda flaglash (avtomatik aniqlashdan tashqari)
 }
 
 /**
@@ -23,7 +24,7 @@ export class AuditService {
 
   async record(p: AuditParams) {
     try {
-      const flagged = this.isSuspicious(p);
+      const flagged = p.flagged ?? this.isSuspicious(p);
       await this.prisma.auditLog.create({
         data: {
           userId: p.userId ?? null,

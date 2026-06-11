@@ -54,7 +54,7 @@ export function ProjectsPage() {
   ];
 
   return (
-    <div>
+    <div className="flex h-[calc(100vh-6rem)] flex-col sm:h-[calc(100vh-7rem)]">
       <PageHeader
         title="Loyihalar"
         subtitle="Barcha loyihalar va ularning holati"
@@ -72,18 +72,22 @@ export function ProjectsPage() {
         </Select>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={data?.items}
-        loading={isLoading}
-        onRowClick={(r) => navigate(`/projects/${r.id}`)}
-        page={page}
-        totalPages={data?.totalPages || 1}
-        total={data?.total || 0}
-        onPageChange={setPage}
-        emptyTitle="Loyihalar yo'q"
-        emptyDescription="Sizga biriktirilgan yoki yaratilgan loyihalar bu yerda ko'rinadi."
-      />
+      <div className="min-h-0 flex-1">
+        <DataTable
+          columns={columns}
+          data={data?.items}
+          loading={isLoading}
+          onRowClick={(r) => navigate(`/projects/${r.id}`)}
+          page={page}
+          totalPages={data?.totalPages || 1}
+          total={data?.total || 0}
+          onPageChange={setPage}
+          emptyTitle="Loyihalar yo'q"
+          emptyDescription="Sizga biriktirilgan yoki yaratilgan loyihalar bu yerda ko'rinadi."
+          transparent
+          fill
+        />
+      </div>
 
       <ProjectFormDialog open={formOpen} onClose={() => setFormOpen(false)} />
     </div>

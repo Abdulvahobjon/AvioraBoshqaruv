@@ -13,11 +13,15 @@ export class ExpensesService {
     private currencies: CurrenciesService,
   ) {}
 
-  private include = { category: { select: { id: true, name: true } } };
+  private include = {
+    category: { select: { id: true, name: true } },
+    project: { select: { id: true, name: true } },
+  };
 
   async findAll(q: any) {
     const where: any = {};
     if (q.categoryId) where.categoryId = Number(q.categoryId);
+    if (q.projectId) where.projectId = Number(q.projectId);
     if (q.from || q.to) {
       where.date = {};
       if (q.from) where.date.gte = new Date(q.from);
@@ -35,6 +39,7 @@ export class ExpensesService {
     const expense = await this.prisma.expense.create({
       data: {
         categoryId: dto.categoryId ?? null,
+        projectId: dto.projectId ?? null,
         amount,
         currency,
         amountUzs,
@@ -53,6 +58,7 @@ export class ExpensesService {
     if (!existing) throw new NotFoundException('Xarajat topilmadi');
     const data: any = {};
     if (dto.categoryId !== undefined) data.categoryId = dto.categoryId;
+    if (dto.projectId !== undefined) data.projectId = dto.projectId;
     if (dto.note !== undefined) data.note = dto.note;
     if (dto.date !== undefined) data.date = new Date(dto.date);
     if (dto.amount !== undefined || dto.currency !== undefined) {

@@ -74,7 +74,7 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-lg font-semibold text-text-strong">{meeting.title}</h3>
-              {meeting.uid && <Badge tone="muted">{meeting.uid}</Badge>}
+              {meeting.uid && <Badge tone="muted" className="!bg-transparent px-0">{meeting.uid}</Badge>}
               <MeetingStatusBadge meeting={meeting} />
             </div>
             <p className="mt-1 text-sm text-text-sub">{meeting.project?.name || 'Umumiy yig\'ilish'}</p>
@@ -96,7 +96,7 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
           )}
 
           {!joinLink && (
-            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-bg-1 px-3 py-2.5">
+            <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
               <p className="text-sm text-text-soft">Google Meet havolasi yaratilmagan.</p>
               {canRegenerate && (
                 <Button variant="outline" size="sm" onClick={regenLink} loading={regenerate.isPending}>
@@ -106,7 +106,7 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
             </div>
           )}
 
-          {meeting.content && <p className="rounded-lg bg-bg-1 p-3 text-sm text-text-sub">{meeting.content}</p>}
+          {meeting.content && <p className="p-3 text-sm text-text-sub">{meeting.content}</p>}
 
           {/* Attendance */}
           <div>
@@ -128,7 +128,7 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge tone={meta.tone}>{meta.label}</Badge>
+                        <Badge tone={meta.tone} className="!bg-transparent px-0">{meta.label}</Badge>
                         {a.absenceReason && (
                           <button onClick={() => setExpanded(isOpen ? null : a.id)} className="text-icon-soft">
                             {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}

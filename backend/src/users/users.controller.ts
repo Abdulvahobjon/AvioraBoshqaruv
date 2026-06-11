@@ -3,8 +3,6 @@ import {
   UploadedFile, UseInterceptors, BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { UsersService } from './users.service';
@@ -13,14 +11,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
-
-const uploadStorage = diskStorage({
-  destination: process.env.UPLOAD_DIR || 'uploads',
-  filename: (_req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `${unique}${extname(file.originalname)}`);
-  },
-});
+import { uploadOptions } from '../common/upload.util';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -37,10 +28,31 @@ export class UsersController {
   /** Upload an avatar / passport file before (or while) saving a user → returns its URL. */
   @Post('upload')
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file', { storage: uploadStorage, limits: { fileSize: 10 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', uploadOptions(10)))
   upload(@UploadedFile() file: any) {
     if (!file) throw new BadRequestException('Fayl yuklanmadi');
     return { url: `/uploads/${file.filename}`, name: file.originalname, size: file.size };
+  }
+
+  /** Yengil ro'yxat (dropdownlar): ?role= bilan filtr. */
+  @Get('all')
+  @Roles('superadmin', 'admin', 'manager', 'auditor', 'accountant')
+  all(@Query('role') role?: string) {
+    return this.users.findAllLight(role);
+  }
+
+  /** O'z unumdorligi (KPI) — barcha rollar. */
+  @Get('me/efficiency')
+  @Roles('superadmin', 'admin', 'manager', 'employee', 'accountant', 'auditor')
+  myEfficiency(@CurrentUser('id') userId: number) {
+    return this.users.efficiency(userId);
+  }
+
+  /** Boshqa xodim unumdorligi — boshqaruv/nazorat rollari. */
+  @Get(':id/efficiency')
+  @Roles('superadmin', 'admin', 'manager', 'auditor')
+  userEfficiency(@Param('id', ParseIntPipe) id: number) {
+    return this.users.efficiency(id);
   }
 
   @Get(':id')

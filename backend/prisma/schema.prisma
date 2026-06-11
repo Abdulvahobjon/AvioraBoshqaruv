@@ -21,6 +21,7 @@ enum Role {
   manager
   employee
   accountant
+  auditor // Nazoratchi — read-only + task QA (checked/rejected) + audit xulosa
 }
 
 enum UserStatus {
@@ -59,6 +60,13 @@ enum Currency {
 enum ProjectRole {
   manager
   employee
+  auditor // Nazoratchi — per-loyiha a'zo (read + task QA)
+}
+
+enum ApplicationStatus {
+  pending  // yangi tushgan
+  accepted // keyingi bosqichga
+  rejected // rad etilgan
 }
 
 enum TaskStatus {
@@ -113,24 +121,42 @@ enum PayrollStatus {
 // ─────────────── REFERENCE / NOMENKLATURA ───────────────
 
 model Region {
-  id        Int       @id @default(autoincrement())
-  name      String
-  deletedAt DateTime? @map("deleted_at")
-  createdAt DateTime  @default(now()) @map("created_at")
+  id            Int       @id @default(autoincrement())
+  name          String
+  isApplication Boolean   @default(false) @map("is_application") // arizalar uchun ham ko'rsatiladimi
+  deletedAt     DateTime? @map("deleted_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
 
-  clients Client[]
+  clients      Client[]
+  districts    District[]
+  applications Application[]
 
   @@map("regions")
 }
 
+model District {
+  id            Int       @id @default(autoincrement())
+  name          String
+  regionId      Int?      @map("region_id")
+  isApplication Boolean   @default(false) @map("is_application")
+  deletedAt     DateTime? @map("deleted_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  region       Region?       @relation(fields: [regionId], references: [id])
+  applications Application[]
+
+  @@map("districts")
+}
+
 model Position {
   id        Int       @id @default(autoincrement())
-  name      String
+  name      String    @unique
   deletedAt DateTime? @map("deleted_at")
   createdAt DateTime  @default(now()) @map("created_at")
 
-  users User[]
-  tasks Task[]
+  users        User[]
+  tasks        Task[]
+  applications Application[]
 
   @@map("positions")
 }
@@ -203,6 +229,7 @@ model User {
   dailyPlans       DailyPlan[]
   auditLogs        AuditLog[]
   notifications    Notification[]
+  reviewedApplications Application[] @relation("ApplicationReviewer")
 
   @@map("users")
 }
@@ -260,6 +287,7 @@ model Project {
   tasks    Task[]
   meetings Meeting[]
   payments ClientPayment[]
+  expenses Expense[]
 
   @@map("projects")
 }
@@ -301,6 +329,7 @@ model Task {
   deadline         DateTime?
   estimatedMinutes Int?         @map("estimated_minutes")
   actualMinutes    Int?         @map("actual_minutes")
+  inProgressAt     DateTime?    @map("in_progress_at") // oxirgi marta 'in_progress' ga o'tgan vaqt (actualMinutes hisoblash uchun)
   reopenedCount    Int          @default(0) @map("reopened_count")
   rejectReason     String?      @map("reject_reason")
   orderIndex       Int          @default(0) @map("order_index") // Kanban tartib
@@ -364,6 +393,7 @@ model Meeting {
   googleEventId String? @map("google_event_id") // Calendar event id (patch/delete uchun)
   meetLink      String? @map("meet_link")       // hangoutLink (Google Meet havolasi)
   meetAccount   String? @map("meet_account")    // qaysi akkaunt yaratdi (yagona: 'asositllm')
+  deletedAt  DateTime? @map("deleted_at")
   createdAt  DateTime  @default(now()) @map("created_at")
 
   project    Project?            @relation(fields: [projectId], references: [id])
@@ -421,7 +451,7 @@ model LedgerEntry {
   type            String // "salary" | "company" | "other" | "project_share" | "withdrawal" | "reversal"
   direction       LedgerDirection
   isReversal      Boolean         @default(false) @map("is_reversal")
-  reversedEntryId Int?            @map("reversed_entry_id")
+  reversedEntryId Int?            @unique @map("reversed_entry_id") // bir yozuv faqat bir marta teskari qilinadi (dubl-himoya)
   note            String?
   createdAt       DateTime        @default(now()) @map("created_at")
 
@@ -502,6 +532,7 @@ model CurrencyHistory {
 model Expense {
   id          Int      @id @default(autoincrement())
   categoryId  Int?     @map("category_id")
+  projectId   Int?     @map("project_id") // loyihaga bog'langan xarajat (budget variance uchun)
   date        DateTime @default(now())
   amount      BigInt // tiyin (kiritilgan valutada)
   currency    Currency @default(UZS)
@@ -512,6 +543,7 @@ model Expense {
   createdAt   DateTime @default(now()) @map("created_at")
 
   category ExpenseCategory? @relation(fields: [categoryId], references: [id])
+  project  Project?         @relation(fields: [projectId], references: [id])
 
   @@map("expenses")
 }
@@ -568,10 +600,43 @@ model Notification {
   userId    Int      @map("user_id")
   type      String
   payload   Json?
-  isRead    Boolean  @default(false) @map("is_read")
-  createdAt DateTime @default(now()) @map("created_at")
+  isRead    Boolean   @default(false) @map("is_read")
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id])
 
   @@map("notifications")
+}
+
+// ─────────────── HR: APPLICATIONS (Nomzodlar arizalari) ───────────────
+
+model Application {
+  id         Int               @id @default(autoincrement())
+  fullName   String            @map("full_name")
+  birthDate  DateTime?         @map("birth_date") @db.Date
+  phone      String
+  telegram   String?
+  isStudent  Boolean           @default(false) @map("is_student")
+  university String?
+  regionId   Int?              @map("region_id")
+  districtId Int?              @map("district_id")
+  positionId Int?              @map("position_id") // yo'nalish (direction)
+  resume     String? // PDF fayl URL (max 10MB)
+  portfolio  String? // havola
+  extraInfo  String?           @map("extra_info")
+  status     ApplicationStatus @default(pending)
+  conclusion String? // xulosa (accepted/rejected da majburiy)
+  reviewedBy Int?              @map("reviewed_by")
+  reviewedAt DateTime?         @map("reviewed_at")
+  deletedAt  DateTime?         @map("deleted_at")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+
+  region   Region?   @relation(fields: [regionId], references: [id])
+  district District? @relation(fields: [districtId], references: [id])
+  position Position? @relation(fields: [positionId], references: [id])
+  reviewer User?     @relation("ApplicationReviewer", fields: [reviewedBy], references: [id])
+
+  @@map("applications")
 }

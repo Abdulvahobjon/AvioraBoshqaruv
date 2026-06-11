@@ -57,7 +57,26 @@
       "mcp__ide__getDiagnostics",
       "PowerShell(npm *)",
       "PowerShell($conn = Test-NetConnection -ComputerName localhost -Port 5433 -WarningAction SilentlyContinue; if \\($conn.TcpTestSucceeded\\) { \"Postgres ALLAQACHON ishlayapti \\(port 5433\\)\" } else { \"Postgres ishlamayapti, ishga tushiramiz\" })",
-      "PowerShell(try { $f = Invoke-WebRequest -Uri \"http://localhost:5173\" -UseBasicParsing -TimeoutSec 5; \"Frontend 5173: ✅ HTTP $\\($f.StatusCode\\)\" } catch { \"Frontend 5173: ❌ javob bermadi\" })"
+      "PowerShell(try { $f = Invoke-WebRequest -Uri \"http://localhost:5173\" -UseBasicParsing -TimeoutSec 5; \"Frontend 5173: ✅ HTTP $\\($f.StatusCode\\)\" } catch { \"Frontend 5173: ❌ javob bermadi\" })",
+      "Bash(\"/c/Users/Asadbek/.aviora-pg/pgsql/bin/pg_isready.exe\" -p 5433)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(\"/c/Users/Asadbek/.aviora-pg/pgsql/bin/pg_ctl.exe\" -D \"C:/Users/Asadbek/.aviora-pg/data\" -o \"-p 5433\" -l \"C:/Users/Asadbek/.aviora-pg/pg.log\" start)",
+      "Bash(findstr \"LISTENING\")",
+      "Bash(findstr \":3000\")",
+      "Bash(findstr \":5173\")",
+      "Bash(\"C:/Users/Asadbek/.aviora-pg/pgsql/bin/pg_isready.exe\" -h localhost -p 5433)",
+      "Bash(C:/Users/Asadbek/.aviora-pg/pgsql/bin/pg_ctl.exe *)",
+      "Bash(findstr \"??\")",
+      "PowerShell(Test-Path \"C:\\\\Users\\\\Asadbek\\\\Desktop\\\\AvioraBoshqaruv\\\\backend\\\\.env\"; Test-Path \"C:\\\\Users\\\\Asadbek\\\\.aviora-pg\\\\pgsql\\\\bin\\\\pg_ctl.exe\"; \\(Test-NetConnection -ComputerName localhost -Port 5433 -WarningAction SilentlyContinue\\).TcpTestSucceeded)",
+      "PowerShell(& \"C:\\\\Users\\\\Asadbek\\\\.aviora-pg\\\\pgsql\\\\bin\\\\pg_ctl.exe\" -D \"C:\\\\Users\\\\Asadbek\\\\.aviora-pg\\\\data\" -o \"-p 5433\" -l \"C:\\\\Users\\\\Asadbek\\\\.aviora-pg\\\\pg.log\" start; Start-Sleep -Seconds 2; \\(Test-NetConnection -ComputerName localhost -Port 5433 -WarningAction SilentlyContinue\\).TcpTestSucceeded)",
+      "PowerShell(Start-Sleep -Seconds 8; Get-Content \"C:\\\\Users\\\\Asadbek\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Asadbek-Desktop-AvioraBoshqaruv\\\\e3f0c80c-a970-4b6d-8b24-35bd96c7b8b1\\\\tasks\\\\bjmngyb0p.output\" -Tail 20; \"----\"; \\(Test-NetConnection -ComputerName localhost -Port 3000 -WarningAction SilentlyContinue\\).TcpTestSucceeded)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Asadbek\\\\Desktop\\\\AvioraBoshqaruv\\\\frontend\\\\src\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)",
+      "Bash(grep -iE \"\\\\.env$|\\\\.env\\\\.\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Asadbek\\\\Desktop\\\\AvioraBoshqaruv\\\\backend\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Asadbek\\\\Desktop\\\\AvioraBoshqaruv\\\\frontend\" -Directory)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Asadbek\\.aviora-pg"

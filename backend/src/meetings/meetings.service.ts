@@ -86,25 +86,33 @@ export class MeetingsService {
     const projectId = dto.projectId ? Number(dto.projectId) : null;
     const startAt = this.parseStartAt(dto.startAt);
     await this.assertParticipantsExist(participantIds);
-    const uid = await this.generateUid(projectId);
 
-    const meeting = await this.prisma.meeting.create({
-      data: {
-        uid,
-        title: dto.title || 'Yig\'ilish',
-        projectId,
-        // Foydalanuvchi qo'lda havola kiritsa — shu havola saqlanadi (probel bo'lsa null).
-        // null bo'lsa, quyida avtomatik Google Meet ochiladi.
-        link: typeof dto.link === 'string' && dto.link.trim() ? dto.link.trim() : null,
-        content: dto.content ?? null,
-        duration: dto.duration ? Number(dto.duration) : null,
-        penaltyPercent: dto.penaltyPercent != null && dto.penaltyPercent !== '' ? Number(dto.penaltyPercent) : null,
-        startAt,
-        createdBy: user.id,
-        attendance: { create: participantIds.map((pid) => ({ userId: pid })) },
-      },
-      include: this.include,
-    });
+    const baseData = {
+      title: dto.title || 'Yig\'ilish',
+      projectId,
+      // Foydalanuvchi qo'lda havola kiritsa — shu havola saqlanadi (probel bo'lsa null).
+      // null bo'lsa, quyida avtomatik Google Meet ochiladi.
+      link: typeof dto.link === 'string' && dto.link.trim() ? dto.link.trim() : null,
+      content: dto.content ?? null,
+      duration: dto.duration ? Number(dto.duration) : null,
+      penaltyPercent: dto.penaltyPercent != null && dto.penaltyPercent !== '' ? Number(dto.penaltyPercent) : null,
+      startAt,
+      createdBy: user.id,
+      attendance: { create: participantIds.map((pid) => ({ userId: pid })) },
+    };
+
+    // UID `count+1` asosida — parallel yaratishda unique to'qnashuv bo'lsa (P2002) qayta urinamiz.
+    let meeting;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const uid = await this.generateUid(projectId);
+        meeting = await this.prisma.meeting.create({ data: { uid, ...baseData }, include: this.include });
+        break;
+      } catch (e: any) {
+        if (e?.code === 'P2002' && attempt < 5) continue;
+        throw e;
+      }
+    }
 
     // Notify all participants that a meeting was scheduled
     for (const pid of participantIds) {
@@ -188,8 +196,8 @@ export class MeetingsService {
   async update(id: number, dto: any, user: AuthUser) {
     const meeting = await this.prisma.meeting.findFirst({ where: { id }, include: { attendance: true } });
     if (!meeting) throw new NotFoundException('Yig\'ilish topilmadi');
-    // Faqat o'zi yaratgan va yakunlanmagan yig'ilishni tahrirlash mumkin.
-    if (meeting.createdBy !== user.id) throw new ForbiddenException('Faqat o\'zingiz yaratgan yig\'ilishni tahrirlay olasiz');
+    // Tashkilotchi yoki admin/superadmin tahrirlay oladi (boshqa amallar bilan izchil).
+    if (!this.canManage(meeting, user)) throw new ForbiddenException('Faqat tashkilotchi yoki admin tahrirlay oladi');
     if (meeting.finishedAt) throw new BadRequestException('Yakunlangan yig\'ilishni tahrirlab bo\'lmaydi');
     if (Array.isArray(dto.participantIds)) await this.assertParticipantsExist(dto.participantIds.map(Number));
 

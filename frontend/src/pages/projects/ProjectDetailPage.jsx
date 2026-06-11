@@ -10,9 +10,10 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { formatMoney, formatDate, deadlineInfo } from '@/lib/utils/format';
-import { PROJECT_STATUS, PAYMENT_STATUS } from '@/lib/constants';
+import { PROJECT_STATUS, PAYMENT_STATUS, TASK_STATUS, TASK_PRIORITY } from '@/lib/constants';
 import { useAuthStore } from '@/store/authStore';
 import { useProject } from '@/features/projects/projectsApi';
+import { useTasks } from '@/features/tasks/tasksApi';
 import { ProjectFormDialog } from '@/features/projects/ProjectFormDialog';
 
 export function ProjectDetailPage() {
@@ -79,7 +80,7 @@ export function ProjectDetailPage() {
                   <Avatar name={m.user?.fullName} size="sm" />
                   <div>
                     <p className="text-sm font-medium text-text-strong">{m.user?.fullName}</p>
-                    <p className="text-xs text-text-soft">{m.roleInProject === 'manager' ? 'Menejer' : 'Xodim'}</p>
+                    <p className="text-xs text-text-soft">{m.roleInProject === 'manager' ? 'Menejer' : m.roleInProject === 'auditor' ? 'Nazoratchi' : 'Xodim'}</p>
                   </div>
                 </div>
                 <span className="text-sm font-medium text-text-strong">{formatMoney(m.shareAmount, m.shareCurrency)}</span>
@@ -90,8 +91,65 @@ export function ProjectDetailPage() {
         </Card>
       </div>
 
+      <ProjectTasks projectId={id} />
+
       <ProjectFormDialog open={editOpen} onClose={() => setEditOpen(false)} project={project} />
     </div>
+  );
+}
+
+/** Loyiha vazifalari — status, mas'ul va muddat kesimida ixcham ro'yxat. */
+function ProjectTasks({ projectId }) {
+  const navigate = useNavigate();
+  const { data, isLoading } = useTasks({ projectId, limit: 100 });
+  const tasks = data?.items || [];
+
+  return (
+    <Card className="mt-6">
+      <CardHeader className="flex items-center justify-between">
+        <CardTitle>Vazifalar {!isLoading && <span className="text-text-soft">({data?.total ?? tasks.length})</span>}</CardTitle>
+        <Button variant="outline" size="sm" onClick={() => navigate('/tasks')}>
+          <ListChecks className="h-4 w-4" /> Vazifalar bo'limi
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
+          </div>
+        ) : !tasks.length ? (
+          <p className="py-6 text-center text-sm text-text-soft">Bu loyihada hali vazifa yo'q.</p>
+        ) : (
+          <ul className="divide-y divide-stroke-soft">
+            {tasks.map((t) => {
+              const dl = t.deadline ? deadlineInfo(t.deadline) : null;
+              return (
+                <li key={t.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-text-strong">
+                      {t.uid && <span className="text-text-soft">{t.uid} · </span>}{t.title}
+                    </p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs">
+                      <Badge tone={TASK_STATUS[t.status]?.tone}>{TASK_STATUS[t.status]?.label || t.status}</Badge>
+                      {t.priority && <Badge tone={TASK_PRIORITY[t.priority]?.tone}>{TASK_PRIORITY[t.priority]?.label}</Badge>}
+                      {dl && <span className={dl.overdue ? 'text-error-strong' : 'text-text-soft'}>{dl.text}</span>}
+                    </div>
+                  </div>
+                  {t.assignee ? (
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Avatar name={t.assignee.fullName} size="sm" />
+                      <span className="hidden text-xs text-text-sub sm:inline">{t.assignee.fullName}</span>
+                    </div>
+                  ) : (
+                    <span className="shrink-0 text-xs text-text-soft">Biriktirilmagan</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

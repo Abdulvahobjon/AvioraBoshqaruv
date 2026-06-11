@@ -56,7 +56,7 @@ export function TasksPage() {
   const onDownload = () => exportTasksCsv(rows);
 
   return (
-    <div>
+    <div className="flex h-[calc(100vh-6rem)] flex-col sm:h-[calc(100vh-7rem)]">
       {/* Action buttons live in the top navbar (portalled into Topbar's #page-actions slot). */}
       <TopbarActions>
         <Button variant="outline" size="sm" onClick={onPrint} title="Chop etish"><Printer className="h-4 w-4" /> Chop etish</Button>
@@ -65,7 +65,7 @@ export function TasksPage() {
       </TopbarActions>
 
       {/* Page name lives in the navbar now; here only a compact toolbar. */}
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="mb-3 flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-icon-soft" />
           <Input placeholder="UID yoki nomi bo'yicha izlash..." className="h-9 pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -85,9 +85,11 @@ export function TasksPage() {
         </div>
       </div>
 
-      {view === 'table'
-        ? <TableView query={query} onRowClick={(t) => setDetailId(t.id)} onData={setRows} />
-        : <BoardView query={query} onCardClick={(t) => setDetailId(t.id)} onData={setRows} onAddCard={openCreate} canAdd={canCreate} />}
+      <div className="min-h-0 flex-1">
+        {view === 'table'
+          ? <TableView query={query} onRowClick={(t) => setDetailId(t.id)} onData={setRows} />
+          : <BoardView query={query} onCardClick={(t) => setDetailId(t.id)} onData={setRows} onAddCard={openCreate} canAdd={canCreate} />}
+      </div>
 
       <TaskFormDialog open={formOpen} onClose={() => setFormOpen(false)} task={editing} />
       {detailId && <TaskDetailDialog taskId={detailId} open={!!detailId} onClose={() => setDetailId(null)} onEdit={openEdit} />}
@@ -171,6 +173,8 @@ function TableView({ query, onRowClick, onData }) {
       onPageChange={setPage}
       emptyTitle="Vazifalar yo'q"
       emptyDescription="Yangi vazifa qo'shish uchun yuqoridagi tugmani bosing."
+      transparent
+      fill
     />
   );
 }
@@ -180,7 +184,7 @@ function BoardView({ query, onCardClick, onData, onAddCard, canAdd }) {
   useEffect(() => { if (tasks) onData?.(tasks); }, [tasks, onData]);
   if (isLoading) {
     return (
-      <div className="flex h-[calc(100vh-150px)] gap-2 rounded-xl bg-bg-1 p-2.5">
+      <div className="flex h-full gap-2">
         {Array.from({ length: 7 }).map((_, i) => <Skeleton key={i} className="h-full flex-1 rounded-xl" />)}
       </div>
     );

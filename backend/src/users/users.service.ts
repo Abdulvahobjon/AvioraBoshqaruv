@@ -70,6 +70,85 @@ export class UsersService {
     return user;
   }
 
+  /** Yengil ro'yxat (dropdownlar uchun): id + ism + rol + lavozim. */
+  findAllLight(role?: string) {
+    const where: any = { status: 'active' };
+    if (role) where.role = role;
+    return this.prisma.user.findMany({
+      where,
+      select: { id: true, fullName: true, role: true, avatar: true, positionId: true, position: { select: { id: true, name: true } } },
+      orderBy: { fullName: 'asc' },
+    });
+  }
+
+  /**
+   * Xodim unumdorligi (KPI). TZ 6.1:
+   *   Efficiency = W_tasks·(T_estimated/T_actual) − W_bugs·N_reopened  + yig'ilish davomati.
+   * Bounded [0..100]: taskScore (velocity) 60% + qualityScore (reopen) 20% + meetingScore 20%.
+   */
+  async efficiency(userId: number) {
+    const clamp = (n: number, min = 0, max = 100) => Math.max(min, Math.min(max, n));
+    const user = await this.prisma.user.findFirst({ where: { id: userId }, select: { id: true, fullName: true, role: true } });
+    if (!user) throw new NotFoundException('Foydalanuvchi topilmadi');
+
+    const tasks = await this.prisma.task.findMany({
+      where: { assigneeId: userId },
+      select: { status: true, estimatedMinutes: true, actualMinutes: true, reopenedCount: true },
+    });
+    const total = tasks.length;
+    const completed = tasks.filter((t) => ['done', 'checked', 'production'].includes(t.status));
+    const overdue = tasks.filter((t) => t.status === 'overdue').length;
+    const rejected = tasks.filter((t) => t.status === 'rejected').length;
+    const totalReopened = tasks.reduce((a, t) => a + (t.reopenedCount || 0), 0);
+
+    let est = 0, act = 0;
+    for (const t of completed) {
+      if (t.estimatedMinutes && t.actualMinutes) { est += t.estimatedMinutes; act += t.actualMinutes; }
+    }
+    const velocity = act > 0 ? est / act : 1; // >1 => rejadan tez
+    const taskScore = clamp(Math.round(velocity * 100));
+    const reopenRate = total ? totalReopened / total : 0;
+    const qualityScore = clamp(Math.round(100 - reopenRate * 100));
+
+    const att = await this.prisma.meetingAttendance.findMany({ where: { userId }, select: { attended: true, absenceReason: true } });
+    const totalMeetings = att.length;
+    const attended = att.filter((a) => a.attended).length;
+    const excused = att.filter((a) => !a.attended && !!a.absenceReason).length;
+    const unexcused = att.filter((a) => !a.attended && !a.absenceReason).length;
+    // Sababsiz qatnashmaslik KPI'ni pasaytiradi (sababli — yarim ball).
+    const meetingScore = totalMeetings ? clamp(Math.round(((attended + excused * 0.5) / totalMeetings) * 100)) : 100;
+
+    const overall = clamp(Math.round(taskScore * 0.6 + qualityScore * 0.2 + meetingScore * 0.2));
+
+    let overdueProjects = 0;
+    if (['manager', 'admin', 'superadmin'].includes(user.role)) {
+      overdueProjects = await this.prisma.project.count({
+        where: { status: 'overdue', members: { some: { userId, roleInProject: 'manager' } } },
+      });
+    }
+
+    return {
+      overall_efficiency: overall,
+      task_score: taskScore,
+      quality_score: qualityScore,
+      meeting_score: meetingScore,
+      metrics: {
+        total_tasks: total,
+        completed_tasks: completed.length,
+        overdue_tasks: overdue,
+        rejected_tasks: rejected,
+        total_reopened: totalReopened,
+        estimated_minutes: est,
+        actual_minutes: act,
+        total_meetings: totalMeetings,
+        attended_meetings: attended,
+        excused_meetings: excused,
+        unexcused_meetings: unexcused,
+        overdue_projects: overdueProjects,
+      },
+    };
+  }
+
   async create(dto: CreateUserDto, actorId: number, actorRole: string, ip?: string) {
     // Privilege escalation himoyasi: faqat superadmin 'superadmin' rolini bera oladi.
     if (dto.role === 'superadmin' && actorRole !== 'superadmin') {
@@ -128,6 +207,8 @@ export class UsersService {
   }
 
   async remove(id: number, actorId: number, actorRole: string, ip?: string) {
+    // O'z akkauntini o'chirib bo'lmaydi (admin o'zini qulflab qo'yishidan saqlaydi).
+    if (id === actorId) throw new ForbiddenException('O\'z akkauntingizni o\'chira olmaysiz');
     const user = await this.prisma.user.findFirst({ where: { id } });
     if (!user) throw new NotFoundException('Foydalanuvchi topilmadi');
     // Superadmin foydalanuvchini faqat superadmin o'chira oladi.

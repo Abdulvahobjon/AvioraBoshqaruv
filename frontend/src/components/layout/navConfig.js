@@ -12,9 +12,11 @@ import {
   Video,
   Banknote,
   FolderKanban,
+  ClipboardList,
+  Trash2,
 } from 'lucide-react';
 
-const ALL = ['superadmin', 'admin', 'manager', 'employee', 'accountant'];
+const ALL = ['superadmin', 'admin', 'manager', 'employee', 'accountant', 'auditor'];
 
 /**
  * Sidebar structure: standalone items and accordion groups.
@@ -23,16 +25,17 @@ const ALL = ['superadmin', 'admin', 'manager', 'employee', 'accountant'];
 export const NAV = [
   { type: 'item', to: '/', label: 'Boshqaruv paneli', icon: LayoutDashboard, roles: ALL },
   { type: 'item', to: '/users', label: 'Foydalanuvchilar', icon: UserCog, roles: ['superadmin', 'admin'] },
-  { type: 'item', to: '/clients', label: 'Mijozlar', icon: Users, roles: ['superadmin', 'admin', 'manager'] },
+  { type: 'item', to: '/clients', label: 'Mijozlar', icon: Users, roles: ['superadmin', 'admin', 'manager', 'auditor'] },
+  { type: 'item', to: '/applications', label: 'Arizalar', icon: ClipboardList, roles: ['superadmin', 'admin', 'manager'] },
   {
     type: 'group',
     key: 'tasks',
     label: 'Vazifalar boshqaruvi',
     icon: FolderKanban,
     children: [
-      { to: '/projects', label: 'Loyihalar', icon: Briefcase, roles: ['superadmin', 'admin', 'manager', 'employee'] },
-      { to: '/tasks', label: 'Vazifalar', icon: KanbanSquare, roles: ['superadmin', 'admin', 'manager', 'employee'] },
-      { to: '/meetings', label: "Yig'ilishlar", icon: Video, roles: ['superadmin', 'admin', 'manager', 'employee'] },
+      { to: '/projects', label: 'Loyihalar', icon: Briefcase, roles: ['superadmin', 'admin', 'manager', 'employee', 'auditor'] },
+      { to: '/tasks', label: 'Vazifalar', icon: KanbanSquare, roles: ['superadmin', 'admin', 'manager', 'employee', 'auditor'] },
+      { to: '/meetings', label: "Yig'ilishlar", icon: Video, roles: ['superadmin', 'admin', 'manager', 'employee', 'auditor'] },
     ],
   },
   {
@@ -41,9 +44,9 @@ export const NAV = [
     label: 'Moliya',
     icon: Wallet,
     children: [
-      { to: '/finance', label: 'Balans va so\'rovlar', icon: Wallet, roles: ['superadmin', 'admin', 'manager', 'employee', 'accountant'] },
-      { to: '/payroll', label: 'Oyliklar', icon: Banknote, roles: ['superadmin', 'admin', 'accountant', 'manager', 'employee'] },
-      { to: '/expenses', label: 'Xarajatlar', icon: Receipt, roles: ['superadmin', 'admin', 'accountant'] },
+      { to: '/finance', label: 'Balans va so\'rovlar', icon: Wallet, roles: ['superadmin', 'admin', 'manager', 'employee', 'accountant', 'auditor'] },
+      { to: '/payroll', label: 'Oyliklar', icon: Banknote, roles: ['superadmin', 'admin', 'accountant', 'manager', 'employee', 'auditor'] },
+      { to: '/expenses', label: 'Xarajatlar', icon: Receipt, roles: ['superadmin', 'admin', 'accountant', 'auditor'] },
     ],
   },
   {
@@ -52,15 +55,16 @@ export const NAV = [
     label: 'Hisobotlar',
     icon: BarChart3,
     children: [
-      { to: '/reports/employees', label: "Xodim bo'yicha", icon: UserCog, roles: ['superadmin', 'admin', 'manager', 'accountant'] },
-      { to: '/reports/projects', label: "Loyiha bo'yicha", icon: Briefcase, roles: ['superadmin', 'admin', 'manager', 'accountant'] },
-      { to: '/reports/expenses', label: "Xarajat so'rovlari bo'yicha", icon: Receipt, roles: ['superadmin', 'admin', 'accountant'] },
-      { to: '/reports/payroll', label: "Ish haqi bo'yicha", icon: Banknote, roles: ['superadmin', 'admin', 'accountant'] },
-      { to: '/reports/tasks', label: "Vazifalar bo'yicha", icon: KanbanSquare, roles: ['superadmin', 'admin', 'manager'] },
+      { to: '/reports/employees', label: "Xodim bo'yicha", icon: UserCog, roles: ['superadmin', 'admin', 'accountant', 'auditor'] },
+      { to: '/reports/projects', label: "Loyiha bo'yicha", icon: Briefcase, roles: ['superadmin', 'admin', 'manager', 'accountant', 'auditor'] },
+      { to: '/reports/expenses', label: "Xarajat so'rovlari bo'yicha", icon: Receipt, roles: ['superadmin', 'admin', 'accountant', 'auditor'] },
+      { to: '/reports/payroll', label: "Ish haqi bo'yicha", icon: Banknote, roles: ['superadmin', 'admin', 'accountant', 'auditor'] },
+      { to: '/reports/tasks', label: "Vazifalar bo'yicha", icon: KanbanSquare, roles: ['superadmin', 'admin', 'manager', 'auditor'] },
     ],
   },
   { type: 'item', to: '/daily-plans', label: 'Kundalik rejalar', icon: CalendarCheck, roles: ALL },
-  { type: 'item', to: '/audit', label: 'Audit', icon: ScrollText, roles: ['superadmin', 'admin', 'accountant'] },
+  { type: 'item', to: '/audit', label: 'Audit', icon: ScrollText, roles: ['superadmin', 'admin', 'accountant', 'auditor'] },
+  { type: 'item', to: '/trash', label: 'Chiqindi', icon: Trash2, roles: ['superadmin', 'admin'] },
 ];
 
 /** Filter the nav tree for a role: keep visible items and groups with ≥1 visible child. */
@@ -96,5 +100,6 @@ export function breadcrumbForPath(pathname) {
   }
   // Routes not present in the sidebar nav:
   if (pathname.startsWith('/settings')) return { group: null, label: 'Sozlamalar' };
+  if (pathname.startsWith('/trash')) return { group: null, label: 'Chiqindi' };
   return { group: null, label: '' };
 }

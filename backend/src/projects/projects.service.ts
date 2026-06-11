@@ -16,9 +16,17 @@ export class ProjectsService {
     private notifications: NotificationsService,
   ) {}
 
+  /** A'zolar (members[].userId) haqiqatan mavjudligini tekshiradi (noto'g'ri ID → FK 500 oldini olish). */
+  private async assertMembersExist(members?: { userId: number }[]) {
+    if (!members?.length) return;
+    const ids = [...new Set(members.map((m) => Number(m.userId)))];
+    const cnt = await this.prisma.user.count({ where: { id: { in: ids } } });
+    if (cnt !== ids.length) throw new NotFoundException('Ba\'zi a\'zolar (foydalanuvchilar) topilmadi');
+  }
+
   /** Visibility: superadmin/admin see all; manager/employee only their team's projects. */
   private visibilityWhere(user: AuthUser) {
-    if (user.role === 'superadmin' || user.role === 'admin' || user.role === 'accountant') return {};
+    if (['superadmin', 'admin', 'accountant', 'auditor'].includes(user.role)) return {};
     return { members: { some: { userId: user.id } } };
   }
 
@@ -66,7 +74,7 @@ export class ProjectsService {
     if (!project) throw new NotFoundException('Loyiha topilmadi');
 
     const isMember = project.members.some((m) => m.userId === user.id);
-    const privileged = ['superadmin', 'admin', 'accountant'].includes(user.role);
+    const privileged = ['superadmin', 'admin', 'accountant', 'auditor'].includes(user.role);
     if (!privileged && !isMember) {
       throw new ForbiddenException('Bu loyihani ko\'rishga ruxsatingiz yo\'q');
     }
@@ -75,6 +83,7 @@ export class ProjectsService {
 
   async create(dto: CreateProjectDto, user: AuthUser, ip?: string) {
     const { members, ...rest } = dto;
+    await this.assertMembersExist(members);
     const project = await this.prisma.project.create({
       data: {
         ...rest,
@@ -109,6 +118,7 @@ export class ProjectsService {
     if (!before) throw new NotFoundException('Loyiha topilmadi');
 
     const { members, ...rest } = dto;
+    await this.assertMembersExist(members);
     const data: any = { ...rest };
     if (dto.price !== undefined) data.price = BigInt(dto.price);
     if (dto.deadline !== undefined) data.deadline = dto.deadline ? new Date(dto.deadline) : null;
@@ -150,7 +160,7 @@ export class ProjectsService {
   /** Payroll rule: completed project -> add share to member balance + ledger (once). Cancelled -> nothing. */
   private async creditSharesOnCompletion(projectId: number, actorId: number) {
     const members = await this.prisma.projectMember.findMany({
-      where: { projectId, paidToBalance: false },
+      where: { projectId, paidToBalance: false, roleInProject: { not: 'auditor' } }, // Nazoratchi ulush olmaydi
     });
     for (const m of members) {
       const uzs = await this.currencies.toUzs(m.shareAmount, m.shareCurrency);
@@ -182,6 +192,24 @@ export class ProjectsService {
     await this.prisma.project.delete({ where: { id } });
     await this.audit.record({ userId: user.id, entity: 'Project', entityId: id, action: 'DELETE', ip, oldValue: { name: before.name } });
     return { message: 'Loyiha o\'chirildi' };
+  }
+
+  /** O'chirilgan (trash) loyihalar. */
+  trash() {
+    return this.prisma.project.findMany({
+      where: { deletedAt: { not: null } },
+      include: { type: { select: { id: true, name: true } }, client: { select: { id: true, name: true } }, _count: { select: { tasks: true } } },
+      orderBy: { updatedAt: 'desc' },
+    });
+  }
+
+  /** Trashdagi loyihani tiklash. */
+  async restore(id: number, user: AuthUser, ip?: string) {
+    const before = await this.prisma.project.findFirst({ where: { id, deletedAt: { not: null } } });
+    if (!before) throw new NotFoundException('O\'chirilgan loyiha topilmadi');
+    const restored = await this.prisma.project.update({ where: { id }, data: { deletedAt: null } });
+    await this.audit.record({ userId: user.id, entity: 'Project', entityId: id, action: 'RESTORE', ip, newValue: { name: before.name } });
+    return restored;
   }
 
   /** Recompute progress from task completion (called by tasks module). */

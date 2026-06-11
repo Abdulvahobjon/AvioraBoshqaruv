@@ -9,6 +9,10 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 import { ChangeStatusDto, ReviewTaskDto, CreateCommentDto } from './dto/task-actions.dto';
 
 const PRIVILEGED = ['superadmin', 'admin', 'manager'];
+// Task QA (checked/rejected) — auditor (Nazoratchi) ham bajaradi, lekin yaratmaydi/o'chirmaydi.
+const REVIEWERS = ['superadmin', 'admin', 'manager', 'auditor'];
+// Hamma loyiha/vazifani ko'ra oladigan rollar (read-only nazorat).
+const ALL_VISIBLE = ['superadmin', 'admin', 'accountant', 'auditor'];
 
 @Injectable()
 export class TasksService {
@@ -35,14 +39,14 @@ export class TasksService {
     });
     if (!project) throw new NotFoundException('Loyiha topilmadi');
     const isMember = project.members.some((m) => m.userId === user.id);
-    const privileged = ['superadmin', 'admin', 'accountant'].includes(user.role);
+    const privileged = ALL_VISIBLE.includes(user.role);
     if (!privileged && !isMember) throw new ForbiddenException('Loyihaga ruxsatingiz yo\'q');
     return { project, isMember };
   }
 
   /** Visibility filter: employees see only their own; managers see their projects' tasks; admins all. */
   private visibilityWhere(user: AuthUser) {
-    if (['superadmin', 'admin', 'accountant'].includes(user.role)) return {};
+    if (ALL_VISIBLE.includes(user.role)) return {};
     if (user.role === 'manager') return { project: { members: { some: { userId: user.id } } } };
     return { assigneeId: user.id }; // employee
   }
@@ -69,6 +73,26 @@ export class TasksService {
       if (q.to) where.deadline.lte = new Date(q.to);
     }
     return where;
+  }
+
+  /**
+   * actualMinutes hisoblash: 'in_progress' ga o'tganda inProgressAt belgilanadi;
+   * 'in_progress' dan chiqqanda o'tgan vaqt actualMinutes'ga qo'shiladi (TZ — backendda hisoblanadi).
+   */
+  private trackTime(task: { status: string; inProgressAt: Date | null; actualMinutes: number | null }, newStatus: string) {
+    const data: any = {};
+    if (newStatus === task.status) return data;
+    const now = new Date();
+    if (newStatus === 'in_progress') {
+      data.inProgressAt = now;
+    } else if (task.status === 'in_progress') {
+      if (task.inProgressAt) {
+        const mins = Math.round((now.getTime() - new Date(task.inProgressAt).getTime()) / 60000);
+        data.actualMinutes = (task.actualMinutes || 0) + Math.max(0, mins);
+      }
+      data.inProgressAt = null;
+    }
+    return data;
   }
 
   private withOverdue(tasks: any[]) {
@@ -139,28 +163,37 @@ export class TasksService {
   async create(dto: CreateTaskDto, user: AuthUser, ip?: string) {
     if (!PRIVILEGED.includes(user.role)) throw new ForbiddenException('Vazifa yaratishga ruxsatingiz yo\'q');
     await this.assertProjectAccess(dto.projectId, user);
-    const uid = await this.generateUid(dto.projectId);
 
-    const task = await this.prisma.task.create({
-      data: {
-        uid,
-        projectId: dto.projectId,
-        title: dto.title,
-        description: dto.description,
-        assigneeId: dto.assigneeId ?? null,
-        createdBy: user.id,
-        status: dto.status ?? 'todo',
-        priority: dto.priority ?? 'medium',
-        type: dto.type ?? 'feature',
-        positionId: dto.positionId ?? null,
-        sprint: dto.sprint ?? null,
-        price: BigInt(dto.price ?? 0),
-        penaltyPercent: dto.penaltyPercent ?? null,
-        deadline: dto.deadline ? new Date(dto.deadline) : null,
-        estimatedMinutes: dto.estimatedMinutes ?? null,
-      },
-      include: this.taskInclude,
-    });
+    const baseData = {
+      projectId: dto.projectId,
+      title: dto.title,
+      description: dto.description,
+      assigneeId: dto.assigneeId ?? null,
+      createdBy: user.id,
+      status: dto.status ?? 'todo',
+      priority: dto.priority ?? 'medium',
+      type: dto.type ?? 'feature',
+      positionId: dto.positionId ?? null,
+      sprint: dto.sprint ?? null,
+      price: BigInt(dto.price ?? 0),
+      penaltyPercent: dto.penaltyPercent ?? null,
+      deadline: dto.deadline ? new Date(dto.deadline) : null,
+      estimatedMinutes: dto.estimatedMinutes ?? null,
+    };
+
+    // UID `count+1` asosida — parallel yaratishda to'qnashuv bo'lishi mumkin.
+    // Unique buzilsa (P2002) UID qayta hisoblanib qayta urinamiz.
+    let task;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const uid = await this.generateUid(dto.projectId);
+        task = await this.prisma.task.create({ data: { uid, ...baseData }, include: this.taskInclude });
+        break;
+      } catch (e: any) {
+        if (e?.code === 'P2002' && attempt < 5) continue;
+        throw e;
+      }
+    }
 
     await this.projects.recomputeProgress(dto.projectId);
     await this.audit.record({ userId: user.id, entity: 'Task', entityId: task.id, action: 'CREATE', ip, newValue: { title: task.title } });
@@ -214,13 +247,30 @@ export class TasksService {
       }
     }
 
+    // Kanban statusi faqat OLDINGA siljiydi: todo→in_progress→done→checked→production.
+    // 'rejected' faqat review orqali, 'overdue' avtomatik — ularga drag bilan o'tkazib bo'lmaydi.
+    // Pipeline tashqarisidagi (rejected/overdue) vazifani esa istalgan pipeline statusiga tiklash mumkin.
+    if (dto.status !== task.status) {
+      const PIPELINE = ['todo', 'in_progress', 'done', 'checked', 'production'];
+      const to = PIPELINE.indexOf(dto.status);
+      if (to === -1) throw new BadRequestException('Bu statusga Kanban orqali o\'tkazib bo\'lmaydi');
+      const from = PIPELINE.indexOf(task.status);
+      if (from !== -1 && to < from) {
+        throw new BadRequestException('Statusni orqaga qaytarib bo\'lmaydi — faqat oldinga siljitish mumkin');
+      }
+    }
+
     const updated = await this.prisma.task.update({
       where: { id },
-      data: { status: dto.status, orderIndex: dto.orderIndex ?? task.orderIndex },
+      data: { status: dto.status, orderIndex: dto.orderIndex ?? task.orderIndex, ...this.trackTime(task, dto.status) },
       include: this.taskInclude,
     });
 
     await this.projects.recomputeProgress(task.projectId);
+    // Status o'zgarsa assignee'ni xabardor qilamiz (o'zi o'zgartirgan bo'lsa — shart emas).
+    if (dto.status !== task.status && updated.assigneeId && updated.assigneeId !== user.id) {
+      await this.notifications.notify(updated.assigneeId, 'task_status', { taskId: id, title: updated.title, status: dto.status });
+    }
     await this.audit.record({ userId: user.id, entity: 'Task', entityId: id, action: 'STATUS', ip, oldValue: { status: task.status }, newValue: { status: dto.status } });
     return updated;
   }
@@ -231,7 +281,7 @@ export class TasksService {
    * verdict=rejected -> comment MANDATORY, status auto-returns to 'in_progress', reopened_count++.
    */
   async review(id: number, dto: ReviewTaskDto, user: AuthUser, ip?: string) {
-    if (!PRIVILEGED.includes(user.role)) throw new ForbiddenException('Tekshirishga ruxsatingiz yo\'q');
+    if (!REVIEWERS.includes(user.role)) throw new ForbiddenException('Tekshirishga ruxsatingiz yo\'q');
     const task = await this.prisma.task.findFirst({ where: { id } });
     if (!task) throw new NotFoundException('Vazifa topilmadi');
     await this.assertProjectAccess(task.projectId, user);
@@ -241,7 +291,7 @@ export class TasksService {
       await this.prisma.taskComment.create({ data: { taskId: id, userId: user.id, body: dto.comment.trim() } });
       const updated = await this.prisma.task.update({
         where: { id },
-        data: { status: 'in_progress', reopenedCount: { increment: 1 }, rejectReason: dto.comment.trim() },
+        data: { status: 'in_progress', reopenedCount: { increment: 1 }, rejectReason: dto.comment.trim(), ...this.trackTime(task, 'in_progress') },
         include: this.taskInclude,
       });
       await this.projects.recomputeProgress(task.projectId);
@@ -270,6 +320,10 @@ export class TasksService {
     const task = await this.prisma.task.findFirst({ where: { id } });
     if (!task) throw new NotFoundException('Vazifa topilmadi');
     await this.assertProjectAccess(task.projectId, user);
+    // IDOR: oddiy xodim faqat o'ziga biriktirilgan vazifaga izoh yoza oladi.
+    if (user.role === 'employee' && task.assigneeId !== user.id) {
+      throw new ForbiddenException('Bu vazifa sizga biriktirilmagan');
+    }
     return this.prisma.taskComment.create({
       data: { taskId: id, userId: user.id, body: dto.body },
       include: { user: { select: { id: true, fullName: true, avatar: true } } },
@@ -280,6 +334,10 @@ export class TasksService {
     const task = await this.prisma.task.findFirst({ where: { id } });
     if (!task) throw new NotFoundException('Vazifa topilmadi');
     await this.assertProjectAccess(task.projectId, user);
+    // IDOR: oddiy xodim faqat o'ziga biriktirilgan vazifaga fayl qo'sha oladi.
+    if (user.role === 'employee' && task.assigneeId !== user.id) {
+      throw new ForbiddenException('Bu vazifa sizga biriktirilmagan');
+    }
     return this.prisma.taskFile.create({
       data: {
         taskId: id,
@@ -299,5 +357,33 @@ export class TasksService {
     await this.projects.recomputeProgress(task.projectId);
     await this.audit.record({ userId: user.id, entity: 'Task', entityId: id, action: 'DELETE', ip, oldValue: { title: task.title } });
     return { message: 'Vazifa o\'chirildi' };
+  }
+
+  /** O'chirilgan (trash) vazifalar — ko'rinish filtri bilan. */
+  trash(user: AuthUser) {
+    const where: any = { deletedAt: { not: null }, ...this.visibilityWhere(user) };
+    return this.prisma.task.findMany({ where, include: this.taskInclude, orderBy: { updatedAt: 'desc' } });
+  }
+
+  /** Trashdagi vazifani tiklash. */
+  async restore(id: number, user: AuthUser, ip?: string) {
+    if (!PRIVILEGED.includes(user.role)) throw new ForbiddenException('Tiklashga ruxsatingiz yo\'q');
+    const task = await this.prisma.task.findFirst({ where: { id, deletedAt: { not: null } } });
+    if (!task) throw new NotFoundException('O\'chirilgan vazifa topilmadi');
+    await this.assertProjectAccess(task.projectId, user);
+    const restored = await this.prisma.task.update({ where: { id }, data: { deletedAt: null }, include: this.taskInclude });
+    await this.projects.recomputeProgress(task.projectId);
+    await this.audit.record({ userId: user.id, entity: 'Task', entityId: id, action: 'RESTORE', ip, newValue: { title: task.title } });
+    return restored;
+  }
+
+  /** Butunlay o'chirish (faqat admin, avval trashda bo'lishi shart). */
+  async hardDelete(id: number, user: AuthUser, ip?: string) {
+    if (!['superadmin', 'admin'].includes(user.role)) throw new ForbiddenException('Faqat administrator butunlay o\'chira oladi');
+    const task = await this.prisma.task.findFirst({ where: { id, deletedAt: { not: null } } });
+    if (!task) throw new NotFoundException('Avval vazifani chiqindiga (trash) o\'tkazing');
+    await this.prisma.$executeRaw`DELETE FROM tasks WHERE id = ${id}`; // task_files/comments cascade
+    await this.audit.record({ userId: user.id, entity: 'Task', entityId: id, action: 'HARD_DELETE', ip, oldValue: { title: task.title } });
+    return { message: 'Vazifa butunlay o\'chirildi' };
   }
 }

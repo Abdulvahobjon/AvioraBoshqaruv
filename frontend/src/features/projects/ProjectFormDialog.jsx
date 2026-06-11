@@ -206,6 +206,7 @@ export function ProjectFormDialog({ open, onClose, project }) {
                     <Select className="h-9 w-28" value={m.roleInProject} onChange={(e) => updateMember(m.userId, 'roleInProject', e.target.value)}>
                       <option value="manager">Menejer</option>
                       <option value="employee">Xodim</option>
+                      <option value="auditor">Nazoratchi</option>
                     </Select>
                     <Input className="h-9 w-28" type="number" min="0" placeholder="Ulush" value={m.shareAmount} onChange={(e) => updateMember(m.userId, 'shareAmount', e.target.value)} />
                     <Select className="h-9 w-20" value={m.shareCurrency} onChange={(e) => updateMember(m.userId, 'shareCurrency', e.target.value)}>

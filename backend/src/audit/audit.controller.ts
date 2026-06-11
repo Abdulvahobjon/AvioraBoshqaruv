@@ -6,7 +6,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 @ApiTags('audit')
 @ApiBearerAuth()
 @Controller('audit')
-@Roles('superadmin', 'admin', 'accountant')
+@Roles('superadmin', 'admin', 'accountant', 'auditor')
 export class AuditController {
   constructor(private prisma: PrismaService) {}
 

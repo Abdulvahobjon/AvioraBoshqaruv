@@ -8,7 +8,9 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Tabs } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+import { Input, Select } from '@/components/ui/Input';
+import { Switch } from '@/components/ui/Switch';
+import { Badge } from '@/components/ui/Badge';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 import { FormField } from '@/components/ui/FormField';
 import { Avatar } from '@/components/ui/Avatar';
@@ -31,11 +33,13 @@ const passSchema = z
 export function SettingsPage() {
   const user = useAuthStore((s) => s.user);
   const isAdmin = ['superadmin', 'admin'].includes(user?.role);
+  const canRefs = ['superadmin', 'admin', 'manager'].includes(user?.role); // TZ 8.1/8.3
   const [tab, setTab] = useState('profile');
 
   const tabs = [
     { value: 'profile', label: 'Profil', icon: User },
-    ...(isAdmin ? [{ value: 'refs', label: "Ma'lumotnomalar", icon: ListTree }, { value: 'currency', label: 'Valuta', icon: DollarSign }] : []),
+    ...(canRefs ? [{ value: 'refs', label: "Ma'lumotnomalar", icon: ListTree }] : []),
+    ...(isAdmin ? [{ value: 'currency', label: 'Valuta', icon: DollarSign }] : []),
   ];
 
   return (
@@ -43,7 +47,7 @@ export function SettingsPage() {
       <PageHeader title="Sozlamalar" subtitle="Profil, xavfsizlik va tizim sozlamalari" />
       <Tabs tabs={tabs} value={tab} onChange={setTab} className="mb-6" />
       {tab === 'profile' && <ProfileTab user={user} />}
-      {tab === 'refs' && isAdmin && <ReferencesTab />}
+      {tab === 'refs' && canRefs && <ReferencesTab />}
       {tab === 'currency' && isAdmin && <CurrencyTab />}
     </div>
   );
@@ -95,21 +99,19 @@ function ProfileTab({ user }) {
   );
 }
 
-const REF_MODELS = [
-  { model: 'region', title: 'Hududlar' },
-  { model: 'position', title: 'Lavozimlar' },
-  { model: 'projectType', title: 'Loyiha turlari' },
-  { model: 'expenseCategory', title: 'Xarajat kategoriyalari' },
-];
-
 function ReferencesTab() {
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-      {REF_MODELS.map((r) => <ReferenceManager key={r.model} model={r.model} title={r.title} />)}
+      <RegionManager />
+      <DistrictManager />
+      <ReferenceManager model="position" title="Lavozimlar" />
+      <ReferenceManager model="projectType" title="Loyiha turlari" />
+      <ReferenceManager model="expenseCategory" title="Xarajat kategoriyalari" />
     </div>
   );
 }
 
+/** Simple name-only reference (position / projectType / expenseCategory). */
 function ReferenceManager({ model, title }) {
   const { data: items } = useReference(model);
   const save = useSaveReference(model);
@@ -151,6 +153,121 @@ function ReferenceManager({ model, title }) {
                   <button onClick={() => setDeleting(it)} className="text-icon-soft hover:text-error-strong"><Trash2 className="h-3.5 w-3.5" /></button>
                 </>
               )}
+            </div>
+          ))}
+          {!items?.length && <p className="text-sm text-text-soft">Bo'sh</p>}
+        </div>
+      </CardContent>
+      <ConfirmDialog
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => del.mutate(deleting.id, { onSuccess: () => { toast.success("O'chirildi"); setDeleting(null); }, onError: (e) => toast.error(apiError(e)) })}
+        loading={del.isPending}
+        message={`"${deleting?.name}" ni o'chirmoqchimisiz?`}
+      />
+    </Card>
+  );
+}
+
+/** Hududlar (Region) — nom + "arizalar uchun" (isApplication) bayrog'i. */
+function RegionManager() {
+  const { data: items } = useReference('region');
+  const save = useSaveReference('region');
+  const del = useDeleteReference('region');
+  const [newName, setNewName] = useState('');
+  const [newIsApp, setNewIsApp] = useState(false);
+  const [deleting, setDeleting] = useState(null);
+
+  const add = () => {
+    if (!newName.trim()) return;
+    save.mutate({ name: newName.trim(), isApplication: newIsApp }, {
+      onSuccess: () => { setNewName(''); setNewIsApp(false); },
+      onError: (e) => toast.error(apiError(e)),
+    });
+  };
+  const toggleApp = (it) => save.mutate({ id: it.id, isApplication: !it.isApplication }, { onError: (e) => toast.error(apiError(e)) });
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>Hududlar (Viloyatlar)</CardTitle></CardHeader>
+      <CardContent>
+        <div className="mb-2 flex gap-2">
+          <Input placeholder="Yangi viloyat..." value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+          <Button size="icon" onClick={add} loading={save.isPending}><Plus className="h-4 w-4" /></Button>
+        </div>
+        <label className="mb-3 flex items-center gap-2 text-xs text-text-sub">
+          <Switch checked={newIsApp} onChange={setNewIsApp} /> Arizalar uchun
+        </label>
+        <div className="space-y-1">
+          {(items || []).map((it) => (
+            <div key={it.id} className="flex items-center gap-2 rounded-md border border-stroke-soft px-3 py-2">
+              <span className="flex-1 text-sm text-text-strong">{it.name}</span>
+              <button title="Arizalar uchun" onClick={() => toggleApp(it)}>
+                {it.isApplication ? <Badge tone="success">Ariza</Badge> : <Badge tone="muted">—</Badge>}
+              </button>
+              <button onClick={() => setDeleting(it)} className="text-icon-soft hover:text-error-strong"><Trash2 className="h-3.5 w-3.5" /></button>
+            </div>
+          ))}
+          {!items?.length && <p className="text-sm text-text-soft">Bo'sh</p>}
+        </div>
+      </CardContent>
+      <ConfirmDialog
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => del.mutate(deleting.id, { onSuccess: () => { toast.success("O'chirildi"); setDeleting(null); }, onError: (e) => toast.error(apiError(e)) })}
+        loading={del.isPending}
+        message={`"${deleting?.name}" ni o'chirmoqchimisiz?`}
+      />
+    </Card>
+  );
+}
+
+/** Tumanlar (District) — nom + viloyat + "arizalar uchun" bayrog'i. */
+function DistrictManager() {
+  const { data: regions } = useReference('region');
+  const { data: items } = useReference('district');
+  const save = useSaveReference('district');
+  const del = useDeleteReference('district');
+  const [newName, setNewName] = useState('');
+  const [newRegion, setNewRegion] = useState('');
+  const [newIsApp, setNewIsApp] = useState(false);
+  const [deleting, setDeleting] = useState(null);
+
+  const add = () => {
+    if (!newName.trim()) return;
+    save.mutate(
+      { name: newName.trim(), regionId: newRegion ? Number(newRegion) : null, isApplication: newIsApp },
+      { onSuccess: () => { setNewName(''); setNewIsApp(false); }, onError: (e) => toast.error(apiError(e)) },
+    );
+  };
+  const toggleApp = (it) => save.mutate({ id: it.id, isApplication: !it.isApplication }, { onError: (e) => toast.error(apiError(e)) });
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>Tumanlar</CardTitle></CardHeader>
+      <CardContent>
+        <div className="mb-2 grid grid-cols-1 gap-2">
+          <Input placeholder="Yangi tuman..." value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+          <div className="flex gap-2">
+            <Select value={newRegion} onChange={(e) => setNewRegion(e.target.value)} className="flex-1">
+              <option value="">— Viloyat —</option>
+              {(regions || []).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </Select>
+            <Button size="icon" onClick={add} loading={save.isPending}><Plus className="h-4 w-4" /></Button>
+          </div>
+        </div>
+        <label className="mb-3 flex items-center gap-2 text-xs text-text-sub">
+          <Switch checked={newIsApp} onChange={setNewIsApp} /> Arizalar uchun
+        </label>
+        <div className="max-h-72 space-y-1 overflow-y-auto">
+          {(items || []).map((it) => (
+            <div key={it.id} className="flex items-center gap-2 rounded-md border border-stroke-soft px-3 py-2">
+              <span className="flex-1 text-sm text-text-strong">{it.name}</span>
+              <span className="text-xs text-text-soft">{it.region?.name || '—'}</span>
+              <button title="Arizalar uchun" onClick={() => toggleApp(it)}>
+                {it.isApplication ? <Badge tone="success">Ariza</Badge> : <Badge tone="muted">—</Badge>}
+              </button>
+              <button onClick={() => setDeleting(it)} className="text-icon-soft hover:text-error-strong"><Trash2 className="h-3.5 w-3.5" /></button>
             </div>
           ))}
           {!items?.length && <p className="text-sm text-text-soft">Bo'sh</p>}

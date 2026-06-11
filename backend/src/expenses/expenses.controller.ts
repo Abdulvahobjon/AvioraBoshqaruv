@@ -9,7 +9,7 @@ import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorat
 @ApiTags('expenses')
 @ApiBearerAuth()
 @Controller('expenses')
-@Roles('superadmin', 'admin', 'accountant')
+@Roles('superadmin', 'admin', 'accountant', 'auditor')
 export class ExpensesController {
   constructor(private readonly expenses: ExpensesService) {}
 

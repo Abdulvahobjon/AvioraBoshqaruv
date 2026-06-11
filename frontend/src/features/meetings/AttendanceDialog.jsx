@@ -54,7 +54,7 @@ export function AttendanceDialog({ meetingId, open, onClose }) {
                   onClick={() => toggle(a.userId)}
                   className={cn(
                     'flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors',
-                    checked ? 'border-stroke-accent bg-accent-disabled/40' : 'border-stroke-soft hover:bg-bg-1-alt',
+                    checked ? 'border-stroke-accent' : 'border-stroke-soft hover:bg-bg-1-alt',
                   )}
                 >
                   <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2', checked ? 'border-accent-strong bg-accent-strong text-text-white' : 'border-stroke-strong')}>

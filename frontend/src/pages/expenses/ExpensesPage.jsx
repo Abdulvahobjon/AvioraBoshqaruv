@@ -14,6 +14,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { formatMoney, formatDate, toTiyin, fromTiyin } from '@/lib/utils/format';
 import { apiError } from '@/lib/api/axios';
 import { useReference } from '@/features/settings/settingsApi';
+import { useProjects } from '@/features/projects/projectsApi';
 import { useExpenses, useSaveExpense, useDeleteExpense } from '@/features/expenses/expensesApi';
 
 export function ExpensesPage() {
@@ -26,6 +27,7 @@ export function ExpensesPage() {
   const columns = [
     { key: 'date', header: 'Sana', render: (r) => formatDate(r.date) },
     { key: 'category', header: 'Kategoriya', render: (r) => r.category?.name || '—' },
+    { key: 'project', header: 'Loyiha', render: (r) => r.project?.name || '—' },
     { key: 'amount', header: 'Miqdor', render: (r) => formatMoney(r.amount, r.currency) },
     { key: 'amountUzs', header: "So'mda", render: (r) => formatMoney(r.amountUzs) },
     { key: 'note', header: 'Izoh', render: (r) => <span className="text-text-sub">{r.note || '—'}</span> },
@@ -66,6 +68,7 @@ export function ExpensesPage() {
 
 function ExpenseDialog({ open, onClose, expense }) {
   const { data: categories } = useReference('expenseCategory');
+  const { data: projects } = useProjects({ limit: 200 });
   const save = useSaveExpense();
   const { register, control, handleSubmit, reset, formState: { errors } } = useForm();
 
@@ -73,8 +76,8 @@ function ExpenseDialog({ open, onClose, expense }) {
     if (!open) return;
     reset(
       expense
-        ? { categoryId: expense.categoryId || '', amount: fromTiyin(expense.amount), currency: expense.currency, date: expense.date?.slice(0, 10), note: expense.note || '' }
-        : { categoryId: '', amount: '', currency: 'UZS', date: new Date().toISOString().slice(0, 10), note: '' },
+        ? { categoryId: expense.categoryId || '', projectId: expense.projectId || '', amount: fromTiyin(expense.amount), currency: expense.currency, date: expense.date?.slice(0, 10), note: expense.note || '' }
+        : { categoryId: '', projectId: '', amount: '', currency: 'UZS', date: new Date().toISOString().slice(0, 10), note: '' },
     );
   }, [open, expense, reset]);
 
@@ -83,6 +86,7 @@ function ExpenseDialog({ open, onClose, expense }) {
       {
         id: expense?.id,
         categoryId: v.categoryId ? Number(v.categoryId) : undefined,
+        projectId: v.projectId ? Number(v.projectId) : null,
         amount: toTiyin(v.amount),
         currency: v.currency,
         date: v.date,
@@ -104,6 +108,12 @@ function ExpenseDialog({ open, onClose, expense }) {
           <Select {...register('categoryId')}>
             <option value="">— Tanlang —</option>
             {(categories || []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </Select>
+        </FormField>
+        <FormField label="Loyiha (ixtiyoriy)">
+          <Select {...register('projectId')}>
+            <option value="">— Loyihasiz —</option>
+            {(projects?.items || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </Select>
         </FormField>
         <FormField label="Sana">

@@ -4,9 +4,14 @@ import { cn } from '@/lib/utils/cn';
 import { TaskCard } from './TaskCard';
 
 /** Trello-style list: fixed-width grey column with a header, a droppable card area and an add footer. */
-export function KanbanColumn({ column, tasks, onCardClick, onAddCard, canAdd }) {
+export function KanbanColumn({ column, tasks, onCardClick, onAddCard, canAdd, dropDisabled = false }) {
   return (
-    <div className="flex h-full min-w-[260px] flex-1 flex-col rounded-xl bg-bg-2">
+    <div
+      className={cn(
+        'flex h-full min-w-[260px] flex-1 flex-col rounded-xl bg-bg-2 transition-opacity',
+        dropDisabled && 'opacity-40', // sudrash paytida orqaga/ruxsatsiz ustun xiralashadi
+      )}
+    >
       {/* Header */}
       <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5">
         <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: column.dot }} />
@@ -17,7 +22,7 @@ export function KanbanColumn({ column, tasks, onCardClick, onAddCard, canAdd }) 
       </div>
 
       {/* Droppable card area */}
-      <Droppable droppableId={column.status}>
+      <Droppable droppableId={column.status} isDropDisabled={dropDisabled}>
         {(provided, snapshot) => (
           <div
             ref={provided.innerRef}

@@ -39,22 +39,25 @@ function buildParams(f) {
 export function EmployeeReportPage() {
   const [filters, setFilters] = useState(EMPTY);
   const [filtersOpen, setFiltersOpen] = useState(true);
-  const [applied, setApplied] = useState({}); // mount'da bo'sh -> hamma xodimlar
+  const [applied, setApplied] = useState({});
+  const [generated, setGenerated] = useState(false); // boshida bo'sh — faqat "Shakllantirish"dan keyin yuklanadi
 
   const { data: positions } = useReference('position');
   const { data: usersData } = useUsersList();
   const users = usersData?.items || [];
 
-  const { data, isFetching } = useEmployeeReport(applied, true);
+  const { data, isFetching } = useEmployeeReport(applied, generated);
 
   const set = (k, v) => setFilters((s) => ({ ...s, [k]: v }));
   const hasFilters = useMemo(() => JSON.stringify(buildParams(filters)) !== '{}', [filters]);
 
   const generate = () => {
     setApplied(buildParams(filters));
+    setGenerated(true);
+    setFiltersOpen(false); // shakllantirilgach filter paneli yopiladi
     toast.success("Ma'lumotlar shakllantirildi");
   };
-  const clear = () => { setFilters(EMPTY); setApplied({}); };
+  const clear = () => { setFilters(EMPTY); setApplied({}); setGenerated(false); setFiltersOpen(true); };
 
   const positionOpts = (positions || []).map((p) => ({ value: p.id, label: p.name }));
   const regionOpts = UZ_REGIONS.map((r) => ({ value: r.name, label: r.name }));
@@ -106,7 +109,7 @@ export function EmployeeReportPage() {
         <PageHeader
           title="Xodim bo'yicha hisobot"
           subtitle="Xodimlar kesimida vazifa, yig'ilish, moliya ko'rsatkichlari"
-          actions={<ReportExportActions type="employee-report" params={buildParams(filters)} />}
+          actions={<ReportExportActions type="employee-report" params={applied} />}
         />
 
         <ReportToolbar
@@ -166,10 +169,10 @@ export function EmployeeReportPage() {
       <div className="mt-4 min-h-0 flex-1">
         <ReportTable
           columns={columns}
-          rows={data?.rows}
+          rows={generated ? data?.rows : []}
           loading={isFetching}
-          emptyTitle="Xodimlar topilmadi"
-          emptyDescription="Filtrlarni o'zgartiring yoki tozalang."
+          emptyTitle={generated ? 'Xodimlar topilmadi' : 'Hisobot shakllantirilmagan'}
+          emptyDescription={generated ? "Filtrlarni o'zgartiring yoki tozalang." : "Filtrlarni tanlab \"Shakllantirish\" tugmasini bosing."}
         />
       </div>
     </div>

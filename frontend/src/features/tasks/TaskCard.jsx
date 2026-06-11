@@ -1,15 +1,23 @@
 import { Draggable } from '@hello-pangea/dnd';
-import { Calendar, RotateCcw } from 'lucide-react';
+import { Flag, Calendar, Clock, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { Avatar } from '@/components/ui/Avatar';
-import { Badge } from '@/components/ui/Badge';
-import { TASK_PRIORITY } from '@/lib/constants';
 import { formatDate, deadlineInfo } from '@/lib/utils/format';
 
-/** Trello-style draggable card with a fixed (uniform) height. */
+/** estimatedMinutes → "4h", "1h 30m", "45m". */
+function formatEstimate(min) {
+  if (!min) return null;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (h && m) return `${h}h ${m}m`;
+  if (h) return `${h}h`;
+  return `${m}m`;
+}
+
+/** Trello-style draggable card: nomi, UID, muddat, taxminiy vaqt va mas'ul xodim. */
 export function TaskCard({ task, index, onClick }) {
   const dl = task.deadline ? deadlineInfo(task.deadline) : null;
-  const priority = TASK_PRIORITY[task.priority];
+  const estimate = formatEstimate(task.estimatedMinutes);
 
   return (
     <Draggable draggableId={String(task.id)} index={index}>
@@ -20,43 +28,54 @@ export function TaskCard({ task, index, onClick }) {
           {...provided.dragHandleProps}
           onClick={() => onClick?.(task)}
           className={cn(
-            'flex h-[118px] cursor-pointer select-none flex-col overflow-hidden rounded-lg border bg-bg-base p-2.5 shadow-card transition-shadow hover:shadow-elevated',
-            snapshot.isDragging && 'shadow-elevated ring-2 ring-stroke-accent',
-            task.isOverdue ? 'border-error-strong' : 'border-stroke-sub',
+            'relative flex h-[180px] cursor-pointer select-none flex-col overflow-hidden rounded-lg bg-bg-base p-3 shadow-card transition-shadow hover:shadow-elevated',
+            snapshot.isDragging && 'shadow-elevated',
           )}
         >
-          {/* Top: priority + reopened */}
-          <div className="mb-1 flex items-center gap-1">
-            {priority && <Badge tone={priority.tone} className="px-2 py-0 text-[11px]">{priority.label}</Badge>}
-            {task.reopenedCount > 0 && (
-              <span className="ml-auto inline-flex items-center gap-0.5 text-[11px] text-warning-strong" title="Qayta ochilgan">
-                <RotateCcw className="h-3 w-3" />{task.reopenedCount}
-              </span>
+          {/* Qayta ochilgan (rad etilgan) belgisi — o'ng yuqori burchakda */}
+          {task.reopenedCount > 0 && (
+            <span className="absolute right-2 top-2 inline-flex items-center gap-0.5 text-[11px] font-medium text-warning-strong" title="Qayta ochilgan">
+              <RotateCcw className="h-3 w-3" />{task.reopenedCount}
+            </span>
+          )}
+
+          {/* Nomi */}
+          <p className="line-clamp-2 pr-6 text-sm font-semibold leading-snug text-text-strong">{task.title}</p>
+
+          {/* Meta: UID · muddat · taxminiy vaqt */}
+          <div className="mt-2.5 space-y-1.5 text-xs">
+            {task.uid && (
+              <div className="flex items-center gap-1.5 text-text-sub">
+                <Flag className="h-3.5 w-3.5 shrink-0 text-icon-soft" />
+                <span className="font-mono">{task.uid}</span>
+              </div>
             )}
-          </div>
-
-          {/* Title */}
-          <p className="line-clamp-2 text-sm font-medium leading-snug text-text-strong">{task.title}</p>
-          {task.uid && <p className="mt-0.5 truncate font-mono text-[10px] text-text-soft">{task.uid}</p>}
-
-          {/* Footer pinned to bottom */}
-          <div className="mt-auto flex items-center gap-1.5 pt-1">
             {task.deadline && (
-              <span
-                className={cn(
-                  'inline-flex min-w-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium',
-                  dl?.overdue ? 'bg-error-soft text-error-strong' : 'bg-bg-2 text-text-sub',
-                )}
-              >
-                <Calendar className="h-3 w-3 shrink-0" /><span className="truncate">{formatDate(task.deadline)}</span>
-              </span>
+              <div className={cn('flex items-center gap-1.5', dl?.overdue ? 'text-error-strong' : 'text-text-sub')}>
+                <Calendar className="h-3.5 w-3.5 shrink-0 text-icon-soft" />
+                <span>{formatDate(task.deadline, true)}</span>
+              </div>
             )}
-            {task.assignee && (
-              <span className="ml-auto shrink-0" title={task.assignee.fullName}>
-                <Avatar name={task.assignee.fullName} src={task.assignee.avatar} size="sm" className="h-6 w-6 text-[10px] ring-2 ring-bg-base" />
-              </span>
+            {estimate && (
+              <div className="flex items-center gap-1.5 text-text-sub">
+                <Clock className="h-3.5 w-3.5 shrink-0 text-icon-soft" />
+                <span>{estimate}</span>
+              </div>
             )}
           </div>
+
+          {/* Mas'ul xodim — doim kartaning pastiga yopishadi (bir xil balandlik uchun) */}
+          {task.assignee && (
+            <div className="mt-auto flex items-center gap-2 border-t border-stroke-soft pt-2.5">
+              <Avatar name={task.assignee.fullName} src={task.assignee.avatar} size="sm" className="h-7 w-7 shrink-0 text-[10px]" />
+              <div className="min-w-0">
+                <p className="truncate text-xs font-medium text-text-strong">{task.assignee.fullName}</p>
+                {task.assignee.position?.name && (
+                  <p className="truncate text-[11px] text-text-soft">{task.assignee.position.name}</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Draggable>

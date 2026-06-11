@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Check, BellOff } from 'lucide-react';
+import { Bell, Check, BellOff, Trash2, X } from 'lucide-react';
 import { Drawer } from '@/components/ui/Drawer';
 import { cn } from '@/lib/utils/cn';
 import { formatDate } from '@/lib/utils/format';
 import dayjs from 'dayjs';
-import { useNotifications, useMarkAllRead, useMarkRead, describeNotification, notifLink } from '@/features/notifications/notificationsApi';
+import { useNotifications, useMarkAllRead, useMarkRead, useDeleteNotification, useClearNotifications, describeNotification, notifLink } from '@/features/notifications/notificationsApi';
 
 /** Group notifications by calendar day (newest first). */
 function groupByDay(items) {
@@ -23,6 +23,8 @@ export function NotificationBell() {
   const { data } = useNotifications();
   const markAll = useMarkAllRead();
   const markRead = useMarkRead();
+  const delOne = useDeleteNotification();
+  const clearAll = useClearNotifications();
 
   const unread = data?.unread || 0;
   const items = data?.items || [];
@@ -50,10 +52,17 @@ export function NotificationBell() {
         onClose={() => setOpen(false)}
         title="Bildirishnomalar"
         headerAction={
-          unread > 0 && (
-            <button onClick={() => markAll.mutate()} className="inline-flex items-center gap-1 text-xs font-medium text-text-accent hover:underline">
-              <Check className="h-3.5 w-3.5" /> Barchasi o'qish
-            </button>
+          items.length > 0 && (
+            <div className="flex items-center gap-3">
+              {unread > 0 && (
+                <button onClick={() => markAll.mutate()} className="inline-flex items-center gap-1 text-xs font-medium text-text-accent hover:underline">
+                  <Check className="h-3.5 w-3.5" /> Barchasi o'qish
+                </button>
+              )}
+              <button onClick={() => clearAll.mutate()} className="inline-flex items-center gap-1 text-xs font-medium text-error-strong hover:underline">
+                <Trash2 className="h-3.5 w-3.5" /> Tozalash
+              </button>
+            </div>
           )
         }
       >
@@ -71,10 +80,10 @@ export function NotificationBell() {
                   const d = describeNotification(n);
                   const Icon = d.icon;
                   return (
-                    <button
+                    <div
                       key={n.id}
                       onClick={() => onItemClick(n)}
-                      className={cn('flex w-full items-start gap-3 border-b border-stroke-soft px-5 py-3 text-left transition-colors hover:bg-bg-1-alt', !n.isRead && 'bg-bg-1/60')}
+                      className={cn('group flex w-full cursor-pointer items-start gap-3 border-b border-stroke-soft px-5 py-3 text-left transition-colors hover:bg-bg-1-alt', !n.isRead && 'bg-bg-1/60')}
                     >
                       <span className="relative mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg-2 text-icon-accent">
                         <Icon className="h-4 w-4" />
@@ -85,7 +94,14 @@ export function NotificationBell() {
                         {d.body && <p className="text-xs text-text-sub">{d.body}</p>}
                       </div>
                       <span className="shrink-0 text-xs text-text-soft">{dayjs(n.createdAt).format('HH:mm')}</span>
-                    </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); delOne.mutate(n.id); }}
+                        className="shrink-0 rounded p-1 text-icon-soft opacity-0 transition-opacity hover:bg-error-soft hover:text-error-strong group-hover:opacity-100"
+                        title="O'chirish"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   );
                 })}
               </div>

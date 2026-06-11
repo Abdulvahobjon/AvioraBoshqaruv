@@ -55,3 +55,33 @@ export class UpdateMeetingDto extends PartialType(CreateMeetingDto) {
   @IsBoolean()
   finished?: boolean;
 }
+
+export class FinishMeetingDto {
+  @ApiPropertyOptional({ type: [Number], description: 'Qatnashgan foydalanuvchilar ID lari' })
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  attendedUserIds?: number[];
+}
+
+export class SetAttendanceDto {
+  @ApiProperty({ description: 'Qaysi ishtirokchi' })
+  @IsInt()
+  userId: number;
+
+  @ApiProperty({ description: 'Qatnashdimi' })
+  @IsBoolean()
+  attended: boolean;
+
+  @ApiPropertyOptional({ description: 'Qatnashmagan bo\'lsa sabab' })
+  @IsOptional()
+  @IsString()
+  absenceReason?: string;
+}
+
+export class SubmitReasonDto {
+  @ApiProperty({ description: 'Qatnashmaslik sababi' })
+  @IsString()
+  @IsNotEmpty({ message: 'Sabab kiriting' })
+  reason: string;
+}

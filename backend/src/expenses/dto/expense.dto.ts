@@ -18,6 +18,11 @@ export class CreateExpenseDto {
   @IsInt()
   categoryId?: number;
 
+  @ApiPropertyOptional({ description: 'Bog\'langan loyiha (budget variance uchun)' })
+  @IsOptional()
+  @IsInt()
+  projectId?: number;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

@@ -57,6 +57,9 @@ export class ClientsService {
         region: { select: { id: true, name: true } },
         manager: { select: { id: true, fullName: true } },
         projects: {
+          // Middleware nested include'larni filtrlamaydi — o'chirilgan loyiha
+          // daromad/qarz hisobiga kirib ketmasligi uchun aniq filtr.
+          where: { deletedAt: null },
           include: { type: { select: { id: true, name: true } } },
           orderBy: { createdAt: 'desc' },
         },
@@ -94,7 +97,20 @@ export class ClientsService {
     };
   }
 
+  /** regionId/managerId haqiqatan mavjudligini tekshiradi (noto'g'ri ID → FK 500 oldini olish). */
+  private async assertRefs(dto: { regionId?: number | null; managerId?: number | null }) {
+    if (dto.regionId != null) {
+      const r = await this.prisma.region.count({ where: { id: Number(dto.regionId) } });
+      if (!r) throw new NotFoundException('Viloyat (region) topilmadi');
+    }
+    if (dto.managerId != null) {
+      const m = await this.prisma.user.count({ where: { id: Number(dto.managerId) } });
+      if (!m) throw new NotFoundException('Menejer (foydalanuvchi) topilmadi');
+    }
+  }
+
   async create(dto: CreateClientDto, actorId: number, ip?: string) {
+    await this.assertRefs(dto);
     const client = await this.prisma.client.create({ data: dto });
     await this.audit.record({ userId: actorId, entity: 'Client', entityId: client.id, action: 'CREATE', ip, newValue: { name: client.name } });
     return client;
@@ -103,6 +119,7 @@ export class ClientsService {
   async update(id: number, dto: UpdateClientDto, actorId: number, ip?: string) {
     const before = await this.prisma.client.findFirst({ where: { id } });
     if (!before) throw new NotFoundException('Mijoz topilmadi');
+    await this.assertRefs(dto);
     const client = await this.prisma.client.update({ where: { id }, data: dto });
     await this.audit.record({ userId: actorId, entity: 'Client', entityId: id, action: 'UPDATE', ip, oldValue: { name: before.name, status: before.status }, newValue: { name: client.name, status: client.status } });
     return client;

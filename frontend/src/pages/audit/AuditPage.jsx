@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ShieldAlert, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { Card } from '@/components/ui/Card';
 import { Select } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
@@ -51,7 +50,7 @@ export function AuditPage() {
       ) : items.length === 0 ? (
         <EmptyState fill title="Yozuvlar yo'q" />
       ) : (
-        <Card className="divide-y divide-stroke-soft">
+        <div className="divide-y divide-stroke-soft">
           {items.map((log) => (
             <button
               key={log.id}
@@ -74,7 +73,7 @@ export function AuditPage() {
               <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-icon-soft" />
             </button>
           ))}
-        </Card>
+        </div>
       )}
       </div>
 

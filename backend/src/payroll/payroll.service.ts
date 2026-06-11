@@ -35,7 +35,9 @@ export class PayrollService {
     for (const u of users) {
       // Shares from projects completed this month where the user is a member
       const members = await this.prisma.projectMember.findMany({
-        where: { userId: u.id, project: { status: 'completed', updatedAt: { gte: start, lt: end } } },
+        // ProjectMember soft-delete emas — ichki `project` relatsiyasiga deletedAt filtri
+        // qo'lda qo'shiladi (middleware faqat top-level modelga ta'sir qiladi).
+        where: { userId: u.id, project: { status: 'completed', updatedAt: { gte: start, lt: end }, deletedAt: null } },
       });
       let shares = 0n;
       for (const m of members) shares += await this.currencies.toUzs(m.shareAmount, m.shareCurrency);
@@ -57,7 +59,9 @@ export class PayrollService {
 
   async list(user: AuthUser, q: any) {
     const where: any = {};
-    if (!ACCT.includes(user.role)) where.userId = user.id;
+    // Buxgalter/admin/superadmin + auditor (nazorat) hammasini ko'radi; qolganlar faqat o'zinikini.
+    const seesAll = ACCT.includes(user.role) || user.role === 'auditor';
+    if (!seesAll) where.userId = user.id;
     else if (q.userId) where.userId = Number(q.userId);
     if (q.month) where.month = q.month;
     return this.prisma.payroll.findMany({ where, include: this.include, orderBy: [{ month: 'desc' }, { userId: 'asc' }] });

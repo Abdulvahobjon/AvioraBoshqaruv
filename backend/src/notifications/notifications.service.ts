@@ -50,4 +50,16 @@ export class NotificationsService {
     await this.prisma.notification.updateMany({ where: { userId, isRead: false }, data: { isRead: true } });
     return { ok: true };
   }
+
+  /** Bitta bildirishnomani o'chirish (soft-delete, faqat o'ziniki). */
+  async remove(id: number, userId: number) {
+    await this.prisma.notification.deleteMany({ where: { id, userId } }); // middleware -> soft delete
+    return { ok: true };
+  }
+
+  /** Barcha bildirishnomalarni tozalash (soft-delete). */
+  async clearAll(userId: number) {
+    await this.prisma.notification.deleteMany({ where: { userId } });
+    return { ok: true };
+  }
 }

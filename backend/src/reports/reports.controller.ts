@@ -1,17 +1,22 @@
-import { Controller, Get, Query, Res } from '@nestjs/common';
+import { Controller, ForbiddenException, Get, Query, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import * as ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 import { ReportsService } from './reports.service';
 import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 
 const fmt = (v: number) => new Intl.NumberFormat('uz-UZ').format(v) + " so'm";
+
+// Maosh va xarajatlar moliyaviy maxfiy — manager ko'ra olmaydi (frontend bilan mos).
+// Auditor (Nazoratchi) read-only nazorat sifatida moliyani ko'ra oladi.
+const FINANCE_ONLY_ROLES = ['superadmin', 'admin', 'accountant', 'auditor'];
 
 @ApiTags('reports')
 @ApiBearerAuth()
 @Controller('reports')
-@Roles('superadmin', 'admin', 'manager', 'accountant')
+@Roles('superadmin', 'admin', 'manager', 'accountant', 'auditor')
 export class ReportsController {
   constructor(private readonly reports: ReportsService) {}
 
@@ -20,25 +25,55 @@ export class ReportsController {
     return this.reports.projects(q);
   }
 
+  /** Loyiha budjeti burn-down (byudjet vs sarflangan). */
+  @Get('project-budget')
+  projectBudget(@Query('projectId') projectId: string) {
+    return this.reports.projectBudget(Number(projectId));
+  }
+
   @Get('finance')
+  @Roles('superadmin', 'admin', 'accountant', 'auditor')
   finance(@Query() q: any) {
     return this.reports.finance(q);
   }
 
+  @Get('expenses')
+  @Roles('superadmin', 'admin', 'accountant', 'auditor')
+  expenses(@Query() q: any) {
+    return this.reports.expenses(q);
+  }
+
+  @Get('payroll')
+  @Roles('superadmin', 'admin', 'accountant', 'auditor')
+  payroll(@Query() q: any) {
+    return this.reports.payroll(q);
+  }
+
+  @Get('tasks')
+  tasksReport(@Query() q: any) {
+    return this.reports.tasksReport(q);
+  }
+
   @Get('employees')
+  @Roles('superadmin', 'admin', 'accountant', 'auditor')
   employees() {
     return this.reports.employees();
   }
 
   @Get('employee-report')
+  @Roles('superadmin', 'admin', 'accountant', 'auditor')
   employeeReport(@Query() q: any) {
     return this.reports.employeeReport(q);
   }
 
   /** Export: type=projects|employees|employee-report, format=xlsx|pdf|csv */
   @Get('export')
-  async export(@Query() q: any, @Res() res: Response) {
+  async export(@Query() q: any, @Res() res: Response, @CurrentUser() user: AuthUser) {
     const type = q.type || 'projects';
+    // Maosh/balans/xarajat eksporti faqat moliyaviy rollarga (to'g'ridan-to'g'ri endpointlar bilan bir xil).
+    if (['payroll', 'expenses', 'employees', 'employee-report'].includes(type) && !FINANCE_ONLY_ROLES.includes(user.role)) {
+      throw new ForbiddenException('Ruxsat yo\'q');
+    }
     const format = ['pdf', 'csv'].includes(q.format) ? q.format : 'xlsx';
 
     const { columns, rows, title } = await this.buildDataset(type, q);
@@ -147,6 +182,60 @@ export class ReportsController {
         rows: data.map((d) => ({ ...d, balanceFmt: fmt(d.balance), earnedFmt: fmt(d.earned) })),
       };
     }
+    if (type === 'expenses') {
+      const { rows } = await this.reports.expenses(q);
+      return {
+        title: 'Xarajatlar hisoboti',
+        columns: [
+          { header: 'Sana', key: 'dateFmt', width: 16 },
+          { header: 'Kategoriya', key: 'category', width: 22 },
+          { header: 'Summa', key: 'amountFmt', width: 18 },
+          { header: 'Valyuta', key: 'currency', width: 10 },
+          { header: 'UZS ekvivalent', key: 'amountUzsFmt', width: 20 },
+          { header: 'Izoh', key: 'note', width: 30 },
+        ],
+        rows: rows.map((r) => ({
+          ...r,
+          dateFmt: new Date(r.date).toLocaleDateString('uz-UZ'),
+          amountFmt: new Intl.NumberFormat('uz-UZ').format(r.amount),
+          amountUzsFmt: fmt(r.amountUzs),
+        })),
+      };
+    }
+    if (type === 'payroll') {
+      const { rows } = await this.reports.payroll(q);
+      return {
+        title: 'Ish haqi hisoboti',
+        columns: [
+          { header: 'F.I.O', key: 'fullName', width: 28 },
+          { header: 'Lavozim', key: 'position', width: 20 },
+          { header: 'Oy', key: 'month', width: 12 },
+          { header: 'Oylik (UZS)', key: 'fixedFmt', width: 18 },
+          { header: 'Ulushlar (UZS)', key: 'shareFmt', width: 18 },
+          { header: 'Jami (UZS)', key: 'totalFmt', width: 18 },
+          { header: 'Holat', key: 'status', width: 12 },
+        ],
+        rows: rows.map((r) => ({ ...r, fixedFmt: fmt(r.fixedAmount), shareFmt: fmt(r.projectShareTotal), totalFmt: fmt(r.total) })),
+      };
+    }
+    if (type === 'tasks') {
+      const { byAssignee } = await this.reports.tasksReport(q);
+      return {
+        title: 'Vazifalar hisoboti (xodim kesimida)',
+        columns: [
+          { header: 'Xodim', key: 'fullName', width: 28 },
+          { header: 'Jami', key: 'total', width: 10 },
+          { header: 'Qilish kerak', key: 'todo', width: 12 },
+          { header: 'Jarayonda', key: 'in_progress', width: 11 },
+          { header: 'Muddati o\'tgan', key: 'overdue', width: 13 },
+          { header: 'Bajarilgan', key: 'done', width: 11 },
+          { header: 'Tekshirilgan', key: 'checked', width: 12 },
+          { header: 'Ishga tushirilgan', key: 'production', width: 15 },
+          { header: 'Rad etilgan', key: 'rejected', width: 11 },
+        ],
+        rows: byAssignee,
+      };
+    }
     const { rows } = await this.reports.projects(q);
     return {
       title: 'Loyihalar hisoboti',
@@ -156,9 +245,10 @@ export class ReportsController {
         { header: 'Status', key: 'status', width: 14 },
         { header: 'Summa', key: 'priceFmt', width: 20 },
         { header: 'Ulushlar', key: 'sharesFmt', width: 20 },
+        { header: 'Xarajatlar', key: 'expensesFmt', width: 20 },
         { header: 'Foyda', key: 'profitFmt', width: 20 },
       ],
-      rows: rows.map((r) => ({ ...r, priceFmt: fmt(r.price), sharesFmt: fmt(r.shares), profitFmt: fmt(r.profit) })),
+      rows: rows.map((r) => ({ ...r, priceFmt: fmt(r.price), sharesFmt: fmt(r.shares), expensesFmt: fmt(r.expenses), profitFmt: fmt(r.profit) })),
     };
   }
 }

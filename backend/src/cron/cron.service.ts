@@ -18,7 +18,7 @@ export class CronService {
    *  - auto-mark passed-deadline tasks as 'overdue'
    *  - notify assignees about tasks due today and overdue tasks
    */
-  @Cron('0 9 * * *', { name: 'deadline-check' })
+  @Cron('0 9 * * *', { name: 'deadline-check', timeZone: 'Asia/Tashkent' })
   async dailyDeadlineCheck() {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -54,5 +54,25 @@ export class CronService {
     }
 
     this.logger.log(`Deadline check: ${overdueTasks.length} overdue, ${dueToday.length} due today`);
+  }
+
+  /**
+   * Har soatda: muddati o'tgan, hali yakunlanmagan loyihalarni 'overdue' qiladi
+   * va a'zolarni xabardor qiladi (TZ A.11 — markOverdueProjects).
+   */
+  @Cron('0 * * * *', { name: 'project-overdue-check', timeZone: 'Asia/Tashkent' })
+  async markOverdueProjects() {
+    const now = new Date();
+    const projects = await this.prisma.project.findMany({
+      where: { deadline: { lt: now }, status: { in: ['planning', 'active'] } },
+      include: { members: { select: { userId: true } } },
+    });
+    for (const p of projects) {
+      await this.prisma.project.update({ where: { id: p.id }, data: { status: 'overdue' } });
+      for (const m of p.members) {
+        await this.notifications.notify(m.userId, 'project_overdue', { projectId: p.id, projectName: p.name });
+      }
+    }
+    if (projects.length) this.logger.log(`Loyiha overdue: ${projects.length} ta loyiha muddati o'tgan deb belgilandi`);
   }
 }

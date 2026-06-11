@@ -10,12 +10,21 @@ dayjs.locale('uz-latn');
  * formatMoney string/number/bigint qabul qiladi va so'm/dollar ko'rsatadi.
  */
 export function formatMoney(tiyin, currency = 'UZS') {
-  const value = Number(tiyin || 0) / 100; // tiyin -> butun birlik
-  const formatted = new Intl.NumberFormat('uz-UZ', {
-    maximumFractionDigits: currency === 'USD' ? 2 : 0,
-  }).format(value);
+  // BigInt arifmetikasi — katta summalarda (>90 trln so'm) Number precision yo'qolishini oldini oladi.
+  let big;
+  try {
+    big = typeof tiyin === 'bigint' ? tiyin : BigInt(tiyin ?? 0);
+  } catch {
+    big = BigInt(Math.round(Number(tiyin) || 0)); // float/yaroqsiz string uchun zaxira
+  }
+  const neg = big < 0n;
+  if (neg) big = -big;
+  const whole = big / 100n; // tiyin -> butun birlik
+  const cents = big % 100n;
+  const wholeStr = new Intl.NumberFormat('uz-UZ').format(whole); // Intl BigInt'ni qo'llab-quvvatlaydi
+  const body = currency === 'USD' ? `${wholeStr},${cents.toString().padStart(2, '0')}` : wholeStr;
   const suffix = currency === 'USD' ? '$' : "so'm";
-  return `${formatted} ${suffix}`;
+  return `${neg ? '-' : ''}${body} ${suffix}`;
 }
 
 /** Butun birlikni (so'm) tiyinga aylantirish (formaga kiritishda). */
@@ -48,7 +57,8 @@ export function deadlineInfo(deadline) {
   const absDays = Math.abs(d.diff(now, 'day'));
   const absHours = Math.abs(d.diff(now, 'hour')) % 24;
   if (overdue) {
-    return { text: `${absDays} kun kechikdi`, overdue: true };
+    if (absDays > 0) return { text: `${absDays} kun kechikdi`, overdue: true };
+    return { text: `${absHours} soat kechikdi`, overdue: true };
   }
   if (absDays > 0) return { text: `${absDays} kun ${absHours} soat qoldi`, overdue: false };
   return { text: `${absHours} soat qoldi`, overdue: false };

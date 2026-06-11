@@ -6,12 +6,47 @@ export function useDashboard() {
   return useQuery({ queryKey: ['dashboard'], queryFn: async () => (await api.get('/dashboard')).data });
 }
 
-export function useProjectsReport(params = {}) {
-  return useQuery({ queryKey: ['report-projects', params], queryFn: async () => (await api.get('/reports/projects', { params })).data });
+/** Dashboard analitikasi — vazifa/loyiha/yig'ilish dinamikasi, davr bo'yicha (1m|3m|6m|1y). */
+export function useAnalytics(period = '1m') {
+  return useQuery({
+    queryKey: ['dashboard-analytics', period],
+    queryFn: async () => (await api.get('/dashboard/analytics', { params: { period } })).data,
+  });
+}
+
+export function useProjectsReport(params = {}, enabled = true) {
+  return useQuery({ queryKey: ['report-projects', params], enabled: !!enabled, queryFn: async () => (await api.get('/reports/projects', { params })).data });
+}
+
+/** Loyiha budjeti burn-down (byudjet vs sarflangan). */
+export function useProjectBudget(projectId, enabled = true) {
+  return useQuery({
+    queryKey: ['report-project-budget', projectId],
+    enabled: !!enabled && !!projectId,
+    queryFn: async () => (await api.get('/reports/project-budget', { params: { projectId } })).data,
+  });
+}
+
+/** Joriy foydalanuvchi unumdorligi (KPI). */
+export function useMyEfficiency() {
+  return useQuery({ queryKey: ['my-efficiency'], queryFn: async () => (await api.get('/users/me/efficiency')).data });
 }
 
 export function useFinanceReport(params = {}) {
   return useQuery({ queryKey: ['report-finance', params], queryFn: async () => (await api.get('/reports/finance', { params })).data });
+}
+
+/** Hisobotlar: "Shakllantirish" bosilganda (enabled) ishlaydi. */
+export function useExpensesReport(params, enabled) {
+  return useQuery({ queryKey: ['report-expenses', params], enabled: !!enabled, queryFn: async () => (await api.get('/reports/expenses', { params })).data });
+}
+
+export function usePayrollReport(params, enabled) {
+  return useQuery({ queryKey: ['report-payroll', params], enabled: !!enabled, queryFn: async () => (await api.get('/reports/payroll', { params })).data });
+}
+
+export function useTasksReport(params, enabled) {
+  return useQuery({ queryKey: ['report-tasks', params], enabled: !!enabled, queryFn: async () => (await api.get('/reports/tasks', { params })).data });
 }
 
 export function useEmployeesReport() {

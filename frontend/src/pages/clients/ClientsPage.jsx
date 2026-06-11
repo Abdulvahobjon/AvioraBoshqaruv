@@ -75,7 +75,7 @@ export function ClientsPage() {
   };
 
   return (
-    <div>
+    <div className="flex h-[calc(100vh-6rem)] flex-col sm:h-[calc(100vh-7rem)]">
       <PageHeader
         title="Mijozlar"
         subtitle="CRM — mijozlar bazasi"
@@ -103,18 +103,22 @@ export function ClientsPage() {
         </Select>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={data?.items}
-        loading={isLoading}
-        onRowClick={(r) => navigate(`/clients/${r.id}`)}
-        page={page}
-        totalPages={data?.totalPages || 1}
-        total={data?.total || 0}
-        onPageChange={setPage}
-        emptyTitle="Mijozlar yo'q"
-        emptyDescription="Birinchi mijozni qo'shish uchun yuqoridagi tugmani bosing."
-      />
+      <div className="min-h-0 flex-1">
+        <DataTable
+          columns={columns}
+          data={data?.items}
+          loading={isLoading}
+          onRowClick={(r) => navigate(`/clients/${r.id}`)}
+          page={page}
+          totalPages={data?.totalPages || 1}
+          total={data?.total || 0}
+          onPageChange={setPage}
+          emptyTitle="Mijozlar yo'q"
+          emptyDescription="Birinchi mijozni qo'shish uchun yuqoridagi tugmani bosing."
+          transparent
+          fill
+        />
+      </div>
 
       <ClientFormDialog open={formOpen} onClose={() => setFormOpen(false)} client={editing} />
       <ConfirmDialog

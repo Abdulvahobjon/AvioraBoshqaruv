@@ -67,10 +67,6 @@ export function LoginPage() {
             Kirish
           </Button>
         </form>
-
-        <p className="mt-4 text-center text-xs text-text-soft">
-          Test: <span className="font-medium text-text-sub">Asadbek Superadmin</span> / Aviora2026!
-        </p>
       </div>
     </div>
   );

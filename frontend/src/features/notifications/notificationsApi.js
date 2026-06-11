@@ -20,6 +20,8 @@ export function describeNotification(n) {
       return { title: 'Vazifa rad etildi', body: p.title && `'${p.title}' — ${p.reason || 'qayta ishlang'}`, icon: FolderOpen };
     case 'task_checked':
       return { title: 'Vazifa tasdiqlandi', body: p.title && `'${p.title}' tekshiruvdan o'tdi`, icon: FolderOpen };
+    case 'task_status':
+      return { title: 'Vazifa holati o\'zgardi', body: p.title && `'${p.title}' — yangi holat`, icon: FolderOpen };
     case 'task_overdue':
       return { title: 'Vazifa muddati o\'tdi', body: p.title && `'${p.title}' kechikmoqda`, icon: AlertTriangle };
     case 'task_due_today':
@@ -67,6 +69,22 @@ export function useMarkRead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id) => (await api.patch(`/notifications/${id}/read`)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+}
+
+export function useDeleteNotification() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id) => (await api.delete(`/notifications/${id}`)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+}
+
+export function useClearNotifications() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => (await api.delete('/notifications/clear')).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
   });
 }

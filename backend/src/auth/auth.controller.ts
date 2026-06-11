@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Post, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -13,6 +14,8 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
+  // Brute-force himoyasi: bir IP'dan 1 daqiqada maks 8 ta login urinishi.
+  @Throttle({ default: { ttl: 60_000, limit: 8 } })
   @Public()
   @Post('login')
   login(@Body() dto: LoginDto, @Req() req: Request) {

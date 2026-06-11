@@ -2,7 +2,10 @@
 
 IT firma uchun ichki boshqaruv tizimi: **CRM (mijozlar), loyihalar, vazifalar (Kanban), moliya, oyliklar va audit**. Faqat web, to'liq responsiv, light/dark mode.
 
-> **Holat:** Vertikal qism tayyor — Auth + RBAC, Layout/Theme, Mijozlar (CRM) va Loyihalar to'liq ishlaydi. Qolgan modullar (Kanban, Moliya, Hisobotlar, Audit, Bildirishnomalar...) keyingi bosqichlarda quriladi. UI'da ular "Tez orada" sifatida ko'rinadi.
+> **Holat:** Barcha asosiy modullar ishlaydi — Auth + RBAC, Layout/Theme, Mijozlar (CRM), Loyihalar,
+> Vazifalar (Kanban), Yig'ilishlar (Google Meet), Moliya (ledger + so'rov workflow), Oyliklar,
+> Xarajatlar, Valyutalar, Hisobotlar (Excel/PDF/CSV eksport), Audit, Bildirishnomalar (Socket.io),
+> Kunlik rejalar va Sozlamalar. Build: backend `nest build` ✅, frontend `vite build` ✅.
 
 ## Texnologiyalar
 
@@ -132,10 +135,20 @@ Parol (barchasi uchun): **`Aviora2026!`**
 
 ---
 
+## Modullar (tayyor)
+
+- **Moliya** — Ledger (append-only), 3-bosqichli so'rov workflow (pending → paid → closed), balans
+- **Valyuta** — UZS/USD kurslari + tarix; pul UZS ga konvertatsiya qilinadi
+- **Oyliklar** — oylik = fiks maosh + loyiha ulushlari; atomik to'lov
+- **Xarajatlar** — kategoriya bo'yicha, UZS ekvivalenti bilan
+- **Vazifalar (Kanban)** — `@hello-pangea/dnd`, faqat-oldinga status pipeline, izoh + fayl
+- **Yig'ilishlar** — Google Meet avtomatik link, davomat
+- **Hisobotlar** — 7 tur, Excel/PDF/CSV eksport
+- **Audit** — JSONB old/new, moliyaviy o'zgarishlar flaglanadi
+- **Bildirishnomalar** — Socket.io real-time + cron (deadline tekshiruvi)
+- **Kunlik rejalar, Sozlamalar (nomenklatura CRUD)**
+
 ## Keyingi bosqichlar (reja)
 
-5. Moliya (Ledger, 3-bosqichli so'rov workflow, balans), valuta, oylik, xarajatlar
-6. Vazifalar (Kanban — dnd-kit), Meeting
-7. Dashboard kengaytmasi, hisobotlar (Excel/PDF eksport)
-8. Audit log UI, bildirishnomalar (Socket.io + cron), todo, sozlamalar (nomenklatura CRUD)
-9. Sayqal: empty/loading/error holatlari, responsivlik testlari
+- Sayqal: empty/loading/error holatlarini to'liq qoplash, responsivlik testlari
+- Avtomatlashtirilgan testlar (unit/e2e) qo'shish

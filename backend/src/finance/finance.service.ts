@@ -53,8 +53,8 @@ export class FinanceService {
 
   async listRequests(user: AuthUser, q: any) {
     const where: any = {};
-    // Accountant/admin/superadmin see all; others see only their own.
-    if (!['accountant', 'admin', 'superadmin'].includes(user.role)) {
+    // Accountant/admin/superadmin/auditor see all; others see only their own.
+    if (!['accountant', 'admin', 'superadmin', 'auditor'].includes(user.role)) {
       where.userId = user.id;
     } else if (q.userId) {
       where.userId = Number(q.userId);
@@ -78,13 +78,16 @@ export class FinanceService {
     if (!req) throw new NotFoundException('So\'rov topilmadi');
     if (req.status !== 'pending') throw new BadRequestException('Faqat kutilayotgan so\'rovni to\'lash mumkin');
 
+    // Ledger har doim UZS (tiyin) saqlanadi — aralash valyutali yozuvlar jamlanganda
+    // noto'g'ri bo'lmasligi uchun (balansga ta'sir ham confirm'da UZS bilan bo'ladi).
+    const uzs = await this.currencies.toUzs(req.amount, req.currency);
     const updated = await this.prisma.$transaction(async (tx) => {
       // Atomik holat almashinuvi: faqat hali 'pending' bo'lsa to'laymiz — parallel ikki to'lov dubl ledger yozmaydi.
       const res = await tx.financeRequest.updateMany({ where: { id, status: 'pending' }, data: { status: 'paid', paidAt: new Date() } });
       if (res.count === 0) throw new BadRequestException('Faqat kutilayotgan so\'rovni to\'lash mumkin');
       await tx.ledgerEntry.create({
         data: {
-          requestId: id, userId: req.userId, amount: req.amount,
+          requestId: id, userId: req.userId, amount: uzs,
           type: req.type, direction: 'debit',
           note: `To'lov: ${req.reason}`,
         },
@@ -171,22 +174,54 @@ export class FinanceService {
     if (!entry) throw new NotFoundException('Yozuv topilmadi');
     if (entry.isReversal) throw new BadRequestException('Teskari yozuvni qayta teskari qilib bo\'lmaydi');
     // Bir yozuvni faqat bir marta teskari qilish mumkin (dubl-bosishdan himoya).
+    // Yakuniy himoya — reversedEntryId ustidagi UNIQUE constraint (quyida P2002 ushlanadi);
+    // bu erdagi tekshiruv tezkor/aniq xabar uchun.
     const already = await this.prisma.ledgerEntry.findFirst({ where: { reversedEntryId: entry.id } });
     if (already) throw new BadRequestException('Bu yozuv allaqachon teskari qilingan');
 
-    const reversal = await this.prisma.ledgerEntry.create({
-      data: {
-        requestId: entry.requestId,
-        userId: entry.userId,
-        amount: entry.amount,
-        type: 'reversal',
-        direction: entry.direction === 'debit' ? 'credit' : 'debit',
-        isReversal: true,
-        reversedEntryId: entry.id,
-        note: dto.note || `Teskari yozuv (#${entry.id})`,
-      },
-    });
-    await this.audit.record({ userId: actor.id, entity: 'LedgerEntry', entityId: reversal.id, action: 'REVERSE', ip, newValue: { reversedEntryId: entry.id } });
+    // Balansga ta'sirni ham teskari qaytaramiz — aks holda ledger yig'indisi balansga mos kelmaydi:
+    //  • kredit (oylik / loyiha ulushi) balansni OSHIRGAN  → teskarisi KAMAYTIRADI
+    //  • debit (oylik yechib olish, faqat tasdiqlangan so'rov) balansni KAMAYTIRGAN → teskarisi OSHIRADI
+    // company/other turdagi so'rovlar balansga umuman ta'sir qilmaydi (confirm faqat 'salary'da kamaytiradi).
+    let balanceDelta = 0n;
+    if (entry.userId) {
+      if (entry.direction === 'credit' && ['salary', 'project_share'].includes(entry.type)) {
+        balanceDelta = -entry.amount;
+      } else if (entry.direction === 'debit' && entry.type === 'salary') {
+        // Yechib olish balansni faqat so'rov TASDIQLANGANDA (closed) kamaytirgan.
+        const linked = entry.requestId
+          ? await this.prisma.financeRequest.findFirst({ where: { id: entry.requestId }, select: { status: true } })
+          : null;
+        if (linked?.status === 'closed') balanceDelta = entry.amount;
+      }
+    }
+
+    let reversal;
+    try {
+      reversal = await this.prisma.$transaction(async (tx) => {
+        // UNIQUE(reversed_entry_id) ikki bir vaqtli urinishdan birini P2002 bilan rad etadi.
+        const r = await tx.ledgerEntry.create({
+          data: {
+            requestId: entry.requestId,
+            userId: entry.userId,
+            amount: entry.amount,
+            type: 'reversal',
+            direction: entry.direction === 'debit' ? 'credit' : 'debit',
+            isReversal: true,
+            reversedEntryId: entry.id,
+            note: dto.note || `Teskari yozuv (#${entry.id})`,
+          },
+        });
+        if (balanceDelta !== 0n && entry.userId) {
+          await tx.user.update({ where: { id: entry.userId }, data: { balance: { increment: balanceDelta } } });
+        }
+        return r;
+      });
+    } catch (e: any) {
+      if (e?.code === 'P2002') throw new BadRequestException('Bu yozuv allaqachon teskari qilingan');
+      throw e;
+    }
+    await this.audit.record({ userId: actor.id, entity: 'LedgerEntry', entityId: reversal.id, action: 'REVERSE', ip, flagged: true, newValue: { reversedEntryId: entry.id, balanceDelta: balanceDelta.toString() } });
     return reversal;
   }
 }

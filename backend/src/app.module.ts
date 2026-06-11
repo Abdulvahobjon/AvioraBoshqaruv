@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { HealthController } from './health.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
@@ -18,14 +20,18 @@ import { ExpensesModule } from './expenses/expenses.module';
 import { ReportsModule } from './reports/reports.module';
 import { MeetingsModule } from './meetings/meetings.module';
 import { DailyPlansModule } from './daily-plans/daily-plans.module';
+import { ApplicationsModule } from './applications/applications.module';
 import { CronModule } from './cron/cron.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { AuditorReadOnlyGuard } from './common/guards/auditor-read-only.guard';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
+    // Global rate-limit: bir IP'dan 1 daqiqada maks 120 so'rov (brute-force/DoS himoyasi).
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     PrismaModule,
     AuditModule,
     AuthModule,
@@ -42,13 +48,19 @@ import { RolesGuard } from './common/guards/roles.guard';
     ReportsModule,
     MeetingsModule,
     DailyPlansModule,
+    ApplicationsModule,
     CronModule,
   ],
+  controllers: [HealthController],
   providers: [
+    // Global rate-limit guard (eng birinchi ishlaydi)
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     // Global auth: every route requires JWT unless @Public()
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     // Global RBAC: routes with @Roles() are checked
     { provide: APP_GUARD, useClass: RolesGuard },
+    // Nazoratchi (auditor) read-only — RolesGuard'dan keyin
+    { provide: APP_GUARD, useClass: AuditorReadOnlyGuard },
   ],
 })
 export class AppModule {}

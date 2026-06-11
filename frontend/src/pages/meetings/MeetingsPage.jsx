@@ -158,6 +158,7 @@ export function MeetingsPage() {
         columns={columns}
         data={meetings}
         loading={isLoading}
+        transparent
         onRowClick={(r) => (canEdit(r) ? setEditing(r) : setDetailId(r.id))}
         emptyTitle="Yig'ilishlar yo'q"
         emptyDescription={canCreate ? "Yangi yig'ilish tashkil eting." : "Sizni yig'ilishlarga taklif qilishadi."}
@@ -324,7 +325,7 @@ function MeetingDialog({ open, onClose, meeting }) {
     >
       {created ? (
         <div className="flex flex-col items-center gap-4 py-6 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-success-soft text-success-strong"><CheckCircle2 className="h-8 w-8" /></span>
+          <span className="flex h-14 w-14 items-center justify-center text-success-strong"><CheckCircle2 className="h-8 w-8" /></span>
           <div>
             <p className="text-lg font-semibold text-text-strong">Yig'ilish yaratildi</p>
             <p className="text-sm text-text-sub">"{created.title}" muvaffaqiyatli qo'shildi</p>
@@ -341,7 +342,7 @@ function MeetingDialog({ open, onClose, meeting }) {
               </div>
             </div>
           ) : (
-            <p className="rounded-lg bg-bg-1 px-4 py-2 text-sm text-text-soft">
+            <p className="px-4 py-2 text-sm text-text-soft">
               Google Meet havolasi yaratilmadi (Google akkaunt sozlanmagan). Yig'ilish saqlandi.
             </p>
           )}
@@ -412,7 +413,7 @@ function MeetingDialog({ open, onClose, meeting }) {
                 <div className="space-y-3">
                   <div className="flex flex-wrap gap-2">
                     {selectedUsers.map((u) => (
-                      <span key={u.id} className="inline-flex items-center gap-2 rounded-full bg-bg-2 py-1 pl-1 pr-2.5 text-sm">
+                      <span key={u.id} className="inline-flex items-center gap-2 rounded-full border border-stroke-soft py-1 pl-1 pr-2.5 text-sm">
                         <Avatar name={u.fullName} src={u.avatar} size="sm" />
                         <span className="text-text-strong">{u.fullName}</span>
                         <button type="button" onClick={() => setParticipants((p) => p.filter((x) => x !== u.id))} className="text-icon-soft hover:text-error-strong">

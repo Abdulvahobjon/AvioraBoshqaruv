@@ -43,7 +43,7 @@ export class FinanceController {
   }
 
   @Get('ledger')
-  @Roles('superadmin', 'admin', 'accountant')
+  @Roles('superadmin', 'admin', 'accountant', 'auditor')
   ledger(@Query() q: any) {
     return this.finance.ledger(q);
   }

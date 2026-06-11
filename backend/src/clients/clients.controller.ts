@@ -15,13 +15,13 @@ export class ClientsController {
   constructor(private readonly clients: ClientsService) {}
 
   @Get()
-  @Roles('superadmin', 'admin', 'manager')
+  @Roles('superadmin', 'admin', 'manager', 'auditor')
   findAll(@Query() q: any) {
     return this.clients.findAll(q);
   }
 
   @Get(':id')
-  @Roles('superadmin', 'admin', 'manager')
+  @Roles('superadmin', 'admin', 'manager', 'auditor')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.clients.findOne(id);
   }

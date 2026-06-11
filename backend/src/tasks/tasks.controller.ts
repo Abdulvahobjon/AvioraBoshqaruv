@@ -3,8 +3,6 @@ import {
   UploadedFile, UseInterceptors, BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { TasksService } from './tasks.service';
@@ -12,14 +10,8 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { ChangeStatusDto, ReviewTaskDto, CreateCommentDto } from './dto/task-actions.dto';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
-
-const uploadStorage = diskStorage({
-  destination: process.env.UPLOAD_DIR || 'uploads',
-  filename: (_req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `${unique}${extname(file.originalname)}`);
-  },
-});
+import { AuditorCanWrite } from '../common/decorators/auditor.decorator';
+import { uploadOptions } from '../common/upload.util';
 
 @ApiTags('tasks')
 @ApiBearerAuth()
@@ -30,6 +22,11 @@ export class TasksController {
   @Get('board')
   board(@CurrentUser() user: AuthUser, @Query() q: any) {
     return this.tasks.board(user, q);
+  }
+
+  @Get('trash')
+  trash(@CurrentUser() user: AuthUser) {
+    return this.tasks.trash(user);
   }
 
   @Get()
@@ -58,6 +55,7 @@ export class TasksController {
   }
 
   @Post(':id/review')
+  @AuditorCanWrite() // Nazoratchi (auditor) task QA qila oladi (checked/rejected)
   review(@Param('id', ParseIntPipe) id: number, @Body() dto: ReviewTaskDto, @CurrentUser() user: AuthUser, @Req() req: Request) {
     return this.tasks.review(id, dto, user, req.ip);
   }
@@ -69,10 +67,20 @@ export class TasksController {
 
   @Post(':id/files')
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file', { storage: uploadStorage, limits: { fileSize: 20 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', uploadOptions(20)))
   addFile(@Param('id', ParseIntPipe) id: number, @UploadedFile() file: any, @CurrentUser() user: AuthUser) {
     if (!file) throw new BadRequestException('Fayl yuklanmadi');
     return this.tasks.addFile(id, file, user);
+  }
+
+  @Post(':id/restore')
+  restore(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser, @Req() req: Request) {
+    return this.tasks.restore(id, user, req.ip);
+  }
+
+  @Delete(':id/hard')
+  hardDelete(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser, @Req() req: Request) {
+    return this.tasks.hardDelete(id, user, req.ip);
   }
 
   @Delete(':id')

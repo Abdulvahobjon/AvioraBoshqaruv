@@ -15,7 +15,8 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      # Parol git'ga kommit qilinmaydi — root `.env` faylidan olinadi (namuna: .env.docker.example).
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD .env faylida belgilanishi shart}
       POSTGRES_DB: aviora
     volumes:
       - aviora_pg_data:/var/lib/postgresql/data
@@ -36,16 +37,17 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/aviora?schema=public
-      JWT_ACCESS_SECRET: "5ae5d318f8c89e5e1734c3fb97d4e68fdd444c9ef3aafa3d789e0d84c7840b5a"
-      JWT_REFRESH_SECRET: "b59d4545c46fbbab4ad37cd858115549d84600e2cdaa20a51e649bc2de7474b8"
+      # Maxfiy qiymatlar git'ga kommit QILINMAYDI — root `.env` faylidan o'qiladi (namuna: .env.docker.example).
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?belgilang}@postgres:5432/aviora?schema=public
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET .env faylida belgilanishi shart}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET .env faylida belgilanishi shart}
       JWT_ACCESS_EXPIRES: 15m
       JWT_REFRESH_EXPIRES: 7d
       PORT: 3000
       NODE_ENV: production
-      CORS_ORIGIN: https://avioraerp.asosit.uz
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://avioraerp.asosit.uz}
       UPLOAD_DIR: uploads
-      SEED_DEFAULT_PASSWORD: Aviora2026!
+      SEED_DEFAULT_PASSWORD: ${SEED_DEFAULT_PASSWORD:?SEED_DEFAULT_PASSWORD .env faylida belgilanishi shart}
     # ── Google Meet (Calendar API) ──
     # Sirlar git'ga kommit qilinmaydi. Serverda `google-meet.env` faylini yarating
     # (namuna: google-meet.env.example) va GOOGLE_* qiymatlarni to'ldiring.

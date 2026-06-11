@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { AppModule } from './app.module';
@@ -17,6 +18,11 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService);
+  const isProd = config.get<string>('NODE_ENV') === 'production';
+
+  // Xavfsizlik header'lari (HSTS, X-Content-Type-Options, frameguard, ...).
+  // crossOriginResourcePolicy o'chirilgan — /uploads fayllarini front-end (boshqa origin) ko'rsata olishi uchun.
+  app.use(helmet({ crossOriginResourcePolicy: false }));
 
   // Static serving for uploaded task files: /uploads/<file>
   const uploadDir = config.get<string>('UPLOAD_DIR', 'uploads');
@@ -49,19 +55,21 @@ async function bootstrap() {
   );
   app.useGlobalFilters(new AllExceptionsFilter());
 
-  // ── Swagger ──
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('Aviora Boshqaruv API')
-    .setDescription('IT firma ichki boshqaruv tizimi — REST API')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document);
+  // ── Swagger — faqat NOL-production muhitda (productionda API sxemasi oshkor bo'lmasligi uchun) ──
+  if (!isProd) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('Aviora Boshqaruv API')
+      .setDescription('IT firma ichki boshqaruv tizimi — REST API')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   const port = config.get<number>('PORT', 3000);
   await app.listen(port);
   console.log(`🚀 Backend: http://localhost:${port}/api`);
-  console.log(`📚 Swagger: http://localhost:${port}/api/docs`);
+  if (!isProd) console.log(`📚 Swagger: http://localhost:${port}/api/docs`);
 }
 bootstrap();
