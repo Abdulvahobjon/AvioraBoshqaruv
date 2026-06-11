@@ -25,10 +25,10 @@ export class ReportsController {
     return this.reports.projects(q);
   }
 
-  /** Loyiha budjeti burn-down (byudjet vs sarflangan). */
-  @Get('project-budget')
-  projectBudget(@Query('projectId') projectId: string) {
-    return this.reports.projectBudget(Number(projectId));
+  @Get('expense-requests')
+  @Roles('superadmin', 'admin', 'accountant', 'auditor')
+  expenseRequests(@Query() q: any) {
+    return this.reports.expenseRequests(q);
   }
 
   @Get('finance')
@@ -71,7 +71,7 @@ export class ReportsController {
   async export(@Query() q: any, @Res() res: Response, @CurrentUser() user: AuthUser) {
     const type = q.type || 'projects';
     // Maosh/balans/xarajat eksporti faqat moliyaviy rollarga (to'g'ridan-to'g'ri endpointlar bilan bir xil).
-    if (['payroll', 'expenses', 'employees', 'employee-report'].includes(type) && !FINANCE_ONLY_ROLES.includes(user.role)) {
+    if (['payroll', 'expenses', 'employees', 'employee-report', 'expense-requests'].includes(type) && !FINANCE_ONLY_ROLES.includes(user.role)) {
       throw new ForbiddenException('Ruxsat yo\'q');
     }
     const format = ['pdf', 'csv'].includes(q.format) ? q.format : 'xlsx';
@@ -236,19 +236,66 @@ export class ReportsController {
         rows: byAssignee,
       };
     }
+    if (type === 'expense-requests') {
+      const { rows } = await this.reports.expenseRequests(q);
+      const TYPE: Record<string, string> = { salary: 'Mablag\' chiqarish', company: 'Kompaniya xarajatlari', other: 'Boshqa xarajatlar' };
+      const STAT: Record<string, string> = { pending: 'To\'lanmagan', paid: 'To\'langan', closed: 'Tasdiqlangan', rejected: 'Bekor qilingan' };
+      const PAY: Record<string, string> = { card: 'Karta orqali', cash: 'Naqd pul' };
+      const dt = (d: any) => (d ? new Date(d).toLocaleString('uz-UZ') : '—');
+      return {
+        title: 'Xarajat so\'rovlari hisoboti',
+        columns: [
+          { header: 'Ism Sharifi', key: 'fullName', width: 24 },
+          { header: 'Loyiha', key: 'project', width: 22 },
+          { header: 'Xarajat turi', key: 'typeLabel', width: 20 },
+          { header: 'Toifa', key: 'category', width: 18 },
+          { header: 'Miqdori (UZS)', key: 'amountFmt', width: 18 },
+          { header: 'To\'lov turi', key: 'payLabel', width: 14 },
+          { header: 'Holati', key: 'statLabel', width: 14 },
+          { header: 'So\'rov sababi', key: 'reason', width: 28 },
+          { header: 'So\'ralgan vaqti', key: 'createdFmt', width: 18 },
+          { header: 'To\'langan vaqti', key: 'paidFmt', width: 18 },
+          { header: 'Tasdiqlangan vaqti', key: 'confFmt', width: 18 },
+          { header: 'Hisobchi', key: 'accountant', width: 22 },
+          { header: 'Bekor qilingan vaqt', key: 'cancelFmt', width: 18 },
+          { header: 'Bekor qilish sababi', key: 'cancelReason', width: 28 },
+        ],
+        rows: rows.map((r) => ({
+          ...r,
+          typeLabel: TYPE[r.type] || r.type,
+          payLabel: r.paymentMethod ? PAY[r.paymentMethod] || r.paymentMethod : '—',
+          statLabel: STAT[r.status] || r.status,
+          amountFmt: fmt(r.amount),
+          createdFmt: dt(r.createdAt), paidFmt: dt(r.paidAt), confFmt: dt(r.confirmedAt), cancelFmt: dt(r.canceledAt),
+        })),
+      };
+    }
     const { rows } = await this.reports.projects(q);
+    const PSTAT: Record<string, string> = { planning: 'Rejalashtirilgan', active: 'Faol', overdue: 'Muddati o\'tgan', completed: 'Yakunlangan', cancelled: 'Bekor qilingan' };
     return {
       title: 'Loyihalar hisoboti',
       columns: [
-        { header: 'Loyiha', key: 'name', width: 30 },
-        { header: 'Mijoz', key: 'client', width: 24 },
-        { header: 'Status', key: 'status', width: 14 },
-        { header: 'Summa', key: 'priceFmt', width: 20 },
-        { header: 'Ulushlar', key: 'sharesFmt', width: 20 },
-        { header: 'Xarajatlar', key: 'expensesFmt', width: 20 },
-        { header: 'Foyda', key: 'profitFmt', width: 20 },
+        { header: 'Titul', key: 'code', width: 10 },
+        { header: 'Nomi', key: 'name', width: 26 },
+        { header: 'Tavsifi', key: 'description', width: 28 },
+        { header: 'Muddati', key: 'deadlineFmt', width: 16 },
+        { header: 'Holati', key: 'statLabel', width: 14 },
+        { header: 'Boshqaruvchi bonusi', key: 'bonusFmt', width: 18 },
+        { header: 'Muallif', key: 'author', width: 22 },
+        { header: 'Boshqaruvchi', key: 'managers', width: 24 },
+        { header: 'Xodimlar', key: 'employees', width: 28 },
+        { header: 'Sinovchilar', key: 'testers', width: 24 },
+        { header: 'Vazifalar (jami)', key: 'tasksTotal', width: 14 },
+        { header: 'Bajarilgan', key: 'tDone', width: 12 },
+        { header: 'Rad etilgan', key: 'tRejected', width: 12 },
       ],
-      rows: rows.map((r) => ({ ...r, priceFmt: fmt(r.price), sharesFmt: fmt(r.shares), expensesFmt: fmt(r.expenses), profitFmt: fmt(r.profit) })),
+      rows: rows.map((r) => ({
+        ...r,
+        deadlineFmt: r.deadline ? new Date(r.deadline).toLocaleString('uz-UZ') : '—',
+        statLabel: PSTAT[r.status] || r.status,
+        bonusFmt: fmt(r.managerBonus),
+        tDone: r.tasks.done, tRejected: r.tasks.rejected,
+      })),
     };
   }
 }

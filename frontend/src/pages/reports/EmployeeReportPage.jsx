@@ -9,29 +9,61 @@ import { useReference } from '@/features/settings/settingsApi';
 import { useUsersList } from '@/features/users/usersApi';
 import { useEmployeeReport } from '@/features/reports/reportsApi';
 import { ReportExportActions, ReportToolbar } from '@/features/reports/ReportShell';
-import { FilterField, FilterSelect, NumberRange, UserPickerField } from '@/features/reports/ReportFilters';
+import { FilterField, FilterSelect, MoneyRange, StatusRange, UserPickerField } from '@/features/reports/ReportFilters';
 import { ReportTable } from '@/features/reports/ReportTable';
 
 const money = (v) => formatMoney(Math.round((v || 0) * 100)); // unit -> tiyin
 
+// Status variantlari (rangli nuqta bilan)
+const PROJECT_OPTS = [
+  { value: 'completed', label: 'Tugatilgan', dot: '#22C55E' },
+  { value: 'active', label: 'Jarayonda', dot: '#14B8A6' },
+  { value: 'cancelled', label: 'Bekor qilingan', dot: '#111827' },
+  { value: 'overdue', label: "Muddati o'tgan", dot: '#EF4444' },
+  { value: 'planning', label: 'Rejalashtirilgan', dot: '#9CA3AF' },
+];
+const TASK_OPTS = [
+  { value: 'todo', label: 'Qilish kerak', dot: '#F59E0B' },
+  { value: 'in_progress', label: 'Jarayonda', dot: '#3B82F6' },
+  { value: 'done', label: 'Bajarilgan', dot: '#8B5CF6' },
+  { value: 'production', label: 'Ishga tushirilgan', dot: '#22C55E' },
+  { value: 'checked', label: 'Tekshirilgan', dot: '#06B6D4' },
+  { value: 'rejected', label: 'Rad etilgan', dot: '#EF4444' },
+  { value: 'overdue', label: "Muddati o'tgan", dot: '#6B7280' },
+];
+const MEETING_OPTS = [
+  { value: 'attended', label: 'Qatnashgan', dot: '#22C55E' },
+  { value: 'excused', label: 'Qatnashmagan "sababli"', dot: '#F59E0B' },
+  { value: 'unexcused', label: 'Qatnashmagan "sababsiz"', dot: '#EF4444' },
+];
+const REQUEST_OPTS = [
+  { value: 'pending', label: "To'lanmagan", dot: '#F59E0B' },
+  { value: 'paid', label: "To'langan", dot: '#22C55E' },
+  { value: 'closed', label: 'Tasdiqlangan', dot: '#3B82F6' },
+  { value: 'rejected', label: 'Bekor qilingan', dot: '#EF4444' },
+];
+
 const EMPTY = {
   search: '', joinedFrom: '', joinedTo: '', positionId: '', region: '',
   salaryFrom: '', salaryTo: '', balanceFrom: '', balanceTo: '',
-  projectsFrom: '', projectsTo: '', tasksFrom: '', tasksTo: '',
-  meetingsFrom: '', meetingsTo: '', requestsFrom: '', requestsTo: '',
+  projectStatus: '', projectsFrom: '', projectsTo: '',
+  taskStatus: '', tasksFrom: '', tasksTo: '',
+  meetingStatus: '', meetingsFrom: '', meetingsTo: '',
+  requestStatus: '', requestAmountFrom: '', requestAmountTo: '',
+  payrollFrom: '', payrollTo: '',
   userIds: [],
 };
 
-const RANGE_KEYS = ['salaryFrom', 'salaryTo', 'balanceFrom', 'balanceTo', 'projectsFrom', 'projectsTo', 'tasksFrom', 'tasksTo', 'meetingsFrom', 'meetingsTo', 'requestsFrom', 'requestsTo'];
-
 function buildParams(f) {
   const p = {};
-  if (f.search) p.search = f.search;
-  if (f.joinedFrom) p.joinedFrom = f.joinedFrom;
-  if (f.joinedTo) p.joinedTo = f.joinedTo;
-  if (f.positionId) p.positionId = f.positionId;
-  if (f.region) p.region = f.region;
-  RANGE_KEYS.forEach((k) => { if (f[k] !== '' && f[k] != null) p[k] = f[k]; });
+  const add = (k) => { if (f[k] !== '' && f[k] != null) p[k] = f[k]; };
+  ['search', 'joinedFrom', 'joinedTo', 'positionId', 'region',
+    'salaryFrom', 'salaryTo', 'balanceFrom', 'balanceTo',
+    'projectStatus', 'projectsFrom', 'projectsTo',
+    'taskStatus', 'tasksFrom', 'tasksTo',
+    'meetingStatus', 'meetingsFrom', 'meetingsTo',
+    'requestStatus', 'requestAmountFrom', 'requestAmountTo',
+    'payrollFrom', 'payrollTo'].forEach(add);
   if (f.userIds?.length) p.userIds = f.userIds.join(',');
   return p;
 }
@@ -40,10 +72,10 @@ export function EmployeeReportPage() {
   const [filters, setFilters] = useState(EMPTY);
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [applied, setApplied] = useState({});
-  const [generated, setGenerated] = useState(false); // boshida bo'sh — faqat "Shakllantirish"dan keyin yuklanadi
+  const [generated, setGenerated] = useState(false);
 
   const { data: positions } = useReference('position');
-  const { data: usersData } = useUsersList();
+  const { data: usersData } = useUsersList({ limit: 500 });
   const users = usersData?.items || [];
 
   const { data, isFetching } = useEmployeeReport(applied, generated);
@@ -51,12 +83,7 @@ export function EmployeeReportPage() {
   const set = (k, v) => setFilters((s) => ({ ...s, [k]: v }));
   const hasFilters = useMemo(() => JSON.stringify(buildParams(filters)) !== '{}', [filters]);
 
-  const generate = () => {
-    setApplied(buildParams(filters));
-    setGenerated(true);
-    setFiltersOpen(false); // shakllantirilgach filter paneli yopiladi
-    toast.success("Ma'lumotlar shakllantirildi");
-  };
+  const generate = () => { setApplied(buildParams(filters)); setGenerated(true); setFiltersOpen(false); toast.success("Ma'lumotlar shakllantirildi"); };
   const clear = () => { setFilters(EMPTY); setApplied({}); setGenerated(false); setFiltersOpen(true); };
 
   const positionOpts = (positions || []).map((p) => ({ value: p.id, label: p.name }));
@@ -104,7 +131,7 @@ export function EmployeeReportPage() {
   ];
 
   return (
-    <div className="flex h-[calc(100vh-7rem)] flex-col">
+    <div className="flex min-h-[calc(100vh-7rem)] flex-col">
       <div className="shrink-0">
         <PageHeader
           title="Xodim bo'yicha hisobot"
@@ -125,42 +152,62 @@ export function EmployeeReportPage() {
 
         {filtersOpen && (
           <Card className="mt-3 p-4">
-            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-              <FilterField label="Ishga kirgan vaqti" className="sm:col-span-2">
-                <div className="flex gap-2">
-                  <AntDate value={filters.joinedFrom} onChange={(v) => set('joinedFrom', v)} placeholder="dan" />
-                  <AntDate value={filters.joinedTo} onChange={(v) => set('joinedTo', v)} placeholder="gacha" />
-                </div>
-              </FilterField>
-              <FilterField label="Lavozimi">
-                <FilterSelect value={filters.positionId} onChange={(v) => set('positionId', v)} options={positionOpts} placeholder="Lavozim tanlang" />
-              </FilterField>
-              <FilterField label="Viloyat">
-                <FilterSelect value={filters.region} onChange={(v) => set('region', v)} options={regionOpts} placeholder="Viloyat tanlang" />
-              </FilterField>
+            <div className="grid grid-cols-1 gap-x-4 gap-y-3 lg:grid-cols-2">
+              {/* Chap blok */}
+              <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+                <FilterField label="Ishga kirgan vaqti" className="sm:col-span-2">
+                  <div className="flex gap-2">
+                    <AntDate value={filters.joinedFrom} onChange={(v) => set('joinedFrom', v)} placeholder="dan" />
+                    <AntDate value={filters.joinedTo} onChange={(v) => set('joinedTo', v)} placeholder="gacha" />
+                  </div>
+                </FilterField>
+                <FilterField label="Oylik maoshi (UZS)">
+                  <MoneyRange from={filters.salaryFrom} to={filters.salaryTo} onFrom={(v) => set('salaryFrom', v)} onTo={(v) => set('salaryTo', v)} />
+                </FilterField>
+                <FilterField label="Balansi (UZS)">
+                  <MoneyRange from={filters.balanceFrom} to={filters.balanceTo} onFrom={(v) => set('balanceFrom', v)} onTo={(v) => set('balanceTo', v)} />
+                </FilterField>
+                <FilterField label="Vazifalar" className="sm:col-span-2">
+                  <StatusRange
+                    statusValue={filters.taskStatus} onStatus={(v) => set('taskStatus', v)} statusOptions={TASK_OPTS}
+                    from={filters.tasksFrom} to={filters.tasksTo} onFrom={(v) => set('tasksFrom', v)} onTo={(v) => set('tasksTo', v)}
+                  />
+                </FilterField>
+                <FilterField label="Xarajat so'rovi (UZS)" className="sm:col-span-2">
+                  <StatusRange
+                    statusValue={filters.requestStatus} onStatus={(v) => set('requestStatus', v)} statusOptions={REQUEST_OPTS} statusPlaceholder="Holat"
+                    from={filters.requestAmountFrom} to={filters.requestAmountTo} onFrom={(v) => set('requestAmountFrom', v)} onTo={(v) => set('requestAmountTo', v)} money
+                  />
+                </FilterField>
+              </div>
 
-              <FilterField label="Oylik maoshi (UZS)">
-                <NumberRange from={filters.salaryFrom} to={filters.salaryTo} onFrom={(v) => set('salaryFrom', v)} onTo={(v) => set('salaryTo', v)} />
-              </FilterField>
-              <FilterField label="Balansi (UZS)">
-                <NumberRange from={filters.balanceFrom} to={filters.balanceTo} onFrom={(v) => set('balanceFrom', v)} onTo={(v) => set('balanceTo', v)} />
-              </FilterField>
-              <FilterField label="Loyihalar (soni)">
-                <NumberRange from={filters.projectsFrom} to={filters.projectsTo} onFrom={(v) => set('projectsFrom', v)} onTo={(v) => set('projectsTo', v)} />
-              </FilterField>
-              <FilterField label="Vazifalar (soni)">
-                <NumberRange from={filters.tasksFrom} to={filters.tasksTo} onFrom={(v) => set('tasksFrom', v)} onTo={(v) => set('tasksTo', v)} />
-              </FilterField>
-
-              <FilterField label="Yig'ilishlar (soni)">
-                <NumberRange from={filters.meetingsFrom} to={filters.meetingsTo} onFrom={(v) => set('meetingsFrom', v)} onTo={(v) => set('meetingsTo', v)} />
-              </FilterField>
-              <FilterField label="Xarajat so'rovi (soni)">
-                <NumberRange from={filters.requestsFrom} to={filters.requestsTo} onFrom={(v) => set('requestsFrom', v)} onTo={(v) => set('requestsTo', v)} />
-              </FilterField>
-              <FilterField label="Xodimlar" className="sm:col-span-2">
-                <UserPickerField value={filters.userIds} onChange={(v) => set('userIds', v)} users={users} placeholder="Xodim tanlang" title="Xodim tanlang" />
-              </FilterField>
+              {/* O'ng blok */}
+              <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+                <FilterField label="Lavozimi">
+                  <FilterSelect value={filters.positionId} onChange={(v) => set('positionId', v)} options={positionOpts} placeholder="Lavozim tanlang" />
+                </FilterField>
+                <FilterField label="Viloyat">
+                  <FilterSelect value={filters.region} onChange={(v) => set('region', v)} options={regionOpts} placeholder="Viloyat tanlang" />
+                </FilterField>
+                <FilterField label="Loyihalar" className="sm:col-span-2">
+                  <StatusRange
+                    statusValue={filters.projectStatus} onStatus={(v) => set('projectStatus', v)} statusOptions={PROJECT_OPTS}
+                    from={filters.projectsFrom} to={filters.projectsTo} onFrom={(v) => set('projectsFrom', v)} onTo={(v) => set('projectsTo', v)}
+                  />
+                </FilterField>
+                <FilterField label="Yig'ilishlar" className="sm:col-span-2">
+                  <StatusRange
+                    statusValue={filters.meetingStatus} onStatus={(v) => set('meetingStatus', v)} statusOptions={MEETING_OPTS}
+                    from={filters.meetingsFrom} to={filters.meetingsTo} onFrom={(v) => set('meetingsFrom', v)} onTo={(v) => set('meetingsTo', v)}
+                  />
+                </FilterField>
+                <FilterField label="Ish haqi (UZS)" className="sm:col-span-2">
+                  <MoneyRange from={filters.payrollFrom} to={filters.payrollTo} onFrom={(v) => set('payrollFrom', v)} onTo={(v) => set('payrollTo', v)} />
+                </FilterField>
+                <FilterField label="Xodimlar" className="sm:col-span-2">
+                  <UserPickerField value={filters.userIds} onChange={(v) => set('userIds', v)} users={users} placeholder="Xodim tanlang" title="Xodim tanlang" />
+                </FilterField>
+              </div>
             </div>
           </Card>
         )}

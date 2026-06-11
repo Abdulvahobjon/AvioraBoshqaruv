@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, X, Check, Users as UsersIcon } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { Input } from '@/components/ui/Input';
+import { MoneyInput } from '@/components/ui/MoneyInput';
 import { ParticipantPicker } from '@/features/meetings/ParticipantPicker';
 
 /** Tashqariga bosilganda yopish. */
@@ -126,6 +127,32 @@ export function NumberRange({ from, to, onFrom, onTo, fromPlaceholder = 'dan', t
     <div className="flex gap-2">
       <Input type="number" inputMode="numeric" placeholder={fromPlaceholder} value={from} onChange={(e) => onFrom(e.target.value)} />
       <Input type="number" inputMode="numeric" placeholder={toPlaceholder} value={to} onChange={(e) => onTo(e.target.value)} />
+    </div>
+  );
+}
+
+/** "dan / gacha" pul oralig'i — mingliklar ajratiladi (2 000 000). */
+export function MoneyRange({ from, to, onFrom, onTo, fromPlaceholder = 'dan', toPlaceholder = 'gacha' }) {
+  return (
+    <div className="flex gap-2">
+      <MoneyInput placeholder={fromPlaceholder} value={from} onChange={onFrom} />
+      <MoneyInput placeholder={toPlaceholder} value={to} onChange={onTo} />
+    </div>
+  );
+}
+
+/**
+ * Status select (rangli nuqta bilan) + "dan/gacha" oralig'i — bir qatorda.
+ * money=true bo'lsa oraliq pul formatida (UZS), aks holda oddiy son (sanoq).
+ */
+export function StatusRange({ statusValue, onStatus, statusOptions, statusPlaceholder = 'Jami', from, to, onFrom, onTo, money = false }) {
+  const RangeC = money ? MoneyRange : NumberRange;
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+      <FilterSelect value={statusValue} onChange={onStatus} options={statusOptions} placeholder={statusPlaceholder} />
+      <div className="w-full sm:w-[14rem]">
+        <RangeC from={from} to={to} onFrom={onFrom} onTo={onTo} />
+      </div>
     </div>
   );
 }

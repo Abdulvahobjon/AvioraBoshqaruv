@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Currency, FinanceRequestType } from '@prisma/client';
+import { Currency, FinanceRequestType, PaymentMethod } from '@prisma/client';
 import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateFinanceRequestDto {
@@ -22,6 +22,11 @@ export class CreateFinanceRequestDto {
   @IsInt()
   categoryId?: number;
 
+  @ApiPropertyOptional({ description: 'Bog\'langan loyiha' })
+  @IsOptional()
+  @IsInt()
+  projectId?: number;
+
   @ApiProperty()
   @IsString()
   @IsNotEmpty({ message: 'Sabab kiriting' })
@@ -31,6 +36,20 @@ export class CreateFinanceRequestDto {
   @IsOptional()
   @IsString()
   card?: string;
+}
+
+export class PayRequestDto {
+  @ApiPropertyOptional({ enum: PaymentMethod, description: 'To\'lov turi (karta/naqd)' })
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  paymentMethod?: PaymentMethod;
+}
+
+export class RejectRequestDto {
+  @ApiPropertyOptional({ description: 'Bekor qilish sababi' })
+  @IsOptional()
+  @IsString()
+  cancelReason?: string;
 }
 
 export class ReverseDto {

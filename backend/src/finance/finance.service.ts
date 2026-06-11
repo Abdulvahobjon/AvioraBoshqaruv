@@ -4,7 +4,7 @@ import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CurrenciesService } from '../currencies/currencies.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
-import { CreateFinanceRequestDto, ReverseDto } from './dto/finance.dto';
+import { CreateFinanceRequestDto, PayRequestDto, RejectRequestDto, ReverseDto } from './dto/finance.dto';
 
 @Injectable()
 export class FinanceService {
@@ -18,6 +18,8 @@ export class FinanceService {
   private requestInclude = {
     user: { select: { id: true, fullName: true } },
     category: { select: { id: true, name: true } },
+    project: { select: { id: true, name: true } },
+    paidByUser: { select: { id: true, fullName: true } },
   };
 
   /** Step 1: employee/manager submits a request. Anti-fraud: no existing pending of same type. */
@@ -36,6 +38,7 @@ export class FinanceService {
         currency: dto.currency || 'UZS',
         type: dto.type,
         categoryId: dto.categoryId ?? null,
+        projectId: dto.projectId ?? null,
         reason: dto.reason,
         card: dto.card ?? null,
         status: 'pending',
@@ -70,7 +73,7 @@ export class FinanceService {
   }
 
   /** Step 2: accountant pays. Creates a ledger debit; amount enters Pending until confirmed. */
-  async pay(id: number, actor: AuthUser, ip?: string) {
+  async pay(id: number, dto: PayRequestDto, actor: AuthUser, ip?: string) {
     if (!['accountant', 'superadmin', 'admin'].includes(actor.role)) {
       throw new ForbiddenException('To\'lovni faqat buxgalter bajaradi');
     }
@@ -83,7 +86,10 @@ export class FinanceService {
     const uzs = await this.currencies.toUzs(req.amount, req.currency);
     const updated = await this.prisma.$transaction(async (tx) => {
       // Atomik holat almashinuvi: faqat hali 'pending' bo'lsa to'laymiz — parallel ikki to'lov dubl ledger yozmaydi.
-      const res = await tx.financeRequest.updateMany({ where: { id, status: 'pending' }, data: { status: 'paid', paidAt: new Date() } });
+      const res = await tx.financeRequest.updateMany({
+        where: { id, status: 'pending' },
+        data: { status: 'paid', paidAt: new Date(), paidBy: actor.id, paymentMethod: dto?.paymentMethod ?? 'card' },
+      });
       if (res.count === 0) throw new BadRequestException('Faqat kutilayotgan so\'rovni to\'lash mumkin');
       await tx.ledgerEntry.create({
         data: {
@@ -121,7 +127,7 @@ export class FinanceService {
     return updated;
   }
 
-  async reject(id: number, actor: AuthUser, ip?: string) {
+  async reject(id: number, dto: RejectRequestDto, actor: AuthUser, ip?: string) {
     if (!['accountant', 'superadmin', 'admin'].includes(actor.role)) {
       throw new ForbiddenException('Ruxsat yo\'q');
     }
@@ -129,7 +135,10 @@ export class FinanceService {
     if (!req) throw new NotFoundException('So\'rov topilmadi');
     if (req.status !== 'pending') throw new BadRequestException('Faqat kutilayotgan so\'rovni rad etish mumkin');
     // Atomik: faqat hali 'pending' bo'lsa rad etamiz (dubl-bosish bir marta ishlaydi).
-    const res = await this.prisma.financeRequest.updateMany({ where: { id, status: 'pending' }, data: { status: 'rejected' } });
+    const res = await this.prisma.financeRequest.updateMany({
+      where: { id, status: 'pending' },
+      data: { status: 'rejected', canceledAt: new Date(), cancelReason: dto?.cancelReason ?? null },
+    });
     if (res.count === 0) throw new BadRequestException('Faqat kutilayotgan so\'rovni rad etish mumkin');
     const updated = await this.prisma.financeRequest.findFirst({ where: { id } });
     await this.audit.record({ userId: actor.id, entity: 'FinanceRequest', entityId: id, action: 'REJECT', ip });

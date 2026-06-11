@@ -4,21 +4,58 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { AntDate } from '@/components/ui/AntDate';
 import { formatMoney, formatDate } from '@/lib/utils/format';
+import { useUsersList } from '@/features/users/usersApi';
+import { useProjects } from '@/features/projects/projectsApi';
 import { useReference } from '@/features/settings/settingsApi';
-import { useExpensesReport } from '@/features/reports/reportsApi';
+import { useExpenseRequestsReport } from '@/features/reports/reportsApi';
 import { ReportExportActions, ReportToolbar } from '@/features/reports/ReportShell';
-import { FilterField, FilterSelect } from '@/features/reports/ReportFilters';
+import { FilterField, FilterSelect, FilterMultiSelect, MoneyRange, UserPickerField } from '@/features/reports/ReportFilters';
 import { ReportTable } from '@/features/reports/ReportTable';
 
-const money = (v) => formatMoney(Math.round((v || 0) * 100)); // unit -> tiyin
+const money = (v) => formatMoney(Math.round((v || 0) * 100));
 
-const EMPTY = { search: '', from: '', to: '', categoryId: '' };
+const TYPE_OPTS = [
+  { value: 'company', label: 'Kompaniya xarajatlari' },
+  { value: 'salary', label: "Mablag' chiqarish" },
+  { value: 'other', label: 'Boshqa xarajatlar' },
+];
+const PAY_OPTS = [
+  { value: 'card', label: 'Karta orqali' },
+  { value: 'cash', label: 'Naqd pul' },
+];
+const STATUS_OPTS = [
+  { value: 'pending', label: "To'lanmagan", dot: '#F59E0B' },
+  { value: 'paid', label: "To'langan", dot: '#22C55E' },
+  { value: 'closed', label: 'Tasdiqlangan', dot: '#3B82F6' },
+  { value: 'rejected', label: 'Bekor qilingan', dot: '#EF4444' },
+];
+const TYPE_LABEL = Object.fromEntries(TYPE_OPTS.map((o) => [o.value, o.label]));
+const PAY_LABEL = Object.fromEntries(PAY_OPTS.map((o) => [o.value, o.label]));
+const STATUS_LABEL = Object.fromEntries(STATUS_OPTS.map((o) => [o.value, o.label]));
+
+const DATE_FIELDS = [
+  { label: "So'ralgan vaqt", from: 'reqFrom', to: 'reqTo' },
+  { label: 'Tasdiqlangan vaqt', from: 'confFrom', to: 'confTo' },
+  { label: "To'langan vaqt", from: 'paidFrom', to: 'paidTo' },
+  { label: 'Bekor qilingan vaqt', from: 'cancelFrom', to: 'cancelTo' },
+];
+
+const EMPTY = {
+  search: '',
+  reqFrom: '', reqTo: '', confFrom: '', confTo: '', paidFrom: '', paidTo: '', cancelFrom: '', cancelTo: '',
+  amountFrom: '', amountTo: '', paymentMethod: '', status: '',
+  userIds: [], accountantIds: [], projectIds: [], type: '', categoryId: '',
+};
 
 function buildParams(f) {
   const p = {};
-  if (f.from) p.from = f.from;
-  if (f.to) p.to = f.to;
-  if (f.categoryId) p.categoryId = f.categoryId;
+  const add = (k) => { if (f[k] !== '' && f[k] != null) p[k] = f[k]; };
+  ['reqFrom', 'reqTo', 'confFrom', 'confTo', 'paidFrom', 'paidTo', 'cancelFrom', 'cancelTo',
+    'amountFrom', 'amountTo', 'paymentMethod', 'status', 'categoryId'].forEach(add);
+  if (f.type) p.expenseType = f.type; // backend 'expenseType' deb kutadi (export 'type' bilan to'qnashmaslik uchun)
+  if (f.userIds?.length) p.userIds = f.userIds.join(',');
+  if (f.accountantIds?.length) p.accountantIds = f.accountantIds.join(',');
+  if (f.projectIds?.length) p.projectIds = f.projectIds.join(',');
   return p;
 }
 
@@ -28,15 +65,19 @@ export function ExpensesReportPage() {
   const [applied, setApplied] = useState({});
   const [generated, setGenerated] = useState(false);
 
+  const { data: usersData } = useUsersList({ limit: 500 });
+  const users = usersData?.items || [];
+  const { data: projects } = useProjects({ limit: 500 });
   const { data: categories } = useReference('expenseCategory');
-  const { data, isFetching } = useExpensesReport(applied, generated);
+  const { data, isFetching } = useExpenseRequestsReport(applied, generated);
 
   const set = (k, v) => setFilters((s) => ({ ...s, [k]: v }));
-  const hasFilters = useMemo(() => JSON.stringify(buildParams(filters)) !== '{}' || !!filters.search, [filters]);
+  const hasFilters = useMemo(() => JSON.stringify(buildParams(filters)) !== '{}', [filters]);
 
   const generate = () => { setApplied(buildParams(filters)); setGenerated(true); setFiltersOpen(false); toast.success("Ma'lumotlar shakllantirildi"); };
   const clear = () => { setFilters(EMPTY); setApplied({}); setGenerated(false); setFiltersOpen(true); };
 
+  const projectOpts = (projects?.items || []).map((p) => ({ value: p.id, label: p.name }));
   const categoryOpts = (categories || []).map((c) => ({ value: c.id, label: c.name }));
 
   const rows = useMemo(() => {
@@ -44,27 +85,35 @@ export function ExpensesReportPage() {
     const all = data?.rows || [];
     if (!filters.search) return all;
     const q = filters.search.toLowerCase();
-    return all.filter((r) => r.note?.toLowerCase().includes(q) || r.category?.toLowerCase().includes(q));
+    return all.filter((r) => r.fullName?.toLowerCase().includes(q) || r.reason?.toLowerCase().includes(q));
   }, [generated, data, filters.search]);
 
-  const totals = generated ? data?.totals : null;
-  const byCategory = generated ? (data?.byCategory || []) : [];
+  const dt = (d) => (d ? formatDate(d, true) : '—');
 
   const columns = [
-    { key: 'date', header: 'Sana', render: (r) => formatDate(r.date) },
-    { key: 'category', header: 'Kategoriya' },
-    { key: 'amount', header: 'Summa', align: 'right', mono: true, render: (r) => money(r.amount) + (r.currency === 'USD' ? ' (USD)' : '') },
-    { key: 'amountUzs', header: 'UZS ekvivalent', align: 'right', mono: true, render: (r) => money(r.amountUzs) },
-    { key: 'note', header: 'Izoh' },
+    { key: 'fullName', header: 'Ism Sharifi' },
+    { key: 'project', header: 'Loyiha nomi' },
+    { key: 'type', header: 'Xarajat turi', render: (r) => TYPE_LABEL[r.type] || r.type },
+    { key: 'category', header: 'Toifa' },
+    { key: 'amount', header: 'Miqdori (UZS)', align: 'right', mono: true, render: (r) => money(r.amount) },
+    { key: 'paymentMethod', header: "To'lov turi", render: (r) => (r.paymentMethod ? PAY_LABEL[r.paymentMethod] : '—') },
+    { key: 'status', header: 'Holati', render: (r) => STATUS_LABEL[r.status] || r.status },
+    { key: 'reason', header: "So'rov sababi" },
+    { key: 'createdAt', header: "So'ralgan vaqti", render: (r) => dt(r.createdAt) },
+    { key: 'paidAt', header: "To'langan vaqti", render: (r) => dt(r.paidAt) },
+    { key: 'confirmedAt', header: 'Tasdiqlangan vaqti', render: (r) => dt(r.confirmedAt) },
+    { key: 'accountant', header: 'Hisobchi' },
+    { key: 'canceledAt', header: 'Bekor qilingan vaqt', render: (r) => dt(r.canceledAt) },
+    { key: 'cancelReason', header: 'Bekor qilish sababi' },
   ];
 
   return (
-    <div className="flex h-[calc(100vh-7rem)] flex-col">
+    <div className="flex min-h-[calc(100vh-7rem)] flex-col">
       <div className="shrink-0">
         <PageHeader
-          title="Xarajatlar bo'yicha hisobot"
-          subtitle="Sana va kategoriya kesimida xarajatlar"
-          actions={<ReportExportActions type="expenses" params={applied} />}
+          title="Xarajat so'rovlari bo'yicha hisobot"
+          subtitle="Moliyaviy so'rovlar to'liq kesimi"
+          actions={<ReportExportActions type="expense-requests" params={applied} />}
         />
         <ReportToolbar
           search={filters.search}
@@ -78,43 +127,54 @@ export function ExpensesReportPage() {
         />
         {filtersOpen && (
           <Card className="mt-3 p-4">
-            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-              <FilterField label="Sana" className="sm:col-span-2">
-                <div className="flex gap-2">
-                  <AntDate value={filters.from} onChange={(v) => set('from', v)} placeholder="dan" />
-                  <AntDate value={filters.to} onChange={(v) => set('to', v)} placeholder="gacha" />
-                </div>
-              </FilterField>
-              <FilterField label="Kategoriya">
-                <FilterSelect value={filters.categoryId} onChange={(v) => set('categoryId', v)} options={categoryOpts} placeholder="Kategoriya tanlang" />
-              </FilterField>
-            </div>
-          </Card>
-        )}
-
-        {totals && (
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Card className="p-4"><p className="text-sm text-text-sub">Xarajatlar soni</p><p className="mt-1 text-lg font-semibold text-text-strong tabular-nums">{totals.count}</p></Card>
-            <Card className="p-4"><p className="text-sm text-text-sub">Jami (UZS)</p><p className="mt-1 text-lg font-semibold text-error-strong tabular-nums">{money(totals.total)}</p></Card>
-          </div>
-        )}
-        {byCategory.length > 0 && (
-          <Card className="mt-3 p-4">
-            <p className="mb-2 text-sm font-medium text-text-sub">Kategoriya kesimi</p>
-            <div className="flex flex-wrap gap-2">
-              {byCategory.map((c) => (
-                <span key={c.category} className="inline-flex items-center gap-2 rounded-md border border-stroke-sub bg-bg-1 px-3 py-1.5 text-sm">
-                  <span className="text-text-sub">{c.category}:</span>
-                  <span className="font-medium tabular-nums text-text-strong">{money(c.total)}</span>
-                </span>
+            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+              {DATE_FIELDS.map((d) => (
+                <FilterField key={d.from} label={d.label}>
+                  <div className="flex gap-2">
+                    <AntDate value={filters[d.from]} onChange={(v) => set(d.from, v)} placeholder="dan" />
+                    <AntDate value={filters[d.to]} onChange={(v) => set(d.to, v)} placeholder="gacha" />
+                  </div>
+                </FilterField>
               ))}
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+              <FilterField label="Miqdor (UZS)" className="sm:col-span-2">
+                <MoneyRange from={filters.amountFrom} to={filters.amountTo} onFrom={(v) => set('amountFrom', v)} onTo={(v) => set('amountTo', v)} />
+              </FilterField>
+              <FilterField label="To'lov turi">
+                <FilterSelect value={filters.paymentMethod} onChange={(v) => set('paymentMethod', v)} options={PAY_OPTS} placeholder="To'lov turi tanlang" />
+              </FilterField>
+              <FilterField label="Holati">
+                <FilterSelect value={filters.status} onChange={(v) => set('status', v)} options={STATUS_OPTS} placeholder="Holatini tanlang" />
+              </FilterField>
+              <FilterField label="Xodimlar">
+                <UserPickerField value={filters.userIds} onChange={(v) => set('userIds', v)} users={users} placeholder="Xodim tanlang" title="Xodimlar tanlang" />
+              </FilterField>
+              <FilterField label="Hisobchi">
+                <UserPickerField value={filters.accountantIds} onChange={(v) => set('accountantIds', v)} users={users} placeholder="Hisobchi tanlang" title="Hisobchi tanlang" />
+              </FilterField>
+              <FilterField label="Loyihalar">
+                <FilterMultiSelect value={filters.projectIds} onChange={(v) => set('projectIds', v)} options={projectOpts} placeholder="Loyiha tanlang" />
+              </FilterField>
+              <FilterField label="Xarajat turi">
+                <FilterSelect value={filters.type} onChange={(v) => set('type', v)} options={TYPE_OPTS} placeholder="Xarajat turi tanlang" />
+              </FilterField>
+              <FilterField label="Toifa">
+                <FilterSelect value={filters.categoryId} onChange={(v) => set('categoryId', v)} options={categoryOpts} placeholder="Toifa tanlang" />
+              </FilterField>
             </div>
           </Card>
         )}
       </div>
 
       <div className="mt-4 min-h-0 flex-1">
-        <ReportTable columns={columns} rows={rows} loading={isFetching} emptyTitle={generated ? 'Xarajatlar topilmadi' : 'Hisobot shakllantirilmagan'} emptyDescription={generated ? "Filtrlarni o'zgartiring yoki tozalang." : "Filtrlarni tanlab \"Shakllantirish\" tugmasini bosing."} />
+        <ReportTable
+          columns={columns}
+          rows={rows}
+          loading={isFetching}
+          emptyTitle={generated ? "So'rovlar topilmadi" : 'Hisobot shakllantirilmagan'}
+          emptyDescription={generated ? "Filtrlarni o'zgartiring yoki tozalang." : "Filtrlarni tanlab \"Shakllantirish\" tugmasini bosing."}
+        />
       </div>
     </div>
   );

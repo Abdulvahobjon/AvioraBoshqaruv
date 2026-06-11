@@ -301,22 +301,22 @@ async function main() {
   });
   // paid — buxgalter to'lagan (Pending), ledger debit yozilgan
   const reqPaid = await prisma.financeRequest.create({
-    data: { userId: emp3.id, amount: sum(1500000), currency: 'UZS', reason: 'Oylik yechib olish', type: 'salary', status: 'paid', paidAt: addDays(-3), card: '8600 **** **** 5678' },
+    data: { userId: emp3.id, amount: sum(1500000), currency: 'UZS', reason: 'Oylik yechib olish', type: 'salary', status: 'paid', paidAt: addDays(-3), paidBy: accountant.id, paymentMethod: 'card', card: '8600 **** **** 5678' },
   });
   await prisma.ledgerEntry.create({ data: { requestId: reqPaid.id, userId: emp3.id, amount: sum(1500000), type: 'salary', direction: 'debit', note: 'To\'lov: Oylik yechib olish' } });
   // closed — xodim tasdiqlagan (balansdan ayrilgan)
   const reqClosed = await prisma.financeRequest.create({
-    data: { userId: emp2.id, amount: sum(1000000), currency: 'UZS', reason: 'Shaxsiy ehtiyoj', type: 'salary', status: 'closed', paidAt: addDays(-8), confirmedAt: addDays(-7), card: '8600 **** **** 9012' },
+    data: { userId: emp2.id, amount: sum(1000000), currency: 'UZS', reason: 'Shaxsiy ehtiyoj', type: 'salary', status: 'closed', paidAt: addDays(-8), confirmedAt: addDays(-7), paidBy: accountant.id, paymentMethod: 'cash', card: '8600 **** **** 9012' },
   });
   await prisma.ledgerEntry.create({ data: { requestId: reqClosed.id, userId: emp2.id, amount: sum(1000000), type: 'salary', direction: 'debit', note: 'To\'lov: Shaxsiy ehtiyoj' } });
-  // company — kompaniya xarajati (balansga ta'sirsiz)
+  // company — kompaniya xarajati (balansga ta'sirsiz), loyihaga bog'langan
   const reqCompany = await prisma.financeRequest.create({
-    data: { userId: admin.id, amount: sum(3000000), currency: 'UZS', reason: 'Server va domen to\'lovi', type: 'company', status: 'paid', paidAt: addDays(-4) },
+    data: { userId: admin.id, amount: sum(3000000), currency: 'UZS', reason: 'Server va domen to\'lovi', type: 'company', status: 'paid', paidAt: addDays(-4), paidBy: accountant.id, paymentMethod: 'card', projectId: project1.id },
   });
   await prisma.ledgerEntry.create({ data: { requestId: reqCompany.id, userId: admin.id, amount: sum(3000000), type: 'company', direction: 'debit', note: 'To\'lov: Server va domen' } });
-  // rejected
+  // rejected — bekor qilingan (sabab bilan)
   await prisma.financeRequest.create({
-    data: { userId: emp1.id, amount: sum(500000), currency: 'UZS', reason: 'Tushlik puli', type: 'other', status: 'rejected' },
+    data: { userId: emp1.id, amount: sum(500000), currency: 'UZS', reason: 'Tushlik puli', type: 'other', status: 'rejected', cancelReason: 'Byudjetda mablag‘ yetarli emas', canceledAt: addDays(-2) },
   });
 
   // Balanslar (yuqoridagi kredit/debetlarga mos): manager +2M, emp2 +4M-1M=3M.

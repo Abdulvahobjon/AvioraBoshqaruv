@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, Req } from '@n
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { FinanceService } from './finance.service';
-import { CreateFinanceRequestDto, ReverseDto } from './dto/finance.dto';
+import { CreateFinanceRequestDto, PayRequestDto, RejectRequestDto, ReverseDto } from './dto/finance.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 
@@ -28,8 +28,8 @@ export class FinanceController {
   }
 
   @Post('requests/:id/pay')
-  pay(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser, @Req() req: Request) {
-    return this.finance.pay(id, user, req.ip);
+  pay(@Param('id', ParseIntPipe) id: number, @Body() dto: PayRequestDto, @CurrentUser() user: AuthUser, @Req() req: Request) {
+    return this.finance.pay(id, dto, user, req.ip);
   }
 
   @Post('requests/:id/confirm')
@@ -38,8 +38,8 @@ export class FinanceController {
   }
 
   @Post('requests/:id/reject')
-  reject(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser, @Req() req: Request) {
-    return this.finance.reject(id, user, req.ip);
+  reject(@Param('id', ParseIntPipe) id: number, @Body() dto: RejectRequestDto, @CurrentUser() user: AuthUser, @Req() req: Request) {
+    return this.finance.reject(id, dto, user, req.ip);
   }
 
   @Get('ledger')

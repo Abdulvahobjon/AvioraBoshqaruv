@@ -43,101 +43,142 @@ export class ReportsService {
     return (amount: bigint, code: string) => (code === 'USD' ? amount * usdRate : amount);
   }
 
-  /** Per-project budget: price vs shares vs actual expenses vs profit/variance (all in UZS). */
-  async projects(r: Range) {
+  /** Loyihalar ro'yxati hisoboti: muallif/boshqaruvchi/xodimlar/sinovchilar + vazifa statuslari kesimi. */
+  async projects(q: any) {
+    const where: any = { deletedAt: null };
+    // Muddat (deadline) oralig'i
+    if (q.from || q.to) {
+      where.deadline = {};
+      if (q.from) where.deadline.gte = new Date(q.from);
+      if (q.to) {
+        const to = new Date(q.to);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(q.to)) to.setUTCHours(23, 59, 59, 999);
+        where.deadline.lte = to;
+      }
+    }
+    if (q.status) where.status = q.status;
+    const authorIds = this.parseIds(q.authorIds);
+    if (authorIds.length) where.createdBy = { in: authorIds };
+    const managerIds = this.parseIds(q.managerIds);
+    const employeeIds = this.parseIds(q.employeeIds);
+    const testerIds = this.parseIds(q.testerIds);
+    const memberAnd: any[] = [];
+    if (managerIds.length) memberAnd.push({ members: { some: { roleInProject: 'manager', userId: { in: managerIds } } } });
+    if (employeeIds.length) memberAnd.push({ members: { some: { roleInProject: 'employee', userId: { in: employeeIds } } } });
+    if (testerIds.length) memberAnd.push({ members: { some: { roleInProject: 'auditor', userId: { in: testerIds } } } });
+    if (memberAnd.length) where.AND = memberAnd;
+
     const projects = await this.prisma.project.findMany({
-      where: { ...this.dateWhere(r) },
-      include: { members: true, client: { select: { name: true } }, type: { select: { name: true } } },
+      where,
+      include: {
+        creator: { select: { fullName: true } },
+        members: { include: { user: { select: { id: true, fullName: true } } } },
+        tasks: { where: { deletedAt: null }, select: { status: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
 
-    // Loyihaga bog'langan real xarajatlar (amountUzs allaqachon so'mda)
-    const expGrouped = await this.prisma.expense.groupBy({
-      by: ['projectId'],
-      where: { projectId: { not: null } },
-      _sum: { amountUzs: true },
-    });
-    const expByProject = new Map<number, bigint>();
-    for (const g of expGrouped) expByProject.set(g.projectId as number, g._sum.amountUzs ?? 0n);
-
     const toUzs = await this.uzsConverter();
-    const rows: any[] = [];
-    for (const p of projects) {
-      const priceUzs = toUzs(p.price, p.currency);
-      let sharesUzs = 0n;
-      for (const m of p.members) sharesUzs += toUzs(m.shareAmount, m.shareCurrency);
-      const expensesUzs = expByProject.get(p.id) ?? 0n;
-      const profitUzs = priceUzs - sharesUzs - expensesUzs; // real foyda (ulush + xarajat ayrilgan)
-      const spentUzs = sharesUzs + expensesUzs;              // jami sarflangan
-      rows.push({
-        id: p.id,
-        name: p.name,
-        client: p.client?.name || '—',
-        type: p.type?.name || '—',
-        status: p.status,
-        price: n(priceUzs),
-        shares: n(sharesUzs),
-        expenses: n(expensesUzs),
-        spent: n(spentUzs),
-        profit: n(profitUzs),
-        variance: n(priceUzs - spentUzs), // byudjet farqi (musbat = byudjet ichida)
-      });
-    }
-    const totals = rows.reduce(
-      (a, x) => ({
-        price: a.price + x.price, shares: a.shares + x.shares,
-        expenses: a.expenses + x.expenses, spent: a.spent + x.spent, profit: a.profit + x.profit,
-      }),
-      { price: 0, shares: 0, expenses: 0, spent: 0, profit: 0 },
-    );
-    return { rows, totals };
-  }
+    const emptyTasks = () => ({ todo: 0, in_progress: 0, overdue: 0, done: 0, production: 0, checked: 0, rejected: 0 });
+    const bonusFrom = this.numFrom(q, 'bonusFrom');
+    const bonusTo = this.numFrom(q, 'bonusTo');
+    const names = (arr: any[]) => arr.map((m) => m.user.fullName).join(', ') || '—';
 
-  /** Loyiha budjeti burn-down: byudjet (price) ga nisbatan kümülativ sarflangan mablag' (xarajatlar) vaqt bo'yicha. */
-  async projectBudget(projectId: number) {
-    const project = await this.prisma.project.findFirst({
-      where: { id: projectId },
-      include: { members: true },
-    });
-    if (!project) throw new NotFoundException('Loyiha topilmadi');
-
-    const toUzs = await this.uzsConverter();
-    const budgetUzs = toUzs(project.price, project.currency);
-    let sharesUzs = 0n;
-    for (const m of project.members) sharesUzs += toUzs(m.shareAmount, m.shareCurrency);
-
-    const expenses = await this.prisma.expense.findMany({
-      where: { projectId },
-      select: { amountUzs: true, date: true, note: true },
-      orderBy: { date: 'asc' },
-    });
-    const expensesTotal = expenses.reduce((a, e) => a + e.amountUzs, 0n);
-
-    // Burn-down: har bir xarajatdan keyin qolgan byudjet
-    let cumulative = 0n;
-    const series = expenses.map((e) => {
-      cumulative += e.amountUzs;
+    let rows = projects.map((p) => {
+      const managers = p.members.filter((m) => m.roleInProject === 'manager');
+      const employees = p.members.filter((m) => m.roleInProject === 'employee');
+      const testers = p.members.filter((m) => m.roleInProject === 'auditor');
+      let bonus = 0n;
+      for (const m of managers) bonus += toUzs(m.shareAmount, m.shareCurrency);
+      const tasks = emptyTasks();
+      for (const t of p.tasks) tasks[t.status] = (tasks[t.status] || 0) + 1;
       return {
-        date: e.date,
-        note: e.note || '—',
-        spent: n(e.amountUzs),
-        cumulative: n(cumulative),
-        remaining: n(budgetUzs - sharesUzs - cumulative),
+        id: p.id,
+        code: p.code || '—',
+        name: p.name,
+        description: p.description || '—',
+        deadline: p.deadline,
+        status: p.status,
+        managerBonus: n(bonus),
+        author: p.creator?.fullName || '—',
+        managers: names(managers),
+        employees: names(employees),
+        testers: names(testers),
+        tasksTotal: p.tasks.length,
+        tasks,
       };
     });
+    if (bonusFrom !== undefined) rows = rows.filter((r) => r.managerBonus >= bonusFrom);
+    if (bonusTo !== undefined) rows = rows.filter((r) => r.managerBonus <= bonusTo);
+    return { rows, count: rows.length };
+  }
 
-    const totalSpent = sharesUzs + expensesTotal;
-    return {
-      projectId,
-      name: project.name,
-      budget: n(budgetUzs),
-      shares: n(sharesUzs),
-      expenses: n(expensesTotal),
-      totalSpent: n(totalSpent),
-      remaining: n(budgetUzs - totalSpent),
-      variance: n(budgetUzs - totalSpent),
-      series,
+  /** Xarajat so'rovlari hisoboti: barcha maydonlar + ko'p o'lchovli filtr. */
+  async expenseRequests(q: any) {
+    const where: any = {};
+    const dr = (field: string, fromK: string, toK: string) => {
+      if (q[fromK] || q[toK]) {
+        where[field] = {};
+        if (q[fromK]) where[field].gte = new Date(q[fromK]);
+        if (q[toK]) {
+          const t = new Date(q[toK]);
+          if (/^\d{4}-\d{2}-\d{2}$/.test(q[toK])) t.setUTCHours(23, 59, 59, 999);
+          where[field].lte = t;
+        }
+      }
     };
+    dr('createdAt', 'reqFrom', 'reqTo');       // so'ralgan vaqt
+    dr('paidAt', 'paidFrom', 'paidTo');         // to'langan vaqt
+    dr('confirmedAt', 'confFrom', 'confTo');    // tasdiqlangan vaqt
+    dr('canceledAt', 'cancelFrom', 'cancelTo'); // bekor qilingan vaqt
+    if (q.status) where.status = q.status;
+    if (q.expenseType) where.type = q.expenseType; // 'type' export report-kind bilan to'qnashmasin
+    if (q.paymentMethod) where.paymentMethod = q.paymentMethod;
+    if (q.categoryId) where.categoryId = Number(q.categoryId);
+    const userIds = this.parseIds(q.userIds);
+    if (userIds.length) where.userId = { in: userIds };
+    const accountantIds = this.parseIds(q.accountantIds);
+    if (accountantIds.length) where.paidBy = { in: accountantIds };
+    const projectIds = this.parseIds(q.projectIds);
+    if (projectIds.length) where.projectId = { in: projectIds };
+    // Miqdor oralig'i (UZS unit -> tiyin)
+    const amtFrom = this.numFrom(q, 'amountFrom');
+    const amtTo = this.numFrom(q, 'amountTo');
+    if (amtFrom !== undefined || amtTo !== undefined) {
+      where.amount = {};
+      if (amtFrom !== undefined) where.amount.gte = BigInt(Math.round(amtFrom * 100));
+      if (amtTo !== undefined) where.amount.lte = BigInt(Math.round(amtTo * 100));
+    }
+
+    const toUzs = await this.uzsConverter();
+    const reqs = await this.prisma.financeRequest.findMany({
+      where,
+      include: {
+        user: { select: { fullName: true } },
+        category: { select: { name: true } },
+        project: { select: { name: true } },
+        paidByUser: { select: { fullName: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const rows = reqs.map((r) => ({
+      id: r.id,
+      fullName: r.user?.fullName || '—',
+      project: r.project?.name || '—',
+      type: r.type,
+      category: r.category?.name || '—',
+      amount: n(toUzs(r.amount, r.currency)),
+      paymentMethod: r.paymentMethod || null,
+      status: r.status,
+      reason: r.reason || '—',
+      createdAt: r.createdAt,
+      paidAt: r.paidAt,
+      confirmedAt: r.confirmedAt,
+      accountant: r.paidByUser?.fullName || '—',
+      canceledAt: r.canceledAt,
+      cancelReason: r.cancelReason || '—',
+    }));
+    return { rows, count: rows.length };
   }
 
   /** Company finance summary: income (client payments) vs expenses vs payroll → net. */
@@ -357,16 +398,22 @@ export class ReportsService {
       where,
       include: {
         position: { select: { name: true } },
-        _count: { select: { projectMembers: true } },
+        projectMembers: { select: { project: { select: { status: true } } } },
         assignedTasks: { where: { deletedAt: null }, select: { status: true } },
         meetingAttendance: { select: { attended: true, absenceReason: true } },
-        financeRequests: { select: { amount: true, currency: true } },
+        financeRequests: { select: { amount: true, currency: true, status: true } },
         payrolls: { select: { total: true } },
       },
       orderBy: { fullName: 'asc' },
     });
 
     const toUzs = await this.uzsConverter();
+    // Tanlangan statuslar — range filtrlar shu status kesimida qo'llanadi
+    const projectStatus: string | undefined = q.projectStatus || undefined;
+    const taskStatus: string | undefined = q.taskStatus || undefined;
+    const meetingStatus: string | undefined = q.meetingStatus || undefined; // attended|excused|unexcused
+    const requestStatus: string | undefined = q.requestStatus || undefined;
+
     let rows: any[] = [];
     for (const u of users) {
       const tasks = { todo: 0, in_progress: 0, overdue: 0, done: 0, production: 0, checked: 0, rejected: 0 };
@@ -379,8 +426,17 @@ export class ReportsService {
         else mUnexcused++;
       }
 
-      let reqTotal = 0n;
-      for (const r of u.financeRequests) reqTotal += toUzs(r.amount, r.currency);
+      // Loyihalar status kesimida
+      const projectsCount = u.projectMembers.length;
+      const projectsByStatus = u.projectMembers.filter((m) => m.project?.status === projectStatus).length;
+
+      // So'rovlar (UZS) — tanlangan status kesimida summa
+      let reqTotal = 0n, reqStatusTotal = 0n;
+      for (const r of u.financeRequests) {
+        const v = toUzs(r.amount, r.currency);
+        reqTotal += v;
+        if (requestStatus && r.status === requestStatus) reqStatusTotal += v;
+      }
       const payrollTotal = u.payrolls.reduce((a, p) => a + p.total, 0n);
 
       rows.push({
@@ -392,30 +448,38 @@ export class ReportsService {
         phone: u.phone || '—',
         fixedSalary: n(u.fixedSalary),
         balance: n(u.balance),
-        projectsCount: u._count.projectMembers,
+        projectsCount,
+        _projVal: projectStatus ? projectsByStatus : projectsCount,
         tasksTotal: u.assignedTasks.length,
+        _taskVal: taskStatus ? (tasks[taskStatus] ?? 0) : u.assignedTasks.length,
         tasks,
         meetingsTotal: u.meetingAttendance.length,
         meetingsAttended: mAttended,
         meetingsExcused: mExcused,
         meetingsUnexcused: mUnexcused,
+        _meetVal: meetingStatus === 'attended' ? mAttended : meetingStatus === 'excused' ? mExcused : meetingStatus === 'unexcused' ? mUnexcused : u.meetingAttendance.length,
         requestsCount: u.financeRequests.length,
         requestsTotal: n(reqTotal),
+        _reqVal: requestStatus ? n(reqStatusTotal) : n(reqTotal),
         payrollTotal: n(payrollTotal),
       });
     }
 
-    // Agregat (sanoq) oralig'i bo'yicha filtrlar
+    // Oraliq filtrlar — tanlangan status kesimida qo'llanadi
     const projF = this.numFrom(q, 'projectsFrom'), projT = this.numFrom(q, 'projectsTo');
     const taskF = this.numFrom(q, 'tasksFrom'), taskT = this.numFrom(q, 'tasksTo');
     const meetF = this.numFrom(q, 'meetingsFrom'), meetT = this.numFrom(q, 'meetingsTo');
-    const reqF = this.numFrom(q, 'requestsFrom'), reqT = this.numFrom(q, 'requestsTo');
+    const reqAmtF = this.numFrom(q, 'requestAmountFrom'), reqAmtT = this.numFrom(q, 'requestAmountTo');
+    const payF = this.numFrom(q, 'payrollFrom'), payT = this.numFrom(q, 'payrollTo');
     rows = rows.filter((r) =>
-      this.inRange(r.projectsCount, projF, projT) &&
-      this.inRange(r.tasksTotal, taskF, taskT) &&
-      this.inRange(r.meetingsTotal, meetF, meetT) &&
-      this.inRange(r.requestsCount, reqF, reqT),
+      this.inRange(r._projVal, projF, projT) &&
+      this.inRange(r._taskVal, taskF, taskT) &&
+      this.inRange(r._meetVal, meetF, meetT) &&
+      this.inRange(r._reqVal, reqAmtF, reqAmtT) &&
+      this.inRange(r.payrollTotal, payF, payT),
     );
+    // Ichki yordamchi maydonlarni olib tashlaymiz
+    rows = rows.map(({ _projVal, _taskVal, _meetVal, _reqVal, ...rest }) => rest);
 
     return { rows, count: rows.length };
   }

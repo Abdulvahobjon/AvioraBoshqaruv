@@ -68,7 +68,7 @@ export function ReportToolbar({ search, onSearch, filtersOpen, onToggleFilters, 
           <X className="h-4 w-4" /> Tozalash
         </button>
       )}
-      <Button className="ml-auto" onClick={onGenerate} loading={generating}>
+      <Button className="ml-auto bg-success-strong text-text-white hover:bg-success-sub" onClick={onGenerate} loading={generating}>
         <FileCheck2 className="h-4 w-4" /> Shakllantirish
       </Button>
     </div>

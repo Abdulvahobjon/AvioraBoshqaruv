@@ -14,17 +14,13 @@ export function useAnalytics(period = '1m') {
   });
 }
 
-export function useProjectsReport(params = {}, enabled = true) {
+export function useProjectsReport(params, enabled) {
   return useQuery({ queryKey: ['report-projects', params], enabled: !!enabled, queryFn: async () => (await api.get('/reports/projects', { params })).data });
 }
 
-/** Loyiha budjeti burn-down (byudjet vs sarflangan). */
-export function useProjectBudget(projectId, enabled = true) {
-  return useQuery({
-    queryKey: ['report-project-budget', projectId],
-    enabled: !!enabled && !!projectId,
-    queryFn: async () => (await api.get('/reports/project-budget', { params: { projectId } })).data,
-  });
+/** Xarajat so'rovlari hisoboti. */
+export function useExpenseRequestsReport(params, enabled) {
+  return useQuery({ queryKey: ['report-expense-requests', params], enabled: !!enabled, queryFn: async () => (await api.get('/reports/expense-requests', { params })).data });
 }
 
 /** Joriy foydalanuvchi unumdorligi (KPI). */
