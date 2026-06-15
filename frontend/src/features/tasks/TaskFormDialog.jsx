@@ -233,10 +233,10 @@ export function TaskFormDialog({ open, onClose, task, template }) {
             return (
               <>
                 <FormField label="Muddati (sana)">
-                  <DateTimeBox type="date" value={d} onChange={(v) => field.onChange(v ? `${v}T${t || '00:00'}` : '')} />
+                  <DateTimeBox type="date" value={d} onChange={(v) => field.onChange(v ? `${v}T${t || '23:59'}` : '')} />
                 </FormField>
                 <FormField label="Muddati (vaqt)">
-                  <DateTimeBox type="time" value={t} onChange={(v) => field.onChange(`${d || todayISO()}T${v || '00:00'}`)} />
+                  <DateTimeBox type="time" value={t} onChange={(v) => field.onChange(`${d || todayISO()}T${v || '23:59'}`)} />
                 </FormField>
               </>
             );

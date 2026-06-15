@@ -57,7 +57,7 @@ export function ProjectFormDialog({ open, onClose, project }) {
   const [docs, setDocs] = useState([]); // { name, url }
   const [faolmi, setFaolmi] = useState(true); // !isFrozen
   const [date, setDate] = useState(''); // YYYY-MM-DD
-  const [time, setTime] = useState('00:00');
+  const [time, setTime] = useState('23:59'); // deadline standart: kun oxiri (tahrirlanadi)
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const [typeOpen, setTypeOpen] = useState(false);
@@ -96,13 +96,13 @@ export function ProjectFormDialog({ open, onClose, project }) {
         const d = new Date(p.deadline);
         setDate(p.deadline.slice(0, 10));
         setTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
-      } else { setDate(''); setTime('00:00'); }
+      } else { setDate(''); setTime('23:59'); }
     } else {
       reset({
         name: '', code: '', description: '', status: 'planning', penaltyPercent: '',
         managerId: '', managerBonus: '', price: '', currency: 'UZS', paymentStatus: 'unpaid', clientId: '', typeId: '',
       });
-      setEmployees([]); setTesters([]); setDocs([]); setFaolmi(true); setDate(''); setTime('00:00');
+      setEmployees([]); setTesters([]); setDocs([]); setFaolmi(true); setDate(''); setTime('23:59');
     }
     setAdvancedOpen(false);
   }, [open, project, full, reset]);
@@ -127,7 +127,7 @@ export function ProjectFormDialog({ open, onClose, project }) {
       members.push({ userId: Number(e.userId), roleInProject: 'employee', shareAmount: toTiyin(e.shareAmount || 0), shareCurrency: e.shareCurrency || 'UZS' });
     }
 
-    const deadline = date ? `${date}T${time || '00:00'}:00` : undefined;
+    const deadline = date ? `${date}T${time || '23:59'}:00` : undefined;
 
     const payload = {
       name: values.name,
