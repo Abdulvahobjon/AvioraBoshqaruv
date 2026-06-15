@@ -57,8 +57,8 @@ export class FinanceService {
 
   async listRequests(user: AuthUser, q: any) {
     const where: any = { deletedAt: null };
-    const seesAll = ['accountant', 'admin', 'superadmin', 'auditor'].includes(user.role);
-    // Accountant/admin/superadmin/auditor see all; others see only their own.
+    // Faqat buxgalter va superadmin hamma so'rovni ko'radi; qolganlar (admin/menejer/xodim/auditor) faqat o'zinikini.
+    const seesAll = ['accountant', 'superadmin'].includes(user.role);
     // `mine=1` — moliyaviy rol o'zining so'rovlarini ham filtrlay oladi ("Mening so'rovlarim").
     if (!seesAll || q.mine === '1' || q.mine === 'true') {
       where.userId = user.id;
@@ -97,8 +97,8 @@ export class FinanceService {
 
   /** Step 2: accountant pays. Creates a ledger debit; amount enters Pending until confirmed. */
   async pay(id: number, dto: PayRequestDto, actor: AuthUser, ip?: string) {
-    if (!['accountant', 'superadmin', 'admin'].includes(actor.role)) {
-      throw new ForbiddenException('To\'lovni faqat buxgalter bajaradi');
+    if (!['accountant', 'superadmin'].includes(actor.role)) {
+      throw new ForbiddenException('To\'lovni faqat buxgalter (yoki superadmin) bajaradi');
     }
     const req = await this.prisma.financeRequest.findFirst({ where: { id } });
     if (!req) throw new NotFoundException('So\'rov topilmadi');
@@ -158,7 +158,7 @@ export class FinanceService {
   }
 
   async reject(id: number, dto: RejectRequestDto, actor: AuthUser, ip?: string) {
-    if (!['accountant', 'superadmin', 'admin'].includes(actor.role)) {
+    if (!['accountant', 'superadmin'].includes(actor.role)) {
       throw new ForbiddenException('Ruxsat yo\'q');
     }
     const req = await this.prisma.financeRequest.findFirst({ where: { id } });

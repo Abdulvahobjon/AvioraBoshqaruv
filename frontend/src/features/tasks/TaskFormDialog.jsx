@@ -163,7 +163,15 @@ export function TaskFormDialog({ open, onClose, task, template }) {
         {isEdit && (
           <FormField label="Holati" className="sm:col-span-2">
             <RHFSelect control={control} name="status">
-              {Object.entries(TASK_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              {(() => {
+                // Faqat OLDINGA: joriy holat + keyingi pipeline bosqichlari.
+                // 'Muddati o'tgan' avtomatik, 'Tekshirilgan'/'Rad etilgan' — tekshiruv orqali (qo'lda yo'q).
+                const MANUAL = ['todo', 'in_progress', 'done', 'production'];
+                const RANK = { todo: 1, in_progress: 2, overdue: 2, rejected: 2, done: 3, production: 4, checked: 4 };
+                const cur = source?.status || 'todo';
+                const keys = [cur, ...MANUAL.filter((k) => k !== cur && (RANK[k] || 0) > (RANK[cur] || 0))];
+                return keys.map((k) => <option key={k} value={k}>{TASK_STATUS[k]?.label || k}</option>);
+              })()}
             </RHFSelect>
           </FormField>
         )}

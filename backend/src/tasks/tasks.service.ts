@@ -12,6 +12,30 @@ const PRIVILEGED = ['superadmin', 'admin', 'manager'];
 // Hamma loyiha/vazifani ko'ra oladigan rollar (read-only nazorat).
 const ALL_VISIBLE = ['superadmin', 'admin', 'accountant', 'auditor'];
 
+// Vazifa statusi faqat OLDINGA siljiydi. 'overdue' jarayon darajasida (kechikkan, lekin jarayonda).
+const STATUS_RANK: Record<string, number> = { todo: 1, in_progress: 2, overdue: 2, done: 3, production: 4 };
+
+/**
+ * Qo'lda status o'zgarishini tekshiradi (hamma rol uchun, superadmin ham):
+ *  - orqaga qaytarish taqiqlanadi (faqat oldinga),
+ *  - 'overdue' faqat avtomatik (cron) belgilanadi — qo'lda yo'q,
+ *  - 'checked'/'rejected' faqat tekshiruv (review) orqali.
+ */
+function assertManualStatusChange(from: string, to: string) {
+  if (to === from) return;
+  if (to === 'overdue') {
+    throw new BadRequestException("'Muddati o'tgan' holati avtomatik belgilanadi — qo'lda qo'yib bo'lmaydi");
+  }
+  if (to === 'checked' || to === 'rejected') {
+    throw new BadRequestException('Bu holat faqat tekshiruv (review) orqali belgilanadi');
+  }
+  const f = STATUS_RANK[from];
+  const t = STATUS_RANK[to];
+  if (!f || !t || t <= f) {
+    throw new BadRequestException("Vazifa statusi faqat oldinga siljiydi — orqaga qaytarib bo'lmaydi");
+  }
+}
+
 @Injectable()
 export class TasksService {
   constructor(
@@ -196,6 +220,10 @@ export class TasksService {
     if (!['active', 'overdue'].includes(project.status)) {
       throw new ForbiddenException('Faqat faol loyihaga vazifa qo\'shiladi — avval loyihani "Faol" holatiga o\'tkazing');
     }
+    // Yangi vazifa 'overdue'/'checked'/'rejected' holatida yaratilmaydi (bular avtomatik/review).
+    if (dto.status && ['overdue', 'checked', 'rejected'].includes(dto.status)) {
+      throw new BadRequestException('Yangi vazifa bu holatda yaratilmaydi');
+    }
 
     const baseData = {
       projectId: dto.projectId,
@@ -248,7 +276,11 @@ export class TasksService {
     if (dto.title !== undefined) data.title = dto.title;
     if (dto.description !== undefined) data.description = dto.description;
     if (dto.assigneeId !== undefined) data.assigneeId = dto.assigneeId;
-    if (dto.status !== undefined) data.status = dto.status;
+    // Status faqat oldinga + 'overdue'/review qo'lda emas (changeStatus bilan bir xil qoida).
+    if (dto.status !== undefined && dto.status !== existing.status) {
+      assertManualStatusChange(existing.status, dto.status);
+      data.status = dto.status;
+    }
     if (dto.priority !== undefined) data.priority = dto.priority;
     if (dto.type !== undefined) data.type = dto.type;
     if (dto.positionId !== undefined) data.positionId = dto.positionId;
@@ -283,17 +315,10 @@ export class TasksService {
       throw new ForbiddenException('Bu vazifa sizga biriktirilmagan');
     }
 
-    // Kanban statusi faqat BITTADAN OLDINGA siljiydi: todo→in_progress→done→production.
-    // 'checked'/'rejected' faqat review (Ishga tushirilgan ustunida) orqali, 'overdue' avtomatik.
-    // Sakrash (masalan todo→done) va orqaga qaytarish taqiqlangan.
-    // Superadmin — hammasi ochiq: istalgan statusga erkin o'tkazadi.
-    if (user.role !== 'superadmin' && dto.status !== task.status) {
-      const PIPELINE = ['todo', 'in_progress', 'done', 'production'];
-      const to = PIPELINE.indexOf(dto.status);
-      const from = PIPELINE.indexOf(task.status);
-      if (to === -1 || to !== from + 1) {
-        throw new BadRequestException('Statusni faqat bittadan keyingi bosqichga siljitish mumkin');
-      }
+    // Status faqat OLDINGA siljiydi (orqaga yo'q). 'overdue' avtomatik, 'checked'/'rejected'
+    // tekshiruv orqali. Bu qoida HAMMA uchun, superadmin ham (izchillik).
+    if (dto.status !== task.status) {
+      assertManualStatusChange(task.status, dto.status);
     }
 
     const updated = await this.prisma.task.update({

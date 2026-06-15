@@ -41,7 +41,7 @@ const PERMISSIONS = {
 
   // Moliya
   'finance.request': [SA, AD, MN, EM, AC], // so'rov yuborish / tasdiqlash (auditordan tashqari)
-  'finance.process': [SA, AD, AC], // to'lash / rad etish / ledger reverse
+  'finance.process': [SA, AC], // to'lash / rad etish — faqat buxgalter va superadmin
   'expenses.write': [SA, AD, AC],
   'payroll.manage': [SA, AD, AC],
 

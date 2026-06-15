@@ -34,7 +34,7 @@ export class FinanceController {
 
   /** To'lov cheki/kvitansiya rasm yuklash (faqat URL qaytaradi). Buxgalter to'lov qilganda ishlatadi. */
   @Post('upload-receipt')
-  @Roles('superadmin', 'admin', 'accountant')
+  @Roles('superadmin', 'accountant')
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file', uploadOptions(10)))
   uploadReceipt(@UploadedFile() file: any) {

@@ -104,7 +104,7 @@ export function NotificationBell() {
                       <span className="shrink-0 text-xs text-text-soft">{dayjs(n.createdAt).format('HH:mm')}</span>
                       <button
                         onClick={(e) => { e.stopPropagation(); delOne.mutate(n.id); }}
-                        className="shrink-0 rounded p-1 text-icon-soft opacity-0 transition-opacity hover:bg-error-soft hover:text-error-strong group-hover:opacity-100"
+                        className="shrink-0 rounded p-1 text-icon-soft transition-colors hover:bg-error-soft hover:text-error-strong"
                         title="O'chirish"
                       >
                         <X className="h-3.5 w-3.5" />
