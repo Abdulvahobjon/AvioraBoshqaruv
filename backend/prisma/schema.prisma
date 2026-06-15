@@ -475,6 +475,7 @@ model MeetingAttendance {
   userId        Int      @map("user_id")
   attended      Boolean  @default(false)
   absenceReason String?  @map("absence_reason")
+  excused       Boolean? @map("excused") // tashkilotchi qarori: true=sababli, false=sababsiz, null=hali hal qilinmagan
   createdAt     DateTime @default(now()) @map("created_at")
 
   meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)

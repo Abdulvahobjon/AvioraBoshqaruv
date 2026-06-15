@@ -35,6 +35,8 @@ export function describeNotification(n) {
       return { title: 'Yig\'ilish tez orada boshlanadi', body: p.title ? `'${p.title}' yig'ilishi boshlanmoqda` : 'Yig\'ilishingiz boshlanmoqda', icon: CalendarClock };
     case 'meeting_absent':
       return { title: 'Siz yig\'ilishda ishtirok etmadingiz', body: p.title ? `'${p.title}' — sababini kiriting` : 'Sababini kiriting', icon: CalendarClock };
+    case 'meeting_reason':
+      return { title: 'Yig\'ilish sababi keldi', body: p.requester ? `${p.requester}: ${p.reason || ''}` : (p.reason || 'Sababni ko\'rib chiqing'), icon: CalendarClock };
     case 'expense_request':
       return { title: 'Yangi xarajat so\'rovi', body: `${p.requester || 'Xodim'} tomonidan ${formatMoney(p.amount)} miqdorida yangi so'rov yaratildi`, icon: Wallet };
     case 'request_paid':
@@ -103,7 +105,7 @@ export function notifLink(n) {
   const p = n.payload || {};
   const t = n.type || '';
   if (t.startsWith('task')) return '/tasks';
-  if (t.startsWith('meeting')) return '/meetings';
+  if (t.startsWith('meeting')) return p.meetingId ? `/meetings?meeting=${p.meetingId}` : '/meetings';
   if (t === 'payroll_paid') return '/payroll';
   if (t === 'expense_request' || t.startsWith('request')) return '/finance';
   if (t.startsWith('project')) return p.projectId ? `/projects/${p.projectId}` : '/projects';

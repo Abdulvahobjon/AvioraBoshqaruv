@@ -69,14 +69,20 @@ export class SetAttendanceDto {
   @IsInt()
   userId: number;
 
-  @ApiProperty({ description: 'Qatnashdimi' })
+  @ApiPropertyOptional({ description: 'Qatnashdimi' })
+  @IsOptional()
   @IsBoolean()
-  attended: boolean;
+  attended?: boolean;
 
   @ApiPropertyOptional({ description: 'Qatnashmagan bo\'lsa sabab' })
   @IsOptional()
   @IsString()
   absenceReason?: string;
+
+  @ApiPropertyOptional({ description: 'Tashkilotchi qarori: true=sababli, false=sababsiz' })
+  @IsOptional()
+  @IsBoolean()
+  excused?: boolean;
 }
 
 export class SubmitReasonDto {

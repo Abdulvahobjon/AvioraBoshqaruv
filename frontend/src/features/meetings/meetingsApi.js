@@ -57,6 +57,18 @@ export function useSubmitReason() {
   });
 }
 
+/** Tashkilotchi: ishtirokchini sababli/sababsiz (excused) yoki qatnashgan deb belgilaydi. */
+export function useSetAttendance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...body }) => (await api.post(`/meetings/${id}/attendance`, body)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['meetings'] });
+      qc.invalidateQueries({ queryKey: ['meeting'] });
+    },
+  });
+}
+
 export function useRegenerateMeetLink() {
   const qc = useQueryClient();
   return useMutation({

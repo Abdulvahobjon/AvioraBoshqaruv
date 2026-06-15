@@ -287,25 +287,35 @@ export class MeetingsService {
     return this.findOne(id);
   }
 
-  /** A non-attendee submits their absence reason → becomes "Sababli". */
+  /** A non-attendee submits their absence reason → tashkilotchiga xabar boradi (u sababli/sababsiz baholaydi). */
   async submitReason(meetingId: number, reason: string, user: AuthUser) {
     const att = await this.prisma.meetingAttendance.findFirst({ where: { meetingId, userId: user.id } });
     if (!att) throw new NotFoundException('Siz bu yig\'ilish ishtirokchisi emassiz');
     if (att.attended) throw new BadRequestException('Siz yig\'ilishda qatnashgansiz');
     if (!reason?.trim()) throw new BadRequestException('Sabab kiriting');
-    await this.prisma.meetingAttendance.update({ where: { id: att.id }, data: { absenceReason: reason.trim() } });
+    // Sabab yuborilganda 'excused' ni null (hal qilinmagan) qoldiramiz — qarorni tashkilotchi beradi.
+    await this.prisma.meetingAttendance.update({ where: { id: att.id }, data: { absenceReason: reason.trim(), excused: null } });
+
+    // Tashkilotchiga "sabab keldi" bildirishnomasi — u bosib, sababli/sababsiz deb belgilaydi.
+    const meeting = await this.prisma.meeting.findFirst({ where: { id: meetingId }, select: { createdBy: true, title: true } });
+    if (meeting?.createdBy && meeting.createdBy !== user.id) {
+      await this.notifications.notify(meeting.createdBy, 'meeting_reason', {
+        meetingId, title: meeting.title, reason: reason.trim(), requester: user.fullName,
+      });
+    }
     return this.findOne(meetingId);
   }
 
-  /** Organizer manual override of a single attendance row. */
+  /** Organizer manual override of a single attendance row (attended / absenceReason / excused — sababli/sababsiz). */
   async setAttendance(meetingId: number, dto: any, actor: AuthUser) {
     const meeting = await this.prisma.meeting.findFirst({ where: { id: meetingId } });
     if (!meeting) throw new NotFoundException('Yig\'ilish topilmadi');
     if (!this.canManage(meeting, actor)) throw new ForbiddenException('Ruxsat yo\'q');
-    await this.prisma.meetingAttendance.updateMany({
-      where: { meetingId, userId: Number(dto.userId) },
-      data: { attended: !!dto.attended, absenceReason: dto.absenceReason ?? null },
-    });
+    const data: any = {};
+    if (dto.attended !== undefined) data.attended = !!dto.attended;
+    if (dto.absenceReason !== undefined) data.absenceReason = dto.absenceReason ?? null;
+    if (dto.excused !== undefined) data.excused = dto.excused === null ? null : !!dto.excused;
+    await this.prisma.meetingAttendance.updateMany({ where: { meetingId, userId: Number(dto.userId) }, data });
     return this.findOne(meetingId);
   }
 

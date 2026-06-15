@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { Plus, X, UserPlus, Eye, CheckCircle2, Trash2, Video, Search, Filter, Copy, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
@@ -79,6 +80,17 @@ export function MeetingsPage() {
   const [detailId, setDetailId] = useState(null);
   const [attendanceId, setAttendanceId] = useState(null);
   const [deleting, setDeleting] = useState(null);
+
+  // Bildirishnoma deep-link: /meetings?meeting=<id> → tegishli yig'ilish oynasi ochiladi.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const mid = searchParams.get('meeting');
+    if (mid) {
+      setDetailId(Number(mid));
+      searchParams.delete('meeting');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const canManage = (m) => m.createdBy === user?.id || isAdmin;
   // Tahrirlash: faqat o'zi yaratgan va hali yakunlanmagan yig'ilish.

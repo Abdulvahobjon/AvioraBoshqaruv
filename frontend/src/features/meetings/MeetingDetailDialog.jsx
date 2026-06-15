@@ -10,14 +10,16 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { formatDate } from '@/lib/utils/format';
 import { apiError } from '@/lib/api/axios';
+import { cn } from '@/lib/utils/cn';
 import { useAuthStore } from '@/store/authStore';
-import { useMeeting, useSubmitReason, useRegenerateMeetLink } from './meetingsApi';
+import { useMeeting, useSubmitReason, useSetAttendance, useRegenerateMeetLink } from './meetingsApi';
 import { MeetingStatusBadge } from './MeetingStatusBadge';
 
 function attendanceMeta(a) {
   if (a.attended) return { label: 'Qatnashdi', tone: 'success' };
-  if (a.absenceReason) return { label: 'Qatnashmadi | Sababli', tone: 'warning' };
-  return { label: 'Qatnashmadi | Sababsiz', tone: 'error' };
+  if (a.excused === true) return { label: 'Qatnashmadi | Sababli', tone: 'warning' };
+  if (a.excused === false) return { label: 'Qatnashmadi | Sababsiz', tone: 'error' };
+  return { label: a.absenceReason ? 'Qatnashmadi | Sabab kutilmoqda' : 'Qatnashmadi', tone: 'muted' };
 }
 
 export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
@@ -25,9 +27,18 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
   const role = useAuthStore((s) => s.user?.role);
   const { data: meeting, isLoading } = useMeeting(meetingId);
   const submitReason = useSubmitReason();
+  const setAtt = useSetAttendance();
   const regenerate = useRegenerateMeetLink();
   const [expanded, setExpanded] = useState(null);
   const [reason, setReason] = useState('');
+
+  // Tashkilotchi qarori: sababli (excused=true) / sababsiz (excused=false).
+  const decide = (userId, excused) => {
+    setAtt.mutate({ id: meetingId, userId, excused }, {
+      onSuccess: () => toast.success(excused ? 'Sababli deb belgilandi' : 'Sababsiz deb belgilandi'),
+      onError: (e) => toast.error(apiError(e)),
+    });
+  };
 
   // Creator (or admin) can finish a meeting that isn't finished yet.
   const canManage = !!meeting && (meeting.createdBy === myId || ['superadmin', 'admin'].includes(role));
@@ -142,6 +153,17 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
 
                     {a.absenceReason && isOpen && (
                       <div className="border-t border-stroke-soft px-3 py-2.5 text-sm text-text-sub">{a.absenceReason}</div>
+                    )}
+
+                    {/* Tashkilotchi: sababli/sababsiz qarori (yig'ilish yakunlangach, qatnashmaganlar uchun). */}
+                    {canManage && meeting.finishedAt && !a.attended && (
+                      <div className="flex flex-wrap items-center gap-2 border-t border-stroke-soft px-3 py-2.5">
+                        <span className="text-xs text-text-soft">Tashkilotchi qarori:</span>
+                        <button type="button" onClick={() => decide(a.userId, true)} disabled={setAtt.isPending}
+                          className={cn('rounded-lg px-3 py-1 text-xs font-medium transition-colors', a.excused === true ? 'bg-success-strong text-text-white' : 'bg-bg-1 text-text-sub hover:bg-bg-2')}>Sababli</button>
+                        <button type="button" onClick={() => decide(a.userId, false)} disabled={setAtt.isPending}
+                          className={cn('rounded-lg px-3 py-1 text-xs font-medium transition-colors', a.excused === false ? 'bg-error-strong text-text-white' : 'bg-bg-1 text-text-sub hover:bg-bg-2')}>Sababsiz</button>
+                      </div>
                     )}
 
                     {canSubmitReason && (
