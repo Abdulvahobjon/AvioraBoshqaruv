@@ -44,7 +44,9 @@ async function main() {
   const positionNames = ['Frontend dasturchi', 'Backend dasturchi', 'UI/UX dizayner', 'Loyiha menejeri', 'QA muhandis'];
   const positions = [];
   for (const name of positionNames) {
-    positions.push(await prisma.position.create({ data: { name } }));
+    // Idempotent: mavjud bo'lsa qayta yaratmaymiz (har restart'da dublikat oldini oladi).
+    const existing = await prisma.position.findFirst({ where: { name } });
+    positions.push(existing ?? (await prisma.position.create({ data: { name } })));
   }
 
   // ── Reference: project types (standart 5 ta) ──
