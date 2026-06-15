@@ -102,7 +102,9 @@ export class GoogleCalendarService {
   }
 
   private calendar() {
-    return google.calendar({ version: 'v3', auth: this.getClient() });
+    // `auth` cast — googleapis-common bilan google-auth-library versiya-skew bo'lsa
+    // OAuth2Client tipi mos kelmasligi mumkin (runtime'ga ta'sir yo'q, faqat TS).
+    return google.calendar({ version: 'v3', auth: this.getClient() as any });
   }
 
   /**
