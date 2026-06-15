@@ -2,9 +2,12 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Plane, X, ChevronDown, Sun, User, LogOut } from 'lucide-react';
+import { Plane, X, ChevronDown, Sun, User, LogOut, Check } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
+import { api, apiError } from '@/lib/api/axios';
 import { useAuthStore } from '@/store/authStore';
+import { useSwitchRole } from '@/features/auth/authApi';
 import { useThemeStore } from '@/store/themeStore';
 import { Avatar } from '@/components/ui/Avatar';
 import { Switch } from '@/components/ui/Switch';
@@ -166,7 +169,9 @@ function UserBlock({ user, collapsed, onNavigate }) {
   const menuRef = useRef(null);
   const navigate = useNavigate();
   const logout = useAuthStore((s) => s.logout);
+  const switchRole = useSwitchRole();
   const { theme, toggle } = useThemeStore();
+  const roles = user?.roles || [];
 
   useEffect(() => {
     if (!open) return;
@@ -199,12 +204,35 @@ function UserBlock({ user, collapsed, onNavigate }) {
               style={{ position: 'fixed', left: coords.left, bottom: coords.bottom, width: coords.width, zIndex: 60 }}
               className="overflow-hidden rounded-xl border border-stroke-sub bg-bg-base shadow-elevated"
             >
-              <div className="flex items-center gap-2.5 border-b border-stroke-sub px-4 py-3">
-                <Avatar name={user?.fullName} src={user?.avatar} size="md" />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-text-strong">{user?.fullName}</p>
-                  <p className="truncate text-xs text-text-soft">{ROLE_LABELS[user?.role]}</p>
-                </div>
+              {/* Rollar — har biri alohida qator; aktiv rol rangli fon bilan ajralib turadi */}
+              <div className="space-y-1 border-b border-stroke-sub p-1.5">
+                {(roles.length > 1 ? roles : [user?.role]).map((r) => {
+                  const active = r === user?.role;
+                  return (
+                    <button
+                      key={r}
+                      type="button"
+                      disabled={active || switchRole.isPending}
+                      onClick={() => {
+                        switchRole.mutate(r, {
+                          onSuccess: () => { setOpen(false); onNavigate?.(); navigate('/'); toast.success(`${ROLE_LABELS[r]} rejimiga o'tildi`); },
+                          onError: (e) => toast.error(apiError(e)),
+                        });
+                      }}
+                      className={cn(
+                        'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors',
+                        active ? 'bg-accent-strong' : 'hover:bg-bg-1-alt',
+                      )}
+                    >
+                      <Avatar name={user?.fullName} src={user?.avatar} size="md" />
+                      <div className="min-w-0 flex-1">
+                        <p className={cn('truncate text-sm font-semibold', active ? 'text-text-white' : 'text-text-strong')}>{user?.fullName}</p>
+                        <p className={cn('truncate text-xs', active ? 'text-text-white opacity-80' : 'text-text-soft')}>{ROLE_LABELS[r]}</p>
+                      </div>
+                      {active && <Check className="h-4 w-4 shrink-0 text-text-white" />}
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="flex items-center justify-between px-4 py-3">
@@ -222,7 +250,12 @@ function UserBlock({ user, collapsed, onNavigate }) {
               </button>
 
               <button
-                onClick={() => { logout(); navigate('/login'); }}
+                onClick={() => {
+                  // Serverdagi httpOnly refresh cookie'ni tozalaymiz (fire-and-forget), so'ng local holat.
+                  api.post('/auth/logout').catch(() => {});
+                  logout();
+                  navigate('/login');
+                }}
                 className="flex w-full items-center gap-2.5 border-t border-stroke-sub px-4 py-3 text-sm font-medium text-error-strong transition-colors hover:bg-error-soft"
               >
                 <LogOut className="h-4 w-4" /> Chiqish

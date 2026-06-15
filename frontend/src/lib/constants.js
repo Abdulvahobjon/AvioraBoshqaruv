@@ -8,13 +8,6 @@ export const ROLE_LABELS = {
   auditor: 'Nazoratchi',
 };
 
-// ── Ariza (Application) holatlari ──
-export const APPLICATION_STATUS = {
-  pending: { label: 'Kutilmoqda', tone: 'warning' },
-  accepted: { label: 'Qabul qilindi', tone: 'success' },
-  rejected: { label: 'Rad etildi', tone: 'error' },
-};
-
 // ── Loyiha statuslari ──
 export const PROJECT_STATUS = {
   planning: { label: 'Rejalashtirilgan', tone: 'neutral' },
@@ -37,6 +30,15 @@ export const CLIENT_TYPE = {
 export const CLIENT_STATUS = {
   active: { label: 'Faol', tone: 'success' },
   inactive: { label: 'Nofaol', tone: 'muted' },
+};
+
+// ── Mijoz bilan muloqot/faoliyat turlari ──
+export const CLIENT_ACTIVITY = {
+  call: { label: 'Qo\'ng\'iroq', tone: 'info' },
+  meeting: { label: 'Uchrashuv', tone: 'success' },
+  email: { label: 'Xat', tone: 'neutral' },
+  note: { label: 'Eslatma', tone: 'warning' },
+  other: { label: 'Boshqa', tone: 'muted' },
 };
 
 // ── Vazifa (Kanban) statuslari ──
@@ -89,17 +91,30 @@ export const DAILY_PLAN_PRIORITY = {
 
 // ── Moliya so'rovi ──
 export const FINANCE_STATUS = {
-  pending: { label: 'Kutilmoqda', tone: 'warning' },
-  paid: { label: "To'langan (Pending)", tone: 'info' },
-  closed: { label: 'Yakunlangan', tone: 'success' },
-  rejected: { label: 'Rad etilgan', tone: 'error' },
+  pending: { label: "To'lanmagan", tone: 'warning' },
+  paid: { label: "To'langan", tone: 'info' },
+  closed: { label: 'Tasdiqlangan', tone: 'success' },
+  rejected: { label: 'Bekor qilingan', tone: 'error' },
 };
 
+// Figma: Xarajat turi — Kompaniya xarajatlari / Mablag' chiqarish / Boshqa xarajatlar.
 export const FINANCE_TYPE = {
-  salary: 'Oylik / yechib olish',
-  company: 'Kompaniya',
-  other: 'Boshqa',
+  salary: "Mablag' chiqarish",
+  company: 'Kompaniya xarajatlari',
+  other: 'Boshqa xarajatlar',
 };
+
+// To'lov turi (Figma)
+export const PAYMENT_METHOD = {
+  cash: 'Naqd pul orqali',
+  card: 'Karta raqam orqali',
+};
+
+// Oy nomlari (Ish haqi "Oy" ustuni / filtri)
+export const MONTHS_UZ = [
+  'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun',
+  'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr',
+];
 
 // ── Oylik (Payroll) ──
 export const PAYROLL_STATUS = {

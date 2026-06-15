@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { RequireAuth, RequireRole } from './guards';
+import { RequireAuth } from './guards';
 import { PageLoader } from '@/components/shared/PageLoader';
 import { LoginPage } from '@/pages/LoginPage';
 
@@ -17,15 +17,14 @@ const TasksPage = lazyPage(() => import('@/pages/tasks/TasksPage'), 'TasksPage')
 const MeetingsPage = lazyPage(() => import('@/pages/meetings/MeetingsPage'), 'MeetingsPage');
 const FinancePage = lazyPage(() => import('@/pages/finance/FinancePage'), 'FinancePage');
 const PayrollPage = lazyPage(() => import('@/pages/payroll/PayrollPage'), 'PayrollPage');
-const ExpensesPage = lazyPage(() => import('@/pages/expenses/ExpensesPage'), 'ExpensesPage');
+const FinanceHistoryPage = lazyPage(() => import('@/pages/finance/FinanceHistoryPage'), 'FinanceHistoryPage');
+const ExpenseCategoriesPage = lazyPage(() => import('@/pages/finance/ExpenseCategoriesPage'), 'ExpenseCategoriesPage');
 const EmployeeReportPage = lazyPage(() => import('@/pages/reports/EmployeeReportPage'), 'EmployeeReportPage');
 const ProjectsReportPage = lazyPage(() => import('@/pages/reports/ProjectsReportPage'), 'ProjectsReportPage');
 const ExpensesReportPage = lazyPage(() => import('@/pages/reports/ExpensesReportPage'), 'ExpensesReportPage');
 const PayrollReportPage = lazyPage(() => import('@/pages/reports/PayrollReportPage'), 'PayrollReportPage');
 const TasksReportPage = lazyPage(() => import('@/pages/reports/TasksReportPage'), 'TasksReportPage');
 const DailyPlansPage = lazyPage(() => import('@/pages/daily-plans/DailyPlansPage'), 'DailyPlansPage');
-const ApplicationsPage = lazyPage(() => import('@/pages/applications/ApplicationsPage'), 'ApplicationsPage');
-const ApplyPage = lazyPage(() => import('@/pages/applications/ApplyPage'), 'ApplyPage');
 const AuditPage = lazyPage(() => import('@/pages/audit/AuditPage'), 'AuditPage');
 const UsersPage = lazyPage(() => import('@/pages/users/UsersPage'), 'UsersPage');
 const UserDetailPage = lazyPage(() => import('@/pages/users/UserDetailPage'), 'UserDetailPage');
@@ -36,7 +35,6 @@ const S = (el) => <Suspense fallback={<PageLoader />}>{el}</Suspense>;
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
-  { path: '/apply', element: S(<ApplyPage />) }, // public nomzod anketasi (auth shart emas)
   {
     path: '/',
     element: (
@@ -47,8 +45,9 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: S(<DashboardPage />) },
 
-      { path: 'clients', element: <RequireRole roles={['superadmin', 'admin', 'manager', 'auditor']}>{S(<ClientsPage />)}</RequireRole> },
-      { path: 'clients/:id', element: <RequireRole roles={['superadmin', 'admin', 'manager', 'auditor']}>{S(<ClientDetailPage />)}</RequireRole> },
+      // Rol himoyasi AppLayout'dagi <RequireRoute> orqali navConfig'dan markazlashgan.
+      { path: 'clients', element: S(<ClientsPage />) },
+      { path: 'clients/:id', element: S(<ClientDetailPage />) },
 
       { path: 'projects', element: S(<ProjectsPage />) },
       { path: 'projects/:id', element: S(<ProjectDetailPage />) },
@@ -56,22 +55,22 @@ export const router = createBrowserRouter([
       { path: 'tasks', element: S(<TasksPage />) },
       { path: 'meetings', element: S(<MeetingsPage />) },
       { path: 'finance', element: S(<FinancePage />) },
-      { path: 'payroll', element: <RequireRole roles={['superadmin', 'admin', 'accountant', 'manager', 'employee', 'auditor']}>{S(<PayrollPage />)}</RequireRole> },
-      { path: 'expenses', element: <RequireRole roles={['superadmin', 'admin', 'accountant', 'auditor']}>{S(<ExpensesPage />)}</RequireRole> },
+      { path: 'payroll', element: S(<PayrollPage />) },
+      { path: 'finance-history', element: S(<FinanceHistoryPage />) },
+      { path: 'expense-categories', element: S(<ExpenseCategoriesPage />) },
       { path: 'reports', element: <Navigate to="/reports/projects" replace /> },
-      { path: 'reports/employees', element: <RequireRole roles={['superadmin', 'admin', 'accountant', 'auditor']}>{S(<EmployeeReportPage />)}</RequireRole> },
-      { path: 'reports/projects', element: <RequireRole roles={['superadmin', 'admin', 'manager', 'accountant', 'auditor']}>{S(<ProjectsReportPage />)}</RequireRole> },
-      { path: 'reports/expenses', element: <RequireRole roles={['superadmin', 'admin', 'accountant', 'auditor']}>{S(<ExpensesReportPage />)}</RequireRole> },
-      { path: 'reports/payroll', element: <RequireRole roles={['superadmin', 'admin', 'accountant', 'auditor']}>{S(<PayrollReportPage />)}</RequireRole> },
-      { path: 'reports/tasks', element: <RequireRole roles={['superadmin', 'admin', 'manager', 'auditor']}>{S(<TasksReportPage />)}</RequireRole> },
+      { path: 'reports/employees', element: S(<EmployeeReportPage />) },
+      { path: 'reports/projects', element: S(<ProjectsReportPage />) },
+      { path: 'reports/expenses', element: S(<ExpensesReportPage />) },
+      { path: 'reports/payroll', element: S(<PayrollReportPage />) },
+      { path: 'reports/tasks', element: S(<TasksReportPage />) },
       { path: 'daily-plans', element: S(<DailyPlansPage />) },
-      { path: 'applications', element: <RequireRole roles={['superadmin', 'admin', 'manager']}>{S(<ApplicationsPage />)}</RequireRole> },
-      { path: 'audit', element: <RequireRole roles={['superadmin', 'admin', 'accountant', 'auditor']}>{S(<AuditPage />)}</RequireRole> },
-      { path: 'users', element: <RequireRole roles={['superadmin', 'admin']}>{S(<UsersPage />)}</RequireRole> },
-      { path: 'users/:id', element: <RequireRole roles={['superadmin', 'admin']}>{S(<UserDetailPage />)}</RequireRole> },
+      { path: 'audit', element: S(<AuditPage />) },
+      { path: 'users', element: S(<UsersPage />) },
+      { path: 'users/:id', element: S(<UserDetailPage />) },
 
       { path: 'settings', element: S(<SettingsPage />) },
-      { path: 'trash', element: <RequireRole roles={['superadmin', 'admin']}>{S(<TrashPage />)}</RequireRole> },
+      { path: 'trash', element: S(<TrashPage />) },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

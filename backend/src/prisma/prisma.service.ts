@@ -20,9 +20,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     'ExpenseCategory',
     'Task',
     'Expense',
+    'FinanceRequest',
     'Meeting',
     'Notification',
     'Application',
+    'ClientContact',
+    'ClientDocument',
   ]);
 
   private readonly logger = new Logger('Prisma');

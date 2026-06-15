@@ -2,28 +2,31 @@ import { useMemo, useState } from 'react';
 import { DragDropContext } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
 import { KANBAN_COLUMNS } from '@/lib/constants';
+import { useAuthStore } from '@/store/authStore';
+import { useCan } from '@/lib/permissions';
 import { KanbanColumn } from './KanbanColumn';
 import { useChangeStatus } from './tasksApi';
 import { apiError } from '@/lib/api/axios';
 
-// Statusni faqat OLDINGA siljitish mumkin: todo→in_progress→done→checked→production.
-// 'rejected' (review natijasi) va 'overdue' (avtomatik) bu zanjirda emas — ularga sudrab bo'lmaydi.
-const PIPELINE = ['todo', 'in_progress', 'done', 'checked', 'production'];
+// Statusni faqat BITTADAN OLDINGA siljitish mumkin: todo→in_progress→done→production.
+// 'checked'/'rejected' faqat review (Ishga tushirilgan ustunida) orqali, 'overdue' avtomatik.
+const PIPELINE = ['todo', 'in_progress', 'done', 'production'];
 
-/** Manbadan maqsadga oldinga siljish ruxsat etilganmi? (orqaga = taqiqlangan). */
+/** Faqat keyingi bitta bosqichga siljish ruxsat etilgan (sakrash/orqaga = taqiqlangan). */
 function isForwardMove(from, to) {
   if (from === to) return true; // bir ustun ichida (no-op)
   const ti = PIPELINE.indexOf(to);
-  if (ti === -1) return false; // rejected/overdue ga sudrab bo'lmaydi
   const fi = PIPELINE.indexOf(from);
-  if (fi === -1) return true; // rejected/overdue dan pipeline ga tiklash mumkin
-  return ti > fi; // faqat keyingi bosqichlarga
+  return ti !== -1 && ti === fi + 1; // faqat darhol keyingi ustun
 }
 
 /** Trello-like board powered by @hello-pangea/dnd (react-beautiful-dnd fork). */
-export function KanbanBoard({ tasks, onCardClick, onAddCard, canAdd }) {
+export function KanbanBoard({ tasks, onCardClick, actions, onAddCard, canAdd }) {
   const changeStatus = useChangeStatus();
   const [draggingFrom, setDraggingFrom] = useState(null); // sudralayotgan kartaning manba statusi
+  // Superadmin — hammasi ochiq: istalgan ustunga (sakrash/orqaga) erkin sudraydi.
+  const canMoveAny = useAuthStore((s) => s.user?.role) === 'superadmin';
+  const canWork = useCan()('tasks.work'); // auditor (faqat-o'qish) statusni o'zgartira olmaydi
 
   const grouped = useMemo(() => {
     const g = Object.fromEntries(KANBAN_COLUMNS.map((c) => [c.status, []]));
@@ -35,12 +38,14 @@ export function KanbanBoard({ tasks, onCardClick, onAddCard, canAdd }) {
 
   const onDragEnd = (result) => {
     setDraggingFrom(null);
+    if (!canWork) return; // auditor — statusni o'zgartirib bo'lmaydi (backend ham bloklaydi)
     const { source, destination, draggableId } = result;
     if (!destination) return; // dropped outside any list
     if (source.droppableId === destination.droppableId) return; // same column — reorder snaps back
     // Faqat oldinga (himoya: isDropDisabled ham bloklaydi, bu esa zaxira tekshiruv).
-    if (!isForwardMove(source.droppableId, destination.droppableId)) {
-      toast.error('Statusni faqat oldinga siljitish mumkin — orqaga qaytarib bo\'lmaydi');
+    // Superadmin uchun cheklov yo'q.
+    if (!canMoveAny && !isForwardMove(source.droppableId, destination.droppableId)) {
+      toast.error('Statusni faqat bittadan keyingi bosqichga siljitish mumkin');
       return;
     }
     changeStatus.mutate(
@@ -61,10 +66,11 @@ export function KanbanBoard({ tasks, onCardClick, onAddCard, canAdd }) {
               column={col}
               tasks={grouped[col.status] || []}
               onCardClick={onCardClick}
+              actions={actions}
               onAddCard={onAddCard}
               canAdd={canAdd}
-              // Sudrash paytida faqat oldinga ruxsat etilgan ustunlar yoniq qoladi.
-              dropDisabled={draggingFrom != null && !isForwardMove(draggingFrom, col.status)}
+              // Sudrash paytida faqat oldinga ruxsat etilgan ustunlar yoniq qoladi (superadmin'ga hammasi).
+              dropDisabled={!canMoveAny && draggingFrom != null && !isForwardMove(draggingFrom, col.status)}
             />
           ))}
         </div>

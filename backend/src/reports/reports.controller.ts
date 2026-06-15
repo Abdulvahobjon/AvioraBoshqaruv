@@ -54,6 +54,11 @@ export class ReportsController {
     return this.reports.tasksReport(q);
   }
 
+  @Get('tasks-detail')
+  tasksDetail(@Query() q: any) {
+    return this.reports.tasksDetail(q);
+  }
+
   @Get('employees')
   @Roles('superadmin', 'admin', 'accountant', 'auditor')
   employees() {
@@ -71,7 +76,7 @@ export class ReportsController {
   async export(@Query() q: any, @Res() res: Response, @CurrentUser() user: AuthUser) {
     const type = q.type || 'projects';
     // Maosh/balans/xarajat eksporti faqat moliyaviy rollarga (to'g'ridan-to'g'ri endpointlar bilan bir xil).
-    if (['payroll', 'expenses', 'employees', 'employee-report', 'expense-requests'].includes(type) && !FINANCE_ONLY_ROLES.includes(user.role)) {
+    if (['payroll', 'expenses', 'employees', 'employee-report', 'expense-requests', 'ledger'].includes(type) && !FINANCE_ONLY_ROLES.includes(user.role)) {
       throw new ForbiddenException('Ruxsat yo\'q');
     }
     const format = ['pdf', 'csv'].includes(q.format) ? q.format : 'xlsx';
@@ -93,11 +98,47 @@ export class ReportsController {
     }
 
     if (format === 'xlsx') {
+      // Rang palitrasi (brend accent + neytral)
+      const ACCENT = 'FF4F46E5', ZEBRA = 'FFF8FAFC', HEAD_TXT = 'FFFFFFFF', TITLE_TXT = 'FF1E293B', LINE = 'FFE2E8F0';
       const wb = new ExcelJS.Workbook();
-      const ws = wb.addWorksheet(title);
-      ws.columns = columns.map((c) => ({ header: c.header, key: c.key, width: c.width || 20 }));
-      ws.getRow(1).font = { bold: true };
-      rows.forEach((r) => ws.addRow(r));
+      wb.creator = 'Aviora Boshqaruv';
+      wb.created = new Date();
+      const ws = wb.addWorksheet(title, {
+        views: [{ state: 'frozen', ySplit: 2 }], // sarlavha + ustun qatorlari muzlatiladi
+        pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+      });
+      ws.columns = columns.map((c) => ({ key: c.key, width: c.width || 18 }));
+      const lastCol = columns.length;
+
+      // 1-qator: sarlavha (butun kenglik bo'ylab birlashtirilgan)
+      ws.mergeCells(1, 1, 1, lastCol);
+      const titleCell = ws.getCell(1, 1);
+      titleCell.value = title;
+      titleCell.font = { bold: true, size: 14, color: { argb: TITLE_TXT } };
+      titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
+      ws.getRow(1).height = 28;
+
+      // 2-qator: ustun sarlavhalari (accent fon, oq qalin matn)
+      const headerRow = ws.getRow(2);
+      columns.forEach((c, i) => {
+        const cell = headerRow.getCell(i + 1);
+        cell.value = c.header;
+        cell.font = { bold: true, size: 11, color: { argb: HEAD_TXT } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ACCENT } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+      });
+      headerRow.height = 24;
+
+      // Ma'lumot qatorlari: zebra + yengil pastki chiziq
+      rows.forEach((r, idx) => {
+        const row = ws.addRow(r);
+        row.eachCell({ includeEmpty: true }, (cell) => {
+          cell.alignment = { vertical: 'middle' };
+          cell.border = { bottom: { style: 'hair', color: { argb: LINE } } };
+          if (idx % 2 === 1) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ZEBRA } };
+        });
+      });
+
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="${type}-report.xlsx"`);
       await wb.xlsx.write(res);
@@ -105,28 +146,43 @@ export class ReportsController {
       return;
     }
 
-    // PDF
+    // PDF — sarlavha bandi, rangli header, zebra qatorlar, sahifa bo'linishi
     const doc = new PDFDocument({ margin: 36, size: 'A4', layout: 'landscape' });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${type}-report.pdf"`);
     doc.pipe(res);
-    doc.fontSize(16).text(title, { align: 'center' }).moveDown();
-    const colWidth = (770 - 72) / columns.length;
-    doc.fontSize(9);
-    // header
-    let x = 36;
-    doc.font('Helvetica-Bold');
-    columns.forEach((c) => { doc.text(c.header, x, doc.y, { width: colWidth, continued: false }); x += colWidth; });
-    doc.moveDown(0.5).font('Helvetica');
-    // rows
-    rows.forEach((r) => {
-      const startY = doc.y;
-      let cx = 36;
-      columns.forEach((c) => {
-        doc.text(String(r[c.key] ?? ''), cx, startY, { width: colWidth });
-        cx += colWidth;
-      });
-      doc.moveDown(0.3);
+
+    const left = 36;
+    const right = doc.page.width - 36;
+    const tableW = right - left;
+    const totalW = columns.reduce((a, c) => a + (c.width || 18), 0);
+    const colW = columns.map((c) => (tableW * (c.width || 18)) / totalW);
+    const bottom = doc.page.height - 36;
+
+    // Sarlavha bandi (accent fon)
+    doc.rect(left, 36, tableW, 30).fill('#4F46E5');
+    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(15).text(title, left + 12, 45, { width: tableW - 24, lineBreak: false });
+    let y = 80;
+
+    const drawHeader = () => {
+      doc.rect(left, y, tableW, 20).fill('#EEF2FF');
+      doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(8);
+      let x = left;
+      columns.forEach((c, i) => { doc.text(c.header, x + 4, y + 6, { width: colW[i] - 8, height: 11, ellipsis: true }); x += colW[i]; });
+      y += 20;
+      doc.font('Helvetica').fillColor('#0F172A');
+    };
+    drawHeader();
+
+    const rowH = 16;
+    rows.forEach((r, idx) => {
+      if (y + rowH > bottom) { doc.addPage(); y = 36; drawHeader(); }
+      if (idx % 2 === 1) { doc.rect(left, y, tableW, rowH).fill('#F8FAFC'); }
+      doc.fillColor('#0F172A').font('Helvetica').fontSize(8);
+      let x = left;
+      columns.forEach((c, i) => { doc.text(String(r[c.key] ?? ''), x + 4, y + 4, { width: colW[i] - 8, height: 11, ellipsis: true }); x += colW[i]; });
+      doc.moveTo(left, y + rowH).lineTo(right, y + rowH).strokeColor('#E2E8F0').lineWidth(0.5).stroke();
+      y += rowH;
     });
     doc.end();
   }
@@ -204,18 +260,32 @@ export class ReportsController {
     }
     if (type === 'payroll') {
       const { rows } = await this.reports.payroll(q);
+      const dt = (d: any) => (d ? new Date(d).toLocaleDateString('uz-UZ') : '—');
+      const STATUS_UZ: Record<string, string> = { draft: 'Hisoblangan', ready: "To'lovga tayyor", paid: "To'langan", closed: 'Tasdiqlangan' };
       return {
         title: 'Ish haqi hisoboti',
         columns: [
-          { header: 'F.I.O', key: 'fullName', width: 28 },
-          { header: 'Lavozim', key: 'position', width: 20 },
+          { header: 'Ism Sharifi', key: 'fullName', width: 26 },
           { header: 'Oy', key: 'month', width: 12 },
-          { header: 'Oylik (UZS)', key: 'fixedFmt', width: 18 },
-          { header: 'Ulushlar (UZS)', key: 'shareFmt', width: 18 },
-          { header: 'Jami (UZS)', key: 'totalFmt', width: 18 },
-          { header: 'Holat', key: 'status', width: 12 },
+          { header: 'Oylik maosh (UZS)', key: 'fixedFmt', width: 18 },
+          { header: 'KPI bonus (UZS)', key: 'kpiFmt', width: 16 },
+          { header: 'Jarima miqdori (UZS)', key: 'penaltyFmt', width: 18 },
+          { header: 'Jami miqdori (UZS)', key: 'totalFmt', width: 18 },
+          { header: 'Holati', key: 'statusUz', width: 14 },
+          { header: 'Hisoblangan vaqti', key: 'createdFmt', width: 16 },
+          { header: 'Tasdiqlangan vaqti', key: 'confirmedFmt', width: 16 },
+          { header: 'Hisobchi', key: 'accountant', width: 22 },
         ],
-        rows: rows.map((r) => ({ ...r, fixedFmt: fmt(r.fixedAmount), shareFmt: fmt(r.projectShareTotal), totalFmt: fmt(r.total) })),
+        rows: rows.map((r) => ({
+          ...r,
+          fixedFmt: fmt(r.fixedAmount),
+          kpiFmt: fmt(r.kpiBonus),
+          penaltyFmt: r.penalty > 0 ? `-${fmt(r.penalty)}` : fmt(0),
+          totalFmt: fmt(r.total),
+          statusUz: STATUS_UZ[r.status] || r.status,
+          createdFmt: dt(r.createdAt),
+          confirmedFmt: dt(r.confirmedAt),
+        })),
       };
     }
     if (type === 'tasks') {
@@ -234,6 +304,66 @@ export class ReportsController {
           { header: 'Rad etilgan', key: 'rejected', width: 11 },
         ],
         rows: byAssignee,
+      };
+    }
+    if (type === 'tasks-detail') {
+      const { rows } = await this.reports.tasksDetail(q);
+      const dt = (d: any) => (d ? new Date(d).toLocaleDateString('uz-UZ') : '—');
+      const PRIO: Record<string, string> = { low: 'Past', medium: "O'rta", high: 'Yuqori', critical: 'Kritik' };
+      const STAT: Record<string, string> = { todo: 'Qilish kerak', in_progress: 'Jarayonda', overdue: "Muddati o'tgan", done: 'Bajarilgan', checked: 'Tekshirilgan', production: 'Ishga tushirilgan', rejected: 'Rad etilgan' };
+      const TYP: Record<string, string> = { bug: 'Xatolik', extra: "Qo'shimcha", research: 'Tadqiqot', feature: 'Yangi funksiya' };
+      return {
+        title: "Vazifalar bo'yicha hisobot",
+        columns: [
+          { header: 'Titul', key: 'uid', width: 12 },
+          { header: 'Loyiha nomi', key: 'projectName', width: 22 },
+          { header: 'Vazifa nomi', key: 'title', width: 24 },
+          { header: 'Topshiruvchi', key: 'assignee', width: 20 },
+          { header: 'Muallif', key: 'author', width: 20 },
+          { header: 'Darajasi', key: 'prioUz', width: 12 },
+          { header: 'Holati', key: 'statUz', width: 16 },
+          { header: 'Turi', key: 'typeUz', width: 16 },
+          { header: 'Vazifa narxi (UZS)', key: 'priceFmt', width: 18 },
+          { header: 'Jarima foizi (%)', key: 'penaltyPercent', width: 14 },
+          { header: 'Muddati', key: 'deadlineFmt', width: 16 },
+          { header: 'Yaratilgan vaqti', key: 'createdFmt', width: 16 },
+          { header: 'Sprint raqami', key: 'sprint', width: 12 },
+          { header: 'Kim uchun', key: 'position', width: 16 },
+          { header: 'Qaytishlar soni', key: 'reopenedCount', width: 14 },
+          { header: 'Bekor qilish sababi', key: 'rejectReason', width: 28 },
+        ],
+        rows: rows.map((r) => ({
+          ...r,
+          prioUz: PRIO[r.priority] || r.priority,
+          statUz: STAT[r.status] || r.status,
+          typeUz: TYP[r.type] || r.type,
+          priceFmt: fmt(r.price),
+          deadlineFmt: dt(r.deadline),
+          createdFmt: dt(r.createdAt),
+        })),
+      };
+    }
+    if (type === 'ledger') {
+      const { rows } = await this.reports.ledger(q);
+      const TYPE: Record<string, string> = { salary: 'Oylik', company: 'Kompaniya', other: 'Boshqa', project_share: 'Loyiha ulushi', withdrawal: 'Yechib olish', reversal: 'Teskari yozuv' };
+      return {
+        title: 'Moliya tarixi',
+        columns: [
+          { header: 'Ism Sharifi', key: 'fullName', width: 26 },
+          { header: 'Xarajat', key: 'category', width: 20 },
+          { header: 'Turi', key: 'typeLabel', width: 16 },
+          { header: "Yo'nalish", key: 'dirLabel', width: 12 },
+          { header: 'Miqdor (UZS)', key: 'amountFmt', width: 18 },
+          { header: 'Sana', key: 'dateFmt', width: 18 },
+          { header: 'Izoh', key: 'note', width: 30 },
+        ],
+        rows: rows.map((r) => ({
+          ...r,
+          typeLabel: TYPE[r.type] || r.type,
+          dirLabel: r.direction === 'credit' ? 'Kirim' : 'Chiqim',
+          amountFmt: new Intl.NumberFormat('uz-UZ').format(r.amount),
+          dateFmt: new Date(r.createdAt).toLocaleString('uz-UZ'),
+        })),
       };
     }
     if (type === 'expense-requests') {

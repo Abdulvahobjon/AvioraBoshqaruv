@@ -1,150 +1,110 @@
 import { useState } from 'react';
-import { Plus, Wallet, Clock, CheckCircle2, XCircle, Send, RotateCcw } from 'lucide-react';
-import { toast } from 'sonner';
+import { Search, Filter, Send, Check, Clock, X } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { StatCard } from '@/components/shared/StatCard';
 import { DataTable } from '@/components/shared/DataTable';
-import { Tabs } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
+import { Input } from '@/components/ui/Input';
+import { cn } from '@/lib/utils/cn';
 import { formatMoney, formatDate } from '@/lib/utils/format';
-import { FINANCE_STATUS, FINANCE_TYPE } from '@/lib/constants';
-import { apiError } from '@/lib/api/axios';
+import { FINANCE_TYPE } from '@/lib/constants';
+import { useCan } from '@/lib/permissions';
 import { useAuthStore } from '@/store/authStore';
-import { useBalance, useRequests, useRequestAction, useLedger, useReverseLedger } from '@/features/finance/financeApi';
+import { useDebounce } from '@/hooks/useDebounce';
+import { useRequests } from '@/features/finance/financeApi';
 import { RequestDialog } from '@/features/finance/RequestDialog';
+import { RequestReviewDialog } from '@/features/finance/RequestReviewDialog';
+import { RequestFilterDialog } from '@/features/finance/RequestFilterDialog';
+
+const STATUS_CELL = {
+  closed: { Icon: Check, cls: 'bg-success-strong text-text-white' },
+  paid: { Icon: Check, cls: 'bg-success-strong text-text-white' },
+  pending: { Icon: Clock, cls: 'bg-warning-soft text-warning-strong' },
+  rejected: { Icon: X, cls: 'bg-error-strong text-text-white' },
+};
+
+function StatusCell({ status }) {
+  const m = STATUS_CELL[status] || STATUS_CELL.pending;
+  return <span className={cn('inline-flex h-6 w-6 items-center justify-center rounded-md', m.cls)}><m.Icon className="h-4 w-4" /></span>;
+}
 
 export function FinancePage() {
-  const role = useAuthStore((s) => s.user?.role);
-  const isAccountant = ['accountant', 'admin', 'superadmin'].includes(role);
-  const [tab, setTab] = useState(isAccountant ? 'manage' : 'mine');
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const can = useCan();
+  const canRequest = can('finance.request');
+  const canProcess = can('finance.process');
+  const myId = useAuthStore((s) => s.user?.id);
 
-  const { data: balance, isLoading: balanceLoading } = useBalance();
-  const action = useRequestAction();
-  const [pending, setPending] = useState(null); // { id, action } — amaldagi so'rov (dubl-bosishdan himoya)
+  const [search, setSearch] = useState('');
+  const debounced = useDebounce(search);
+  const [filters, setFilters] = useState({});
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [selected, setSelected] = useState(null); // ko'rib chiqilayotgan so'rov
 
-  const doAction = (id, act, okMsg) => {
-    if (action.isPending) return; // bir vaqtda faqat bitta amal
-    setPending({ id, action: act });
-    action.mutate({ id, action: act }, {
-      onSuccess: () => toast.success(okMsg),
-      onError: (e) => toast.error(apiError(e)),
-      onSettled: () => setPending(null),
-    });
-  };
+  const activeFilters = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
+  const hasFilters = Object.keys(activeFilters).length > 0;
 
-  const tabs = [
-    { value: 'mine', label: "Mening so'rovlarim" },
-    ...(isAccountant ? [{ value: 'manage', label: "So'rovlarni boshqarish" }, { value: 'ledger', label: 'Ledger' }] : []),
+  const { data, isLoading } = useRequests({ search: debounced || undefined, ...activeFilters });
+  const rows = data || [];
+
+  const columns = [
+    { key: 'idx', header: '№', render: (_r, i) => <span className="text-text-soft">{i + 1}</span> },
+    { key: 'user', header: 'Ism Sharifi', render: (r) => <span className="font-medium text-text-strong">{r.user?.fullName || '—'}</span> },
+    { key: 'type', header: 'Xarajat turi', render: (r) => <span className="text-text-sub">{FINANCE_TYPE[r.type] || '—'}</span> },
+    { key: 'category', header: 'Toifa', render: (r) => <span className="text-text-sub">{r.category?.name || '—'}</span> },
+    { key: 'project', header: 'Loyiha', render: (r) => <span className="text-text-sub">{r.project?.name || '—'}</span> },
+    { key: 'amount', header: 'Summa (UZS)', render: (r) => <span className="font-semibold text-text-strong">{formatMoney(r.amount, r.currency)}</span> },
+    { key: 'createdAt', header: 'Yaratilgan vaqt', render: (r) => <span className="whitespace-nowrap text-text-sub">{formatDate(r.createdAt)}</span> },
+    { key: 'paidAt', header: "To'langan vaqt", render: (r) => <span className="whitespace-nowrap text-text-sub">{r.paidAt ? formatDate(r.paidAt) : '—'}</span> },
+    { key: 'confirmedAt', header: 'Tasdiqlangan vaqt', render: (r) => <span className="whitespace-nowrap text-text-sub">{r.confirmedAt ? formatDate(r.confirmedAt) : '—'}</span> },
+    { key: 'status', header: 'Xolat', render: (r) => <StatusCell status={r.status} /> },
   ];
 
   return (
-    <div>
+    <div className="flex h-[calc(100vh-6rem)] flex-col sm:h-[calc(100vh-7rem)]">
       <PageHeader
-        title="Moliya"
-        subtitle="Balans, so'rovlar va ledger registri"
-        actions={<Button onClick={() => setDialogOpen(true)}><Plus className="h-4 w-4" /> So'rov yuborish</Button>}
+        title="Xarajat so'rovlari"
+        actions={canRequest && <Button onClick={() => setCreateOpen(true)}><Send className="h-4 w-4" /> So'rov</Button>}
       />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <StatCard icon={Wallet} label="Mavjud balans" value={formatMoney(balance?.balance)} tone="accent" loading={balanceLoading} />
-        <StatCard icon={Clock} label="Pending (tasdiqlanmagan)" value={formatMoney(balance?.pending)} tone="neutral" hint="To'langan, tasdiq kutilmoqda" loading={balanceLoading} />
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-icon-soft" />
+          <Input placeholder="Ism Sharifi bo'yicha izlash" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <Button variant="outline" onClick={() => setFilterOpen(true)} className={cn('relative', hasFilters && 'border-stroke-accent text-text-accent')}>
+          <Filter className="h-4 w-4" /> Filtrlash
+          {hasFilters && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-accent-strong" />}
+        </Button>
       </div>
 
-      <Tabs tabs={tabs} value={tab} onChange={setTab} className="mb-4" />
+      <div className="min-h-0 flex-1">
+        <DataTable
+          columns={columns}
+          data={rows}
+          loading={isLoading}
+          onRowClick={(r) => setSelected(r)}
+          emptyTitle="So'rovlar yo'q"
+          emptyDescription={canRequest ? "Yangi so'rov yuborish uchun yuqoridagi tugmani bosing." : "Xarajat so'rovlari bu yerda ko'rinadi."}
+          transparent
+          fill
+        />
+      </div>
 
-      {tab === 'mine' && <MyRequests doAction={doAction} pending={pending} busy={action.isPending} />}
-      {tab === 'manage' && isAccountant && <ManageRequests doAction={doAction} pending={pending} busy={action.isPending} />}
-      {tab === 'ledger' && isAccountant && <LedgerTab />}
-
-      <RequestDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />
+      <RequestDialog open={createOpen} onClose={() => setCreateOpen(false)} />
+      <RequestReviewDialog
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        request={selected}
+        canProcess={canProcess}
+        isOwner={selected?.userId === myId}
+      />
+      <RequestFilterDialog
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        value={filters}
+        onApply={setFilters}
+        showMine={canProcess}
+      />
     </div>
   );
-}
-
-function StatusBadge({ status }) {
-  return <Badge tone={FINANCE_STATUS[status]?.tone}>{FINANCE_STATUS[status]?.label}</Badge>;
-}
-
-function MyRequests({ doAction, pending, busy }) {
-  const { data, isLoading } = useRequests();
-  const columns = [
-    { key: 'createdAt', header: 'Sana', render: (r) => formatDate(r.createdAt) },
-    { key: 'type', header: 'Turi', render: (r) => FINANCE_TYPE[r.type] },
-    { key: 'amount', header: 'Summa', render: (r) => formatMoney(r.amount, r.currency) },
-    { key: 'reason', header: 'Sabab', render: (r) => <span className="text-text-sub">{r.reason}</span> },
-    { key: 'status', header: 'Status', render: (r) => <StatusBadge status={r.status} /> },
-    {
-      key: 'actions', header: '',
-      render: (r) => r.status === 'paid' ? (
-        <Button size="sm" onClick={() => doAction(r.id, 'confirm', 'Tasdiqlandi')}
-          loading={pending?.id === r.id && pending?.action === 'confirm'} disabled={busy}>
-          <CheckCircle2 className="h-4 w-4" /> Tasdiqlash
-        </Button>
-      ) : null,
-    },
-  ];
-  return <DataTable columns={columns} data={data} loading={isLoading} emptyTitle="So'rovlar yo'q" emptyDescription="Yangi so'rov yuborish uchun yuqoridagi tugmani bosing." />;
-}
-
-function ManageRequests({ doAction, pending, busy }) {
-  const { data, isLoading } = useRequests();
-  const columns = [
-    { key: 'user', header: 'Xodim', render: (r) => r.user?.fullName },
-    { key: 'type', header: 'Turi', render: (r) => FINANCE_TYPE[r.type] },
-    { key: 'amount', header: 'Summa', render: (r) => formatMoney(r.amount, r.currency) },
-    { key: 'card', header: 'Karta', render: (r) => r.card || '—' },
-    { key: 'reason', header: 'Sabab', render: (r) => <span className="text-text-sub">{r.reason}</span> },
-    { key: 'status', header: 'Status', render: (r) => <StatusBadge status={r.status} /> },
-    {
-      key: 'actions', header: '',
-      render: (r) => r.status === 'pending' ? (
-        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-          <Button size="sm" onClick={() => doAction(r.id, 'pay', "To'landi")}
-            loading={pending?.id === r.id && pending?.action === 'pay'} disabled={busy}><Send className="h-4 w-4" /> To'lash</Button>
-          <Button size="sm" variant="ghost" className="text-error-strong" onClick={() => doAction(r.id, 'reject', 'Rad etildi')}
-            loading={pending?.id === r.id && pending?.action === 'reject'} disabled={busy}><XCircle className="h-4 w-4" /></Button>
-        </div>
-      ) : null,
-    },
-  ];
-  return <DataTable columns={columns} data={data} loading={isLoading} emptyTitle="So'rovlar yo'q" />;
-}
-
-function LedgerTab() {
-  const { data, isLoading } = useLedger();
-  const reverse = useReverseLedger();
-  const [reversingId, setReversingId] = useState(null);
-
-  const doReverse = (id) => {
-    if (reverse.isPending) return; // dubl-bosishdan himoya
-    setReversingId(id);
-    reverse.mutate({ id }, {
-      onSuccess: () => toast.success('Teskari yozuv qo\'shildi'),
-      onError: (e) => toast.error(apiError(e)),
-      onSettled: () => setReversingId(null),
-    });
-  };
-
-  const columns = [
-    { key: 'createdAt', header: 'Sana', render: (r) => formatDate(r.createdAt, true) },
-    { key: 'user', header: 'Xodim', render: (r) => r.user?.fullName || '—' },
-    { key: 'type', header: 'Turi', render: (r) => r.type },
-    {
-      key: 'direction', header: "Yo'nalish",
-      render: (r) => <Badge tone={r.direction === 'credit' ? 'success' : 'warning'}>{r.direction === 'credit' ? 'Kirim' : 'Chiqim'}</Badge>,
-    },
-    { key: 'amount', header: 'Summa', render: (r) => formatMoney(r.amount) },
-    { key: 'note', header: 'Izoh', render: (r) => <span className="text-text-sub">{r.note}</span> },
-    {
-      key: 'actions', header: '',
-      render: (r) => !r.isReversal ? (
-        <Button size="sm" variant="ghost" onClick={() => doReverse(r.id)} loading={reversingId === r.id} disabled={reverse.isPending}>
-          <RotateCcw className="h-4 w-4" /> Teskari
-        </Button>
-      ) : <Badge tone="muted">Teskari</Badge>,
-    },
-  ];
-  return <DataTable columns={columns} data={data} loading={isLoading} emptyTitle="Ledger bo'sh" emptyDescription="Moliyaviy yozuvlar bu yerda ko'rinadi." />;
 }

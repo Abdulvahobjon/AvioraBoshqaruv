@@ -30,6 +30,8 @@ export function describeNotification(n) {
       return { title: 'Yangi yig\'ilish belgilandi', body: p.title, icon: CalendarClock };
     case 'meeting_finished':
       return { title: 'Yig\'ilish yakunlandi', body: 'Yig\'ilishda kimlar qatnashdi', icon: CalendarClock };
+    case 'meeting_reminder':
+      return { title: 'Yig\'ilish tez orada boshlanadi', body: p.title ? `'${p.title}' yig'ilishi boshlanmoqda` : 'Yig\'ilishingiz boshlanmoqda', icon: CalendarClock };
     case 'meeting_absent':
       return { title: 'Siz yig\'ilishda ishtirok etmadingiz', body: p.title ? `'${p.title}' — sababini kiriting` : 'Sababini kiriting', icon: CalendarClock };
     case 'expense_request':
@@ -44,6 +46,12 @@ export function describeNotification(n) {
       return { title: 'Loyihaga qo\'shildingiz', body: p.projectName && `'${p.projectName}' loyihasiga qo'shildingiz`, icon: FolderOpen };
     case 'project_overdue':
       return { title: 'Loyiha muddati o\'tdi', body: p.projectName && `'${p.projectName}' loyihasi rejadagidan kechikmoqda`, icon: AlertTriangle };
+    case 'project_status':
+      if (p.status === 'cancelled')
+        return { title: 'Loyiha to\'xtatildi', body: p.projectName && `'${p.projectName}' loyihasi to'xtatildi`, icon: AlertTriangle };
+      if (p.status === 'completed')
+        return { title: 'Loyiha yakunlandi', body: p.projectName && `'${p.projectName}' loyihasi yakunlandi`, icon: FolderOpen };
+      return { title: 'Loyiha holati o\'zgardi', body: p.projectName && `'${p.projectName}' holati yangilandi`, icon: FolderOpen };
     default:
       return { title: 'Yangi bildirishnoma', body: p.title || null, icon: Bell };
   }

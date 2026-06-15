@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils/cn';
 import { TaskCard } from './TaskCard';
 
 /** Trello-style list: fixed-width grey column with a header, a droppable card area and an add footer. */
-export function KanbanColumn({ column, tasks, onCardClick, onAddCard, canAdd, dropDisabled = false }) {
+export function KanbanColumn({ column, tasks, onCardClick, actions, onAddCard, canAdd, dropDisabled = false }) {
   return (
     <div
       className={cn(
@@ -38,7 +38,7 @@ export function KanbanColumn({ column, tasks, onCardClick, onAddCard, canAdd, dr
               </div>
             )}
             {tasks.map((t, i) => (
-              <TaskCard key={t.id} task={t} index={i} onClick={onCardClick} />
+              <TaskCard key={t.id} task={t} index={i} onClick={onCardClick} actions={actions} />
             ))}
             {provided.placeholder}
           </div>

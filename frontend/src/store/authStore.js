@@ -1,24 +1,26 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-/** Global auth state (tokens + user). Persisted to localStorage. */
+/**
+ * Global auth state.
+ * Faqat qisqa muddatli accessToken (15m) + user saqlanadi.
+ * Refresh token endi httpOnly cookie'da (JS o'qiy olmaydi — XSS himoyasi).
+ */
 export const useAuthStore = create(
   persist(
     (set) => ({
       accessToken: null,
-      refreshToken: null,
       user: null,
 
-      setAuth: ({ accessToken, refreshToken, user }) =>
+      setAuth: ({ accessToken, user }) =>
         set((s) => ({
           accessToken: accessToken ?? s.accessToken,
-          refreshToken: refreshToken ?? s.refreshToken,
           user: user ?? s.user,
         })),
 
       setUser: (user) => set({ user }),
 
-      logout: () => set({ accessToken: null, refreshToken: null, user: null }),
+      logout: () => set({ accessToken: null, user: null }),
     }),
     { name: 'aviora-auth' },
   ),

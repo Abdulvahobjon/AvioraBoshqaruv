@@ -74,13 +74,27 @@ export function useChangeStatus() {
 export function useReviewTask() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, verdict, comment }) => {
-      const { data } = await api.post(`/tasks/${id}/review`, { verdict, comment });
+    mutationFn: async ({ id, verdict, comment, photoUrl }) => {
+      const { data } = await api.post(`/tasks/${id}/review`, { verdict, comment, photoUrl });
       return data;
     },
     onSuccess: (_d, vars) => {
       invalidateLists(qc);
       qc.invalidateQueries({ queryKey: ['task', Number(vars.id)] });
+    },
+  });
+}
+
+/** Rasm yuklab, URL qaytaradi (rad etish dalili uchun). TaskFile yaratmaydi. */
+export function useUploadImage() {
+  return useMutation({
+    mutationFn: async (file) => {
+      const form = new FormData();
+      form.append('file', file);
+      const { data } = await api.post('/tasks/upload-image', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return data.url;
     },
   });
 }

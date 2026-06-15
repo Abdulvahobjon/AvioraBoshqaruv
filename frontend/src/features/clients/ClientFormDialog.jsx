@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea, Select } from '@/components/ui/Input';
+import { PhoneInput } from '@/components/ui/PhoneInput';
 import { FormField } from '@/components/ui/FormField';
 import { apiError } from '@/lib/api/axios';
 import { useReference } from '@/features/settings/settingsApi';
@@ -30,7 +31,7 @@ export function ClientFormDialog({ open, onClose, client, onCreated }) {
   const { data: users } = useUsersList();
   const save = useSaveClient();
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm({
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: { type: 'yuridik', status: 'active' },
   });
@@ -49,7 +50,9 @@ export function ClientFormDialog({ open, onClose, client, onCreated }) {
     }
   }, [open, client, reset]);
 
-  const managers = (users?.items || []).filter((u) => ['manager', 'admin', 'superadmin'].includes(u.role));
+  const managers = (users?.items || []).filter((u) =>
+    ['manager', 'admin', 'superadmin'].some((r) => r === u.role || (u.roles || []).includes(r)),
+  );
 
   const onSubmit = (values) => {
     const payload = { ...values };
@@ -71,6 +74,7 @@ export function ClientFormDialog({ open, onClose, client, onCreated }) {
       open={open}
       onClose={onClose}
       title={isEdit ? 'Mijozni tahrirlash' : 'Yangi mijoz'}
+      subtitle={isEdit ? "Mijoz ma'lumotlarini yangilang" : "Yangi mijoz ma'lumotlarini kiriting"}
       footer={
         <>
           <Button variant="outline" onClick={onClose}>Bekor qilish</Button>
@@ -83,34 +87,62 @@ export function ClientFormDialog({ open, onClose, client, onCreated }) {
           <Input placeholder="OOO yoki F.I.O" {...register('name')} error={errors.name} />
         </FormField>
         <FormField label="Turi" required>
-          <Select {...register('type')}>
-            <option value="yuridik">Yuridik shaxs</option>
-            <option value="jismoniy">Jismoniy shaxs</option>
-          </Select>
+          <Controller
+            name="type"
+            control={control}
+            render={({ field }) => (
+              <Select value={field.value} onChange={(e) => field.onChange(e.target.value)}>
+                <option value="yuridik">Yuridik shaxs</option>
+                <option value="jismoniy">Jismoniy shaxs</option>
+              </Select>
+            )}
+          />
         </FormField>
         <FormField label="Status">
-          <Select {...register('status')}>
-            <option value="active">Faol</option>
-            <option value="inactive">Nofaol</option>
-          </Select>
+          <Controller
+            name="status"
+            control={control}
+            render={({ field }) => (
+              <Select value={field.value} onChange={(e) => field.onChange(e.target.value)}>
+                <option value="active">Faol</option>
+                <option value="inactive">Nofaol</option>
+              </Select>
+            )}
+          />
         </FormField>
         <FormField label="Telefon">
-          <Input placeholder="+998..." {...register('phone')} />
+          <Controller
+            name="phone"
+            control={control}
+            render={({ field }) => <PhoneInput value={field.value} onChange={field.onChange} />}
+          />
         </FormField>
         <FormField label="Email" error={errors.email?.message}>
           <Input placeholder="email@example.com" {...register('email')} error={errors.email} />
         </FormField>
         <FormField label="Hudud">
-          <Select {...register('regionId')}>
-            <option value="">— Tanlang —</option>
-            {(regions || []).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-          </Select>
+          <Controller
+            name="regionId"
+            control={control}
+            render={({ field }) => (
+              <Select value={field.value ?? ''} onChange={(e) => field.onChange(e.target.value)}>
+                <option value="">— Tanlang —</option>
+                {(regions || []).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </Select>
+            )}
+          />
         </FormField>
         <FormField label="Mas'ul menejer">
-          <Select {...register('managerId')}>
-            <option value="">— Tanlang —</option>
-            {managers.map((m) => <option key={m.id} value={m.id}>{m.fullName}</option>)}
-          </Select>
+          <Controller
+            name="managerId"
+            control={control}
+            render={({ field }) => (
+              <Select value={field.value ?? ''} onChange={(e) => field.onChange(e.target.value)}>
+                <option value="">— Tanlang —</option>
+                {managers.map((m) => <option key={m.id} value={m.id}>{m.fullName}</option>)}
+              </Select>
+            )}
+          />
         </FormField>
         <FormField label="Manzil" className="sm:col-span-2">
           <Input {...register('address')} />

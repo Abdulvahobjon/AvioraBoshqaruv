@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { toast } from 'sonner';
-import { Paperclip, Plus, X } from 'lucide-react';
+import { Paperclip, X } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea, Select } from '@/components/ui/Input';
+import { RHFSelect } from '@/components/ui/RHFSelect';
 import { MoneyInput } from '@/components/ui/MoneyInput';
+import { PercentInput } from '@/components/ui/PercentInput';
 import { DateTimeBox } from '@/components/ui/DateTimeBox';
 import { FormField } from '@/components/ui/FormField';
 import { apiError } from '@/lib/api/axios';
@@ -35,35 +37,58 @@ function isoToLocalInput(iso) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-export function TaskFormDialog({ open, onClose, task }) {
+/** Tanlangan fayl chipi — bosilganda yangi tabda ochiladi; rasm bo'lsa eskiz ko'rsatadi. */
+function SelectedFileChip({ file, onRemove }) {
+  const url = useMemo(() => URL.createObjectURL(file), [file]);
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  const isImg = file.type?.startsWith('image/');
+  return (
+    <div className="flex h-16 w-44 items-center gap-2 rounded-lg border border-stroke-soft p-2 text-xs">
+      <a href={url} target="_blank" rel="noreferrer" title="Ochib ko'rish" className="h-12 w-12 shrink-0 overflow-hidden rounded-md">
+        {isImg ? (
+          <img src={url} alt={file.name} className="h-full w-full cursor-zoom-in object-cover" />
+        ) : (
+          <span className="flex h-full w-full items-center justify-center rounded-md bg-bg-1-alt text-icon-soft"><Paperclip className="h-4 w-4" /></span>
+        )}
+      </a>
+      <a href={url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-text-sub hover:text-text-accent">{file.name}</a>
+      <button type="button" onClick={onRemove} className="shrink-0 text-icon-soft hover:text-error-strong"><X className="h-3.5 w-3.5" /></button>
+    </div>
+  );
+}
+
+export function TaskFormDialog({ open, onClose, task, template }) {
   const isEdit = !!task;
+  // Qiymatlar manbai: tahrirlash (task) yoki nusxalash (template). Nusxalashda yangi
+  // vazifa yaratiladi (isEdit=false), shuning uchun status 'todo' dan boshlanadi.
+  const source = task || template;
   const { data: projectList } = useProjects({ limit: 100 });
   const { data: userList } = useUsersList();
   const { data: positions } = useReference('position');
   const save = useSaveTask();
   const upload = useUploadFile();
 
-  const { register, control, handleSubmit, reset, formState: { errors } } = useForm();
+  const { register, control, handleSubmit, reset, setValue, formState: { errors } } = useForm();
   const [files, setFiles] = useState([]);
 
   useEffect(() => {
     if (!open) return;
     setFiles([]);
     reset(
-      task
+      source
         ? {
-            projectId: task.projectId || '', title: task.title, description: task.description || '',
-            status: task.status, priority: task.priority, type: task.type,
-            assigneeId: task.assigneeId || '', positionId: task.positionId || '',
-            sprint: task.sprint || '', price: fromTiyin(task.price), penaltyPercent: task.penaltyPercent || '',
-            deadline: isoToLocalInput(task.deadline), estimated: minutesToHHMM(task.estimatedMinutes),
+            projectId: source.projectId || '', title: source.title, description: source.description || '',
+            status: isEdit ? source.status : 'todo', priority: source.priority, type: source.type,
+            assigneeId: source.assigneeId || '', positionId: source.positionId || '',
+            sprint: source.sprint || '', price: fromTiyin(source.price), penaltyPercent: source.penaltyPercent || '',
+            deadline: isoToLocalInput(source.deadline), estimated: minutesToHHMM(source.estimatedMinutes),
           }
         : {
             projectId: '', title: '', description: '', status: 'todo', priority: 'medium', type: 'feature',
             assigneeId: '', positionId: '', sprint: '', price: '', penaltyPercent: '', deadline: '', estimated: '',
           },
     );
-  }, [open, task, reset]);
+  }, [open, task, template, reset]);
 
   const users = userList?.items || [];
 
@@ -106,6 +131,7 @@ export function TaskFormDialog({ open, onClose, task }) {
       onClose={onClose}
       onBack={onClose}
       title={isEdit ? 'Vazifa tahrirlash' : 'Vazifa qo\'shish'}
+      subtitle={isEdit ? "Vazifa ma'lumotlarini yangilang" : "Yangi vazifa ma'lumotlarini to'ldiring"}
       size="lg"
       footer={
         <>
@@ -119,10 +145,10 @@ export function TaskFormDialog({ open, onClose, task }) {
       </p>
       <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField label="Loyiha" required error={errors.projectId && req}>
-          <Select {...register('projectId', { required: true })} error={errors.projectId}>
+          <RHFSelect control={control} name="projectId" rules={{ required: true }} error={errors.projectId}>
             <option value="">Loyiha tanlang</option>
             {(projectList?.items || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </Select>
+          </RHFSelect>
         </FormField>
         <FormField label="Nomi" required error={errors.title && req}>
           <Input placeholder="Nomi yozing" {...register('title', { required: true })} error={errors.title} />
@@ -133,45 +159,69 @@ export function TaskFormDialog({ open, onClose, task }) {
 
         {isEdit && (
           <FormField label="Holati" className="sm:col-span-2">
-            <Select {...register('status')}>
+            <RHFSelect control={control} name="status">
               {Object.entries(TASK_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-            </Select>
+            </RHFSelect>
           </FormField>
         )}
 
         <FormField label="Darajasi" required error={errors.priority && req}>
-          <Select {...register('priority', { required: true })} error={errors.priority}>
+          <RHFSelect control={control} name="priority" rules={{ required: true }} error={errors.priority}>
             {Object.entries(TASK_PRIORITY).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </Select>
+          </RHFSelect>
         </FormField>
         <FormField label="Turi" required error={errors.type && req}>
-          <Select {...register('type', { required: true })} error={errors.type}>
+          <RHFSelect control={control} name="type" rules={{ required: true }} error={errors.type}>
             {Object.entries(TASK_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </Select>
+          </RHFSelect>
         </FormField>
 
         <FormField label="Topshiruvchi (mas'ul xodim)" className="sm:col-span-2">
-          <Select {...register('assigneeId')}>
-            <option value="">Tanlang</option>
-            {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}{u.position?.name ? ` | ${u.position.name}` : ''}</option>)}
-          </Select>
+          <Controller control={control} name="assigneeId" render={({ field }) => (
+            <Select
+              value={field.value}
+              onChange={(e) => {
+                const id = e.target.value;
+                field.onChange(id);
+                // Xodim tanlanganda uning lavozimi avtomatik belgilanadi.
+                const u = users.find((x) => String(x.id) === String(id));
+                setValue('positionId', u?.positionId ? String(u.positionId) : '');
+              }}
+            >
+              <option value="">Tanlang</option>
+              {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}{u.position?.name ? ` | ${u.position.name}` : ''}</option>)}
+            </Select>
+          )} />
         </FormField>
 
         <FormField label="Kimlar uchun (lavozim)">
-          <Select {...register('positionId')}>
+          <RHFSelect control={control} name="positionId">
             <option value="">Tanlang</option>
             {(positions || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </Select>
+          </RHFSelect>
         </FormField>
-        <FormField label="Sprint tartib raqami">
-          <Input type="number" min="0" placeholder="0" {...register('sprint')} />
+        <FormField label="Sprint tartib raqami" hint="1 dan 10 gacha">
+          <Controller name="sprint" control={control} render={({ field }) => (
+            <Input
+              inputMode="numeric"
+              placeholder="1-10"
+              value={field.value ?? ''}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, '');
+                if (digits === '') { field.onChange(''); return; }
+                field.onChange(String(Math.min(10, Math.max(1, Number(digits)))));
+              }}
+            />
+          )} />
         </FormField>
 
         <FormField label="Vazifa narxi (UZS)">
           <Controller name="price" control={control} render={({ field }) => <MoneyInput value={field.value} onChange={field.onChange} placeholder="0" />} />
         </FormField>
         <FormField label="Jarima foizi (%)">
-          <Input type="number" min="0" placeholder="Jarima" {...register('penaltyPercent')} />
+          <Controller name="penaltyPercent" control={control} render={({ field }) => (
+            <PercentInput value={field.value} onChange={field.onChange} placeholder="Jarima" />
+          )} />
         </FormField>
 
         <Controller
@@ -205,16 +255,8 @@ export function TaskFormDialog({ open, onClose, task }) {
               <input type="file" multiple className="hidden" onChange={(e) => setFiles((prev) => [...prev, ...Array.from(e.target.files || [])])} />
             </label>
             {files.map((f, i) => (
-              <div key={i} className="flex h-16 w-44 items-center justify-between gap-2 rounded-lg border border-stroke-soft px-3 text-xs">
-                <span className="truncate text-text-sub">{f.name}</span>
-                <button type="button" onClick={() => setFiles((prev) => prev.filter((_, idx) => idx !== i))} className="text-icon-soft hover:text-error-strong"><X className="h-3.5 w-3.5" /></button>
-              </div>
+              <SelectedFileChip key={i} file={f} onRemove={() => setFiles((prev) => prev.filter((_, idx) => idx !== i))} />
             ))}
-            {files.length < 2 && (
-              <div className="flex h-16 w-44 items-center justify-center rounded-lg border border-dashed border-stroke-sub text-icon-soft">
-                <Plus className="h-5 w-5" />
-              </div>
-            )}
           </div>
         </div>
       </form>

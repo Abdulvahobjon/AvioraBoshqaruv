@@ -30,3 +30,19 @@ export function useRestoreTask() {
     },
   });
 }
+
+export function useHardDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id) => (await api.delete(`/projects/${id}/hard`)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['trash', 'projects'] }),
+  });
+}
+
+export function useHardDeleteTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id) => (await api.delete(`/tasks/${id}/hard`)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['trash', 'tasks'] }),
+  });
+}

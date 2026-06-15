@@ -5,6 +5,7 @@ import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
+import { CopyId } from '@/components/ui/CopyId';
 import { Avatar } from '@/components/ui/Avatar';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { formatDate } from '@/lib/utils/format';
@@ -59,6 +60,7 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
       onClose={onClose}
       onBack={onClose}
       title="Yig'ilish ma'lumotlari"
+      subtitle="Yig'ilish tafsilotlari va qatnashchilar"
       size="lg"
       footer={canFinish ? (
         <div className="flex w-full items-center justify-end gap-2">
@@ -74,7 +76,7 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-lg font-semibold text-text-strong">{meeting.title}</h3>
-              {meeting.uid && <Badge tone="muted" className="!bg-transparent px-0">{meeting.uid}</Badge>}
+              {meeting.uid && <CopyId value={meeting.uid} className="text-sm text-text-soft" />}
               <MeetingStatusBadge meeting={meeting} />
             </div>
             <p className="mt-1 text-sm text-text-sub">{meeting.project?.name || 'Umumiy yig\'ilish'}</p>
@@ -111,7 +113,8 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
           {/* Attendance */}
           <div>
             <p className="mb-2 text-sm font-medium text-text-soft">Yig'ilishga qatnashishlar ({meeting.attendance.length})</p>
-            <div className="space-y-2">
+            {/* Faqat ~3 ta qator ko'rinadi; ko'p bo'lsa shu yerning o'zida scroll chiqadi. */}
+            <div className="max-h-[12rem] space-y-2 overflow-y-auto pr-1">
               {meeting.attendance.map((a) => {
                 const meta = attendanceMeta(a);
                 const isMe = a.userId === myId;

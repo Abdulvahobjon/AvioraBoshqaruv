@@ -1,18 +1,24 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Search, Filter, List, LayoutGrid, Flag, Printer, Download } from 'lucide-react';
+import { toast } from 'sonner';
+import { Plus, Search, Filter, List, LayoutGrid, Flag, Printer, Download, Eye, Copy, Trash2 } from 'lucide-react';
 import { DataTable } from '@/components/shared/DataTable';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
+import { CopyId } from '@/components/ui/CopyId';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { cn } from '@/lib/utils/cn';
+import { apiError } from '@/lib/api/axios';
 import { useAuthStore } from '@/store/authStore';
+import { can } from '@/lib/permissions';
 import { useUiStore } from '@/store/uiStore';
 import { useDebounce } from '@/hooks/useDebounce';
 import { TASK_STATUS, TASK_PRIORITY, TASK_TYPE } from '@/lib/constants';
 import { formatDate } from '@/lib/utils/format';
-import { useTasks, useBoard } from '@/features/tasks/tasksApi';
+import { useTasks, useBoard, useDeleteTask } from '@/features/tasks/tasksApi';
 import { TaskFormDialog } from '@/features/tasks/TaskFormDialog';
 import { TaskDetailDialog } from '@/features/tasks/TaskDetailDialog';
 import { TaskFilterDialog } from '@/features/tasks/TaskFilterDialog';
@@ -22,7 +28,8 @@ const countActiveFilters = (f) => Object.entries(f).filter(([k, v]) => v && k !=
 
 export function TasksPage() {
   const role = useAuthStore((s) => s.user?.role);
-  const canCreate = ['superadmin', 'admin', 'manager'].includes(role);
+  const canCreate = can(role, 'tasks.create');
+  const canManage = can(role, 'tasks.manage'); // tahrirlash/o'chirish huquqi (superadmin/admin/manager)
 
   const [view, setView] = useState('table'); // 'table' | 'kanban'
   const [search, setSearch] = useState('');
@@ -31,8 +38,11 @@ export function TasksPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [template, setTemplate] = useState(null); // nusxalash uchun manba vazifa
   const [detailId, setDetailId] = useState(null);
+  const [deleting, setDeleting] = useState(null);
   const [rows, setRows] = useState([]); // currently loaded tasks (for print/export)
+  const del = useDeleteTask();
 
   // Kanban needs the sidebar collapsed; expanding the sidebar switches back to the table view.
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
@@ -50,8 +60,21 @@ export function TasksPage() {
   const query = { search: debounced || undefined, ...cleanFilters(filters) };
   const activeCount = countActiveFilters(filters);
 
-  const openCreate = () => { setEditing(null); setFormOpen(true); };
-  const openEdit = (t) => { setDetailId(null); setEditing(t); setFormOpen(true); };
+  const openCreate = () => { setEditing(null); setTemplate(null); setFormOpen(true); };
+  const openEdit = (t) => { setDetailId(null); setTemplate(null); setEditing(t); setFormOpen(true); };
+  // Takrorlash: vazifa nusxasini olib, yangi vazifa qo'shish modalini to'ldirib ochadi.
+  const openDuplicate = (t) => { setDetailId(null); setEditing(null); setTemplate(t); setFormOpen(true); };
+  const closeForm = () => { setFormOpen(false); setEditing(null); setTemplate(null); };
+  // Bosish marshruti: tahrirlash huquqi bor → Tahrirlash, yo'q → Batafsil (faqat ko'rish).
+  const openTask = (t) => (canManage ? openEdit(t) : setDetailId(t.id));
+  // Kebab (⋮) menyu: Batafsil hamma uchun; Takrorlash/O'chirish faqat huquqi borlar uchun.
+  const rowActions = (t) => [
+    { label: 'Batafsil', icon: Eye, onClick: () => setDetailId(t.id) },
+    ...(canManage ? [
+      { label: 'Takrorlash', icon: Copy, onClick: () => openDuplicate(t) },
+      { label: "O'chirish", icon: Trash2, tone: 'danger', onClick: () => setDeleting(t) },
+    ] : []),
+  ];
   const onPrint = () => window.print();
   const onDownload = () => exportTasksCsv(rows);
 
@@ -87,13 +110,24 @@ export function TasksPage() {
 
       <div className="min-h-0 flex-1">
         {view === 'table'
-          ? <TableView query={query} onRowClick={(t) => setDetailId(t.id)} onData={setRows} />
-          : <BoardView query={query} onCardClick={(t) => setDetailId(t.id)} onData={setRows} onAddCard={openCreate} canAdd={canCreate} />}
+          ? <TableView query={query} onRowClick={openTask} actions={rowActions} onData={setRows} />
+          : <BoardView query={query} onCardClick={openTask} actions={rowActions} onData={setRows} onAddCard={openCreate} canAdd={canCreate} />}
       </div>
 
-      <TaskFormDialog open={formOpen} onClose={() => setFormOpen(false)} task={editing} />
-      {detailId && <TaskDetailDialog taskId={detailId} open={!!detailId} onClose={() => setDetailId(null)} onEdit={openEdit} />}
+      <TaskFormDialog open={formOpen} onClose={closeForm} task={editing} template={template} />
+      {detailId && <TaskDetailDialog taskId={detailId} open={!!detailId} onClose={() => setDetailId(null)} />}
       <TaskFilterDialog open={filterOpen} onClose={() => setFilterOpen(false)} value={filters} onApply={setFilters} />
+      <ConfirmDialog
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
+        title="Vazifani o'chirish"
+        message={`"${deleting?.title}" vazifasini o'chirmoqchimisiz?`}
+        loading={del.isPending}
+        onConfirm={() => del.mutate(deleting.id, {
+          onSuccess: () => { toast.success("Vazifa o'chirildi"); setDeleting(null); },
+          onError: (e) => toast.error(apiError(e)),
+        })}
+      />
     </div>
   );
 }
@@ -145,13 +179,13 @@ function exportTasksCsv(rows) {
   URL.revokeObjectURL(url);
 }
 
-function TableView({ query, onRowClick, onData }) {
+function TableView({ query, onRowClick, actions, onData }) {
   const [page, setPage] = useState(1);
   const { data, isLoading } = useTasks({ ...query, page, limit: 20 });
   useEffect(() => { if (data?.items) onData?.(data.items); }, [data, onData]);
   const columns = [
     { key: 'idx', header: '№', className: 'w-12', render: (_r, i) => i + 1 },
-    { key: 'uid', header: 'UID', render: (r) => <span className="inline-flex items-center gap-1 font-mono text-xs text-text-sub"><Flag className="h-3 w-3" />{r.uid || '—'}</span> },
+    { key: 'uid', header: 'UID', render: (r) => <span className="inline-flex items-center gap-1 text-xs text-text-sub"><Flag className="h-3 w-3 shrink-0" /><CopyId value={r.uid} className="text-xs" /></span> },
     { key: 'title', header: 'Nomi', render: (r) => <span className="font-medium text-text-strong">{r.title}</span> },
     { key: 'project', header: 'Loyiha', render: (r) => r.project?.name || '—' },
     { key: 'creator', header: 'Yaratuvchi', render: (r) => r.creator?.fullName || '—' },
@@ -160,6 +194,14 @@ function TableView({ query, onRowClick, onData }) {
     { key: 'priority', header: 'Darajasi', render: (r) => <Badge tone={TASK_PRIORITY[r.priority]?.tone}>{TASK_PRIORITY[r.priority]?.label}</Badge> },
     { key: 'status', header: 'Holati', render: (r) => <Badge tone={TASK_STATUS[r.status]?.tone}>{TASK_STATUS[r.status]?.label}</Badge> },
     { key: 'deadline', header: 'Muddati', render: (r) => formatDate(r.deadline, true) },
+    {
+      key: 'actions', header: '', className: 'w-12',
+      render: (r) => (
+        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu items={actions(r)} />
+        </div>
+      ),
+    },
   ];
   return (
     <DataTable
@@ -179,7 +221,7 @@ function TableView({ query, onRowClick, onData }) {
   );
 }
 
-function BoardView({ query, onCardClick, onData, onAddCard, canAdd }) {
+function BoardView({ query, onCardClick, actions, onData, onAddCard, canAdd }) {
   const { data: tasks, isLoading } = useBoard(query);
   useEffect(() => { if (tasks) onData?.(tasks); }, [tasks, onData]);
   if (isLoading) {
@@ -189,5 +231,5 @@ function BoardView({ query, onCardClick, onData, onAddCard, canAdd }) {
       </div>
     );
   }
-  return <KanbanBoard tasks={tasks || []} onCardClick={onCardClick} onAddCard={onAddCard} canAdd={canAdd} />;
+  return <KanbanBoard tasks={tasks || []} onCardClick={onCardClick} actions={actions} onAddCard={onAddCard} canAdd={canAdd} />;
 }

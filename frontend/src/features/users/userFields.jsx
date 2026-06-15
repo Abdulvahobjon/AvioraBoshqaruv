@@ -3,6 +3,7 @@ import { Upload, FileText, Camera } from 'lucide-react';
 import { Input, Select } from '@/components/ui/Input';
 import { FormField } from '@/components/ui/FormField';
 import { cn } from '@/lib/utils/cn';
+import { ROLE_LABELS } from '@/lib/constants';
 import { apiError } from '@/lib/api/axios';
 import { UZ_REGIONS, districtsOf } from '@/lib/uzRegions';
 import { useUploadUserFile } from './usersApi';
@@ -47,9 +48,11 @@ export function RegionDistrict({ region, district, onRegion, onDistrict }) {
   );
 }
 
-/** File upload (passport image/pdf). Stores the returned URL. */
-export function FileUpload({ value, onChange, accept, label = 'Rasm yuklash' }) {
-  const upload = useUploadUserFile();
+/** File upload (passport image/pdf). Stores the returned URL.
+ *  `uploadHook` — ixtiyoriy: profil o'zining (/auth/upload) hook'ini uzatishi mumkin. */
+export function FileUpload({ value, onChange, accept, label = 'Rasm yuklash', uploadHook }) {
+  const fallback = useUploadUserFile();
+  const upload = uploadHook || fallback;
   const onPick = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -75,9 +78,10 @@ export function FileUpload({ value, onChange, accept, label = 'Rasm yuklash' }) 
   );
 }
 
-/** Square avatar upload tile. */
-export function AvatarUpload({ value, onChange, size = 'h-16 w-16' }) {
-  const upload = useUploadUserFile();
+/** Square avatar upload tile. `uploadHook` — ixtiyoriy maxsus upload mutation (profil uchun). */
+export function AvatarUpload({ value, onChange, size = 'h-16 w-16', uploadHook }) {
+  const fallback = useUploadUserFile();
+  const upload = uploadHook || fallback;
   const onPick = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -103,17 +107,47 @@ export function AvatarUpload({ value, onChange, size = 'h-16 w-16' }) {
   }
   return (
     <label className={cn('relative flex shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-stroke-sub bg-bg-1-alt text-icon-soft transition-colors hover:bg-bg-2', size)}>
-      <span className="flex flex-col items-center gap-1 text-[11px]">
+      <span className="flex flex-col items-center gap-1 text-center text-[10px] leading-tight">
         <Camera className="h-5 w-5" />
-        {upload.isPending ? 'Yuklanmoqda' : 'Rasm yuklash'}
+        <span className="whitespace-nowrap">{upload.isPending ? 'Yuklanmoqda' : 'Yuklash'}</span>
       </span>
       <input type="file" accept="image/*" className="hidden" onChange={onPick} />
     </label>
   );
 }
 
-/** UZS amount with space thousands + 2 decimals, no suffix (e.g. "10 000 000.00"). */
+/** Rollarni ko'p tanlovli select (dropdown) bilan tanlash. `value` — birlashgan massiv
+ *  ([asosiy, ...qo'shimcha]): birinchi tanlangan rol asosiy (kirishda standart) bo'ladi.
+ *  `roleKeys` — ko'rsatiladigan rollar (superadmin ko'rinishi filtri tashqarida hal qilinadi).
+ *  Bir nechta rol qo'shish mumkin. */
+export function RolesField({ value = [], onChange, roleKeys }) {
+  const primary = value[0];
+  // Yopiq trigger'da faqat asosiy rol; bir nechta bo'lsa qolganlari soni " +N" ko'rinadi.
+  const summary = (vals) => {
+    const label = ROLE_LABELS[vals[0]] || vals[0];
+    return vals.length > 1 ? `${label} +${vals.length - 1}` : label;
+  };
+  return (
+    <Select multiple value={value} onChange={onChange} placeholder="Rollarni tanlang" summary={summary}>
+      {roleKeys.map((k) => (
+        <option key={k} value={k}>{`${ROLE_LABELS[k]}${k === primary ? ' (asosiy)' : ''}`}</option>
+      ))}
+    </Select>
+  );
+}
+
+/** UZS amount with space thousands + 2 decimals, no suffix (e.g. "10 000 000.00").
+ *  BigInt arifmetikasi — maosh/balans katta bo'lsa (>90 trln) Number aniqligi yo'qolmaydi. */
 export function moneyUZS(tiyin) {
-  const n = Number(tiyin || 0) / 100;
-  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/,/g, ' ');
+  let big;
+  try {
+    big = typeof tiyin === 'bigint' ? tiyin : BigInt(tiyin ?? 0);
+  } catch {
+    big = BigInt(Math.round(Number(tiyin) || 0));
+  }
+  const neg = big < 0n;
+  if (neg) big = -big;
+  const whole = new Intl.NumberFormat('en-US').format(big / 100n).replace(/,/g, ' ');
+  const cents = (big % 100n).toString().padStart(2, '0');
+  return `${neg ? '-' : ''}${whole}.${cents}`;
 }

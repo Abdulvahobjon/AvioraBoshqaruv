@@ -60,6 +60,17 @@ export class TasksController {
     return this.tasks.review(id, dto, user, req.ip);
   }
 
+  /** Rasm yuklash (rad etish dalili) — faqat URL qaytaradi, TaskFile yaratmaydi. */
+  @Post('upload-image')
+  @AuditorCanWrite()
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', uploadOptions(10)))
+  uploadImage(@UploadedFile() file: any) {
+    if (!file) throw new BadRequestException('Rasm yuklanmadi');
+    if (!file.mimetype?.startsWith('image/')) throw new BadRequestException('Faqat rasm yuklash mumkin');
+    return { url: `/uploads/${file.filename}` };
+  }
+
   @Post(':id/comments')
   addComment(@Param('id', ParseIntPipe) id: number, @Body() dto: CreateCommentDto, @CurrentUser() user: AuthUser) {
     return this.tasks.addComment(id, dto, user);

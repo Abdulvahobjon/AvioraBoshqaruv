@@ -3,7 +3,8 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 export interface AuthUser {
   id: number;
   fullName: string;
-  role: string;
+  role: string; // AKTIV rol (tanlangan)
+  roles?: string[]; // barcha ruxsat etilgan rollar
 }
 
 /** Inject the authenticated user (set by JwtStrategy) into a handler param. */

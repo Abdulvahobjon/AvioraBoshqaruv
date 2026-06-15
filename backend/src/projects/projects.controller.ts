@@ -47,6 +47,12 @@ export class ProjectsController {
     return this.projects.restore(id, user, req.ip);
   }
 
+  @Delete(':id/hard')
+  @Roles('superadmin', 'admin')
+  hardDelete(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser, @Req() req: Request) {
+    return this.projects.hardDelete(id, user, req.ip);
+  }
+
   @Delete(':id')
   @Roles('superadmin', 'admin')
   remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser, @Req() req: Request) {

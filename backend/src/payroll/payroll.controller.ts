@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { PayrollService } from './payroll.service';
+import { PayManyDto, UpdatePayrollDto } from './dto/payroll.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 
@@ -20,6 +21,20 @@ export class PayrollController {
   @Roles('superadmin', 'admin', 'accountant')
   generate(@Body('month') month: string, @CurrentUser() user: AuthUser) {
     return this.payroll.generate(month, user);
+  }
+
+  /** Tanlangan oyliklarni ommaviy tasdiqlash (buxgalter "Tasdiqlash"). */
+  @Post('pay-many')
+  @Roles('superadmin', 'admin', 'accountant')
+  payMany(@Body() dto: PayManyDto, @CurrentUser() user: AuthUser, @Req() req: Request) {
+    return this.payroll.payMany(dto, user, req.ip);
+  }
+
+  /** KPI bonus / jarima (ma'lumot uchun) ni yangilash. */
+  @Patch(':id')
+  @Roles('superadmin', 'admin', 'accountant')
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdatePayrollDto, @CurrentUser() user: AuthUser) {
+    return this.payroll.update(id, dto, user);
   }
 
   @Post(':id/ready')

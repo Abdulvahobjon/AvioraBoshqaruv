@@ -3,7 +3,8 @@ import { useForm, Controller } from 'react-hook-form';
 import { toast } from 'sonner';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
-import { Input, Textarea, Select } from '@/components/ui/Input';
+import { Input, Textarea } from '@/components/ui/Input';
+import { RHFSelect } from '@/components/ui/RHFSelect';
 import { DateTimeBox } from '@/components/ui/DateTimeBox';
 import { FormField } from '@/components/ui/FormField';
 import { apiError } from '@/lib/api/axios';
@@ -91,9 +92,9 @@ export function DailyPlanFormDialog({ open, onClose, plan, defaultDate }) {
         </FormField>
 
         <FormField label="Muhimligi" className="sm:col-span-2">
-          <Select {...register('priority')}>
+          <RHFSelect control={control} name="priority">
             {Object.entries(DAILY_PLAN_PRIORITY).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </Select>
+          </RHFSelect>
         </FormField>
       </form>
     </Dialog>

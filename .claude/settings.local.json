@@ -76,7 +76,8 @@
       "Bash(grep -iE \"\\\\.env$|\\\\.env\\\\.\")",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Asadbek\\\\Desktop\\\\AvioraBoshqaruv\\\\backend\" -Directory)",
       "Bash(Select-Object Name)",
-      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Asadbek\\\\Desktop\\\\AvioraBoshqaruv\\\\frontend\" -Directory)"
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Asadbek\\\\Desktop\\\\AvioraBoshqaruv\\\\frontend\" -Directory)",
+      "Bash(C:/Users/Asadbek/.aviora-pg/pgsql/bin/pg_isready.exe -p 5433)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Asadbek\\.aviora-pg"

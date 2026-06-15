@@ -20,15 +20,29 @@ import { ExpensesModule } from './expenses/expenses.module';
 import { ReportsModule } from './reports/reports.module';
 import { MeetingsModule } from './meetings/meetings.module';
 import { DailyPlansModule } from './daily-plans/daily-plans.module';
-import { ApplicationsModule } from './applications/applications.module';
 import { CronModule } from './cron/cron.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AuditorReadOnlyGuard } from './common/guards/auditor-read-only.guard';
 
+/**
+ * Muhim env'lar mavjudligini ilova ko'tarilishida (fail-fast) tekshiradi.
+ * JWT sirlari yo'q/qisqa bo'lsa — bo'sh/zaif sir bilan ishlamasin, balki darhol yiqilsin.
+ */
+function validateEnv(config: Record<string, any>) {
+  const required = ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'];
+  for (const key of required) {
+    const v = config[key];
+    if (!v || String(v).length < 16) {
+      throw new Error(`Konfiguratsiya xatosi: ${key} yo'q yoki juda qisqa (kamida 16 belgi). .env ni tekshiring.`);
+    }
+  }
+  return config;
+}
+
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     ScheduleModule.forRoot(),
     // Global rate-limit: bir IP'dan 1 daqiqada maks 120 so'rov (brute-force/DoS himoyasi).
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
@@ -48,7 +62,6 @@ import { AuditorReadOnlyGuard } from './common/guards/auditor-read-only.guard';
     ReportsModule,
     MeetingsModule,
     DailyPlansModule,
-    ApplicationsModule,
     CronModule,
   ],
   controllers: [HealthController],

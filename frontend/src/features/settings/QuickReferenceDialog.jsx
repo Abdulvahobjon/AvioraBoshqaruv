@@ -27,6 +27,7 @@ export function QuickReferenceDialog({ open, onClose, model, title, label, onCre
       open={open}
       onClose={onClose}
       title={title}
+      subtitle="Ro'yxatga yangi qiymat qo'shing"
       size="sm"
       footer={<><Button variant="outline" onClick={onClose}>Bekor</Button><Button onClick={submit} loading={save.isPending}>Qo'shish</Button></>}
     >

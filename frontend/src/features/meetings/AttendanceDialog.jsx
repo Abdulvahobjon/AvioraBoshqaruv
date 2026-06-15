@@ -71,7 +71,7 @@ export function AttendanceDialog({ meetingId, open, onClose }) {
             {!meeting.attendance.length && <p className="text-sm text-text-soft">Ishtirokchilar yo'q</p>}
           </div>
 
-          <div className="flex items-center justify-between gap-2 border-t border-stroke-sub px-5 py-4">
+          <div className="flex items-center justify-between gap-2 px-5 py-4">
             <span className="text-sm text-text-sub">{attended.length} / {meeting.attendance.length} qatnashdi</span>
             <Button onClick={doFinish} loading={finish.isPending}><CheckCircle2 className="h-4 w-4" /> Tasdiqlash</Button>
           </div>

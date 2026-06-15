@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils/cn';
 import { useAuthStore } from '@/store/authStore';
 import { ROLE_LABELS, PROJECT_STATUS } from '@/lib/constants';
 import { formatMoney, formatDate } from '@/lib/utils/format';
-import { useDashboard, useAnalytics, useMyEfficiency } from '@/features/reports/reportsApi';
+import { useDashboard, useAnalytics } from '@/features/reports/reportsApi';
 import { useRequests } from '@/features/finance/financeApi';
 
 const stagger = { show: { transition: { staggerChildren: 0.05 } } };
@@ -65,55 +65,10 @@ export function DashboardPage() {
         subtitle={`${ROLE_LABELS[role]} · Boshqaruv paneli`}
         actions={<PeriodTabs value={period} onChange={setPeriod} />}
       />
-      <EfficiencyCard />
       {role === 'accountant' ? <AccountantDashboard {...shared} />
         : role === 'employee' ? <EmployeeDashboard {...shared} />
           : <AdminDashboard {...shared} />}
     </div>
-  );
-}
-
-/** Xodim unumdorligi (KPI) kartochkasi — barcha rollar uchun. */
-function EfficiencyCard() {
-  const { data, isLoading } = useMyEfficiency();
-  if (isLoading) return <Skeleton className="mb-6 h-28 w-full rounded-2xl" />;
-  if (!data) return null;
-  const tone = data.overall_efficiency >= 80 ? 'success' : data.overall_efficiency >= 50 ? 'warning' : 'error';
-  const bars = [
-    { label: 'Vazifalar (tezlik)', value: data.task_score },
-    { label: 'Sifat (qaytarishlar)', value: data.quality_score },
-    { label: "Yig'ilishlar", value: data.meeting_score },
-  ];
-  const barColor = (v) => (v >= 80 ? 'var(--success-strong)' : v >= 50 ? 'var(--warning-strong)' : 'var(--error-strong)');
-  return (
-    <Card className="mb-6">
-      <CardContent className="flex flex-col gap-6 py-5 sm:flex-row sm:items-center">
-        <div className="flex items-center gap-4">
-          <div className="flex h-20 w-20 shrink-0 flex-col items-center justify-center rounded-full border-4" style={{ borderColor: barColor(data.overall_efficiency) }}>
-            <span className="text-2xl font-bold text-text">{data.overall_efficiency}%</span>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-text">Mening samaradorligim</p>
-            <Badge tone={tone}>{data.overall_efficiency >= 80 ? "A'lo" : data.overall_efficiency >= 50 ? "O'rtacha" : 'Past'}</Badge>
-            <p className="mt-1 text-xs text-text-soft">
-              {data.metrics.completed_tasks}/{data.metrics.total_tasks} vazifa · {data.metrics.total_reopened} qaytarish · {data.metrics.unexcused_meetings} sababsiz absence
-            </p>
-          </div>
-        </div>
-        <div className="flex-1 space-y-2.5">
-          {bars.map((b) => (
-            <div key={b.label}>
-              <div className="mb-1 flex justify-between text-xs text-text-soft">
-                <span>{b.label}</span><span className="font-medium text-text">{b.value}%</span>
-              </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-bg-2">
-                <div className="h-full rounded-full" style={{ width: `${b.value}%`, backgroundColor: barColor(b.value) }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -315,8 +270,8 @@ function AdminDashboard({ analytics, aLoading }) {
   if (isLoading || !data) return <DashSkeleton />;
 
   const fin = data.finance || {};
-  // Menejer /expenses bo'limiga kira olmaydi — kartani bosib bo'lmaydigan qoldiramiz (o'lik klik bo'lmasin).
-  const expensesTo = role === 'manager' ? undefined : '/expenses';
+  // Menejer Moliya tarixiga kira olmaydi — kartani bosib bo'lmaydigan qoldiramiz (o'lik klik bo'lmasin).
+  const expensesTo = role === 'manager' ? undefined : '/finance-history';
 
   return (
     <div className="space-y-6">
@@ -361,7 +316,7 @@ function AccountantDashboard({ analytics, aLoading }) {
       <MotionGrid className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MItem><StatCard icon={Clock} label="To'lovga so'rovlar" value={data.pendingRequests ?? 0} tone="error" to="/finance" /></MItem>
         <MItem><StatCard icon={TrendingUp} label="Tushum" value={m(fin.income)} tone="success" to="/reports/projects" /></MItem>
-        <MItem><StatCard icon={TrendingDown} label="Xarajatlar" value={m(fin.expenses)} tone="neutral" to="/expenses" /></MItem>
+        <MItem><StatCard icon={TrendingDown} label="Xarajatlar" value={m(fin.expenses)} tone="neutral" to="/finance-history" /></MItem>
         <MItem><StatCard icon={Wallet} label="Sof foyda" value={m(fin.net)} tone="accent" to="/reports/projects" /></MItem>
       </MotionGrid>
 

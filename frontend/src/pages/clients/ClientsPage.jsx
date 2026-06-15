@@ -6,19 +6,22 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
+import { formatPhone } from '@/components/ui/PhoneInput';
 import { Badge } from '@/components/ui/Badge';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { CLIENT_TYPE, CLIENT_STATUS } from '@/lib/constants';
 import { apiError } from '@/lib/api/axios';
-import { useAuthStore } from '@/store/authStore';
+import { useCan } from '@/lib/permissions';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useClients, useDeleteClient } from '@/features/clients/clientsApi';
 import { ClientFormDialog } from '@/features/clients/ClientFormDialog';
 
 export function ClientsPage() {
   const navigate = useNavigate();
-  const role = useAuthStore((s) => s.user?.role);
-  const canDelete = ['superadmin', 'admin'].includes(role);
+  const can = useCan();
+  const canCreate = can('clients.create');
+  const canUpdate = can('clients.update');
+  const canDelete = can('clients.delete');
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -42,7 +45,7 @@ export function ClientsPage() {
         </div>
       ),
     },
-    { key: 'phone', header: 'Telefon', render: (r) => r.phone || '—' },
+    { key: 'phone', header: 'Telefon', render: (r) => formatPhone(r.phone) || '—' },
     { key: 'region', header: 'Hudud', render: (r) => r.region?.name || '—' },
     { key: 'manager', header: "Mas'ul", render: (r) => r.manager?.fullName || '—' },
     { key: 'projects', header: 'Loyihalar', render: (r) => r._count?.projects ?? 0 },
@@ -54,9 +57,11 @@ export function ClientsPage() {
       key: 'actions', header: '', className: 'w-20',
       render: (r) => (
         <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-          <button className="rounded p-1.5 text-icon-sub hover:bg-bg-2" onClick={() => { setEditing(r); setFormOpen(true); }}>
-            <Pencil className="h-4 w-4" />
-          </button>
+          {canUpdate && (
+            <button className="rounded p-1.5 text-icon-sub hover:bg-bg-2" onClick={() => { setEditing(r); setFormOpen(true); }}>
+              <Pencil className="h-4 w-4" />
+            </button>
+          )}
           {canDelete && (
             <button className="rounded p-1.5 text-error-strong hover:bg-error-soft" onClick={() => setDeleting(r)}>
               <Trash2 className="h-4 w-4" />
@@ -80,14 +85,16 @@ export function ClientsPage() {
         title="Mijozlar"
         subtitle="CRM — mijozlar bazasi"
         actions={
-          <Button onClick={() => { setEditing(null); setFormOpen(true); }}>
-            <Plus className="h-4 w-4" /> Yangi mijoz
-          </Button>
+          canCreate && (
+            <Button onClick={() => { setEditing(null); setFormOpen(true); }}>
+              <Plus className="h-4 w-4" /> Yangi mijoz
+            </Button>
+          )
         }
       />
 
       <div className="mb-4 flex flex-col gap-2 sm:flex-row">
-        <div className="relative flex-1">
+        <div className="relative w-full sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-icon-soft" />
           <Input
             placeholder="Nom, telefon yoki email bo'yicha qidirish..."

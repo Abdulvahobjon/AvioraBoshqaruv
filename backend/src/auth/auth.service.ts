@@ -6,7 +6,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtPayload } from './jwt.strategy';
+
+// Foydalanuvchi o'zi tahrirlashi mumkin bo'lgan maydonlar (rol/oylik/status YO'Q).
+const SELF_PROFILE_FIELDS = [
+  'card', 'card2', 'phone', 'phone2', 'region', 'district',
+  'passportSeries', 'passportNumber', 'passportImage', 'avatar', 'link1', 'link2',
+] as const;
 
 @Injectable()
 export class AuthService {
@@ -32,11 +39,31 @@ export class AuthService {
     }
 
     await this.audit.record({ userId: user.id, entity: 'Auth', action: 'LOGIN', ip });
-    const tokens = await this.issueTokens({ sub: user.id, role: user.role, tv: user.tokenVersion });
-    return { ...tokens, user: this.publicUser(user) };
+    // Ruxsat etilgan rollar = asosiy rol + qo'shimcha rollar. Birinchi (asosiy) — default aktiv rol.
+    const allowed = this.allowedRoles(user);
+    const activeRole = allowed[0];
+    const tokens = await this.issueTokens({ sub: user.id, role: activeRole, tv: user.tokenVersion });
+    // mustSelectRole=true bo'lsa, frontend rol tanlash oynasini ko'rsatadi (token default rol bilan ishlaydi).
+    return { ...tokens, user: this.publicUser(user, activeRole), roles: allowed, mustSelectRole: allowed.length > 1 };
   }
 
-  async refresh(refreshToken: string) {
+  /** Foydalanuvchining barcha ruxsat etilgan rollari: asosiy 'role' + qo'shimcha 'roles' (dedup). */
+  private allowedRoles(user: { role: string; roles?: string[] }): string[] {
+    return [...new Set([user.role, ...(user.roles || [])])];
+  }
+
+  /** Aktiv rolni almashtirish — yangi token qayta beriladi (qayta login shart emas). */
+  async switchRole(userId: number, role: string) {
+    const user = await this.prisma.user.findFirst({ where: { id: userId, status: 'active' } });
+    if (!user) throw new UnauthorizedException();
+    const allowed = this.allowedRoles(user);
+    if (!allowed.includes(role)) throw new BadRequestException('Bu rol sizga biriktirilmagan');
+    const tokens = await this.issueTokens({ sub: user.id, role, tv: user.tokenVersion });
+    return { ...tokens, user: this.publicUser(user, role), roles: allowed };
+  }
+
+  async refresh(refreshToken?: string) {
+    if (!refreshToken) throw new UnauthorizedException('Refresh token topilmadi');
     let payload: JwtPayload;
     try {
       payload = await this.jwt.verifyAsync<JwtPayload>(refreshToken, {
@@ -49,16 +76,36 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Foydalanuvchi topilmadi');
     // tokenVersion mos kelmasa — token bekor qilingan (parol o'zgargan / chiqilgan).
     if ((payload.tv ?? 0) !== user.tokenVersion) throw new UnauthorizedException('Refresh token bekor qilingan');
-    return this.issueTokens({ sub: user.id, role: user.role, tv: user.tokenVersion });
+    // Aktiv rolni saqlaymiz (refresh'da o'zgarmaydi); roli endi yaroqsiz bo'lsa asosiyga qaytamiz.
+    const allowed = this.allowedRoles(user);
+    const active = payload.role && allowed.includes(payload.role) ? payload.role : allowed[0];
+    return this.issueTokens({ sub: user.id, role: active, tv: user.tokenVersion });
   }
 
-  async me(userId: number) {
+  async me(userId: number, activeRole?: string) {
     const user = await this.prisma.user.findFirst({
       where: { id: userId },
       include: { position: true },
     });
     if (!user) throw new UnauthorizedException();
-    return this.publicUser(user);
+    return this.publicUser(user, activeRole);
+  }
+
+  /** Foydalanuvchi o'z profilini tahrirlaydi — faqat shaxsiy maydonlar (rol/oylik o'zgarmaydi). */
+  async updateProfile(userId: number, dto: UpdateProfileDto, activeRole: string, ip?: string) {
+    const before = await this.prisma.user.findFirst({ where: { id: userId } });
+    if (!before) throw new UnauthorizedException();
+    const data: any = {};
+    for (const f of SELF_PROFILE_FIELDS) {
+      if ((dto as any)[f] !== undefined) data[f] = (dto as any)[f] || null;
+    }
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data,
+      include: { position: true },
+    });
+    await this.audit.record({ userId, entity: 'User', entityId: userId, action: 'UPDATE_PROFILE', ip });
+    return this.publicUser(user, activeRole);
   }
 
   async changePassword(userId: number, dto: ChangePasswordDto, ip?: string) {
@@ -88,8 +135,10 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
-  private publicUser(user: any) {
+  private publicUser(user: any, activeRole?: string) {
     const { passwordHash, ...rest } = user;
-    return rest;
+    const allowed = this.allowedRoles(user);
+    // role = AKTIV rol (tanlangan); roles = barcha ruxsat etilgan rollar (almashtirish uchun).
+    return { ...rest, role: activeRole || user.role, roles: allowed };
   }
 }

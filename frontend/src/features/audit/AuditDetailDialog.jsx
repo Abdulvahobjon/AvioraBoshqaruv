@@ -46,6 +46,7 @@ export function AuditDetailDialog({ open, onClose, log }) {
       onClose={onClose}
       onBack={onClose}
       title="Foydalanuvchi va so'rov haqida ma'lumot"
+      subtitle="Amal va o'zgarishlar tafsiloti"
       size="lg"
       footer={<Button variant="ghost" onClick={onClose}>Yopish</Button>}
     >

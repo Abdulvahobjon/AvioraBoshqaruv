@@ -26,3 +26,24 @@ export function usePayrollAction() {
     },
   });
 }
+
+/** Buxgalter "Tasdiqlash" — tanlangan oyliklarni ommaviy to'lash. */
+export function usePayManyPayrolls() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids) => (await api.post('/payroll/pay-many', { ids })).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['payrolls'] });
+      qc.invalidateQueries({ queryKey: ['balance'] });
+    },
+  });
+}
+
+/** KPI bonus / jarima (ma'lumot uchun) ni yangilash. */
+export function useUpdatePayroll() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...body }) => (await api.patch(`/payroll/${id}`, body)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['payrolls'] }),
+  });
+}

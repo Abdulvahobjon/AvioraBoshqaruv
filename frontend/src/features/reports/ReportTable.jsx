@@ -4,6 +4,15 @@ import { cn } from '@/lib/utils/cn';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/shared/EmptyState';
 
+/** Ikki {key:number} obyektni sayoz solishtirish (offset xaritalari uchun). */
+function shallowEqualNum(a, b) {
+  const ka = Object.keys(a);
+  const kb = Object.keys(b);
+  if (ka.length !== kb.length) return false;
+  for (const k of ka) if (a[k] !== b[k]) return false;
+  return true;
+}
+
 /**
  * Guruhlangan sarlavhali keng hisobot jadvali.
  * columns: leaf {key, header, render?(row,i), align?, mono?} yoki group {group, children:[leaf...]}.
@@ -33,7 +42,9 @@ export function ReportTable({ columns, rows = [], loading, emptyTitle = "Ma'lumo
         acc += headerRefs.current[l.key]?.offsetWidth || 0;
       }
     }
-    setOffsets(off);
+    // Faqat haqiqatan o'zgargan bo'lsa yangilaymiz — aks holda har render yangi obyekt
+    // setState'ni qo'zg'atib, cheksiz "Maximum update depth" siklini hosil qiladi.
+    setOffsets((prev) => (shallowEqualNum(prev, off) ? prev : off));
   };
 
   useLayoutEffect(() => { measure(); /* eslint-disable-next-line */ }, [pinned, rows, columns]);

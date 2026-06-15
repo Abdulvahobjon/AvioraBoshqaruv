@@ -27,7 +27,15 @@ async function bootstrap() {
   // Static serving for uploaded task files: /uploads/<file>
   const uploadDir = config.get<string>('UPLOAD_DIR', 'uploads');
   if (!existsSync(uploadDir)) mkdirSync(uploadDir, { recursive: true });
-  app.useStaticAssets(join(process.cwd(), uploadDir), { prefix: '/uploads/' });
+  app.useStaticAssets(join(process.cwd(), uploadDir), {
+    prefix: '/uploads/',
+    // Yuklangan fayllar brauzerda INLINE ochilmasin (sniffing/stored-XSS himoyasi) —
+    // har doim yuklab olinadi, MIME ham qat'iy (nosniff).
+    setHeaders: (res: any) => {
+      res.set('Content-Disposition', 'attachment');
+      res.set('X-Content-Type-Options', 'nosniff');
+    },
+  });
 
   app.setGlobalPrefix('api');
   // CORS_ORIGIN — vergul bilan ajratilgan ANIQ ro'yxat (wildcard yo'q).
@@ -49,6 +57,7 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
+      forbidNonWhitelisted: true, // DTO'da yo'q maydon kelsa 400 — mass-assignment yuzasini yopadi
       transform: true,
       transformOptions: { enableImplicitConversion: true },
     }),

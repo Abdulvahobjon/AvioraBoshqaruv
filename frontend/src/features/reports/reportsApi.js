@@ -45,6 +45,10 @@ export function useTasksReport(params, enabled) {
   return useQuery({ queryKey: ['report-tasks', params], enabled: !!enabled, queryFn: async () => (await api.get('/reports/tasks', { params })).data });
 }
 
+export function useTasksDetailReport(params, enabled) {
+  return useQuery({ queryKey: ['report-tasks-detail', params], enabled: !!enabled, queryFn: async () => (await api.get('/reports/tasks-detail', { params })).data });
+}
+
 export function useEmployeesReport() {
   return useQuery({ queryKey: ['report-employees'], queryFn: async () => (await api.get('/reports/employees')).data });
 }

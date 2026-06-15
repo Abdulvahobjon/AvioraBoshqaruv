@@ -62,9 +62,12 @@ async function main() {
   }
 
   // ── Currencies ──
-  await prisma.currencyRate.create({ data: { code: 'UZS', name: 'O\'zbek so\'mi', rateToUzs: 1 } });
-  const usd = await prisma.currencyRate.create({ data: { code: 'USD', name: 'AQSh dollari', rateToUzs: 12800 } });
-  await prisma.currencyHistory.create({ data: { currencyId: usd.id, rateToUzs: 12800 } });
+  // Kurs fixed-point masshtabda saqlanadi: haqiqiy kurs × RATE_SCALE (10000).
+  // 1 so'm → 10000, 12800 so'm → 128000000. (currencies.service.ts RATE_SCALE bilan mos.)
+  const RATE_SCALE = 10000n;
+  await prisma.currencyRate.create({ data: { code: 'UZS', name: 'O\'zbek so\'mi', rateToUzs: 1n * RATE_SCALE } });
+  const usd = await prisma.currencyRate.create({ data: { code: 'USD', name: 'AQSh dollari', rateToUzs: 12800n * RATE_SCALE } });
+  await prisma.currencyHistory.create({ data: { currencyId: usd.id, rateToUzs: 12800n * RATE_SCALE } });
 
   // ── Users (5 rol) ──
   const superadmin = await prisma.user.create({

@@ -12,8 +12,8 @@ import {
   Video,
   Banknote,
   FolderKanban,
-  ClipboardList,
   Trash2,
+  History,
 } from 'lucide-react';
 
 const ALL = ['superadmin', 'admin', 'manager', 'employee', 'accountant', 'auditor'];
@@ -26,7 +26,6 @@ export const NAV = [
   { type: 'item', to: '/', label: 'Boshqaruv paneli', icon: LayoutDashboard, roles: ALL },
   { type: 'item', to: '/users', label: 'Foydalanuvchilar', icon: UserCog, roles: ['superadmin', 'admin'] },
   { type: 'item', to: '/clients', label: 'Mijozlar', icon: Users, roles: ['superadmin', 'admin', 'manager', 'auditor'] },
-  { type: 'item', to: '/applications', label: 'Arizalar', icon: ClipboardList, roles: ['superadmin', 'admin', 'manager'] },
   {
     type: 'group',
     key: 'tasks',
@@ -44,9 +43,10 @@ export const NAV = [
     label: 'Moliya',
     icon: Wallet,
     children: [
-      { to: '/finance', label: 'Balans va so\'rovlar', icon: Wallet, roles: ['superadmin', 'admin', 'manager', 'employee', 'accountant', 'auditor'] },
-      { to: '/payroll', label: 'Oyliklar', icon: Banknote, roles: ['superadmin', 'admin', 'accountant', 'manager', 'employee', 'auditor'] },
-      { to: '/expenses', label: 'Xarajatlar', icon: Receipt, roles: ['superadmin', 'admin', 'accountant', 'auditor'] },
+      { to: '/finance', label: "Xarajat so'rovlari", icon: Wallet, roles: ['superadmin', 'admin', 'manager', 'employee', 'accountant', 'auditor'] },
+      { to: '/expense-categories', label: 'Xarajat toifalari', icon: Receipt, roles: ['superadmin', 'admin'] },
+      { to: '/payroll', label: 'Ish haqi', icon: Banknote, roles: ['superadmin', 'admin', 'accountant', 'manager', 'employee', 'auditor'] },
+      { to: '/finance-history', label: 'Tarix', icon: History, roles: ['superadmin', 'admin', 'accountant', 'auditor'] },
     ],
   },
   {
@@ -87,19 +87,43 @@ export function leafLinks(role) {
   return navForRole(role).flatMap((n) => (n.type === 'group' ? n.children : [n]));
 }
 
-/** Breadcrumb for the navbar: { group, label } for a given path (handles detail pages). */
-export function breadcrumbForPath(pathname) {
+/**
+ * Berilgan path uchun ruxsat etilgan rollar (route himoyasi uchun — yagona manba).
+ * Detal sahifalar (masalan /projects/:id) bo'lim ildizidan rollarni meros qiladi.
+ * null qaytsa — bu sidebar boshqarmaydigan route (masalan /settings) → barcha authed uchun ochiq.
+ */
+export function rolesForPath(pathname) {
+  const leaves = [];
+  for (const node of NAV) {
+    if (node.type === 'group') leaves.push(...node.children);
+    else leaves.push(node);
+  }
+  const hit = leaves.find((l) => pathname === l.to || (l.to !== '/' && pathname.startsWith(l.to + '/')));
+  return hit ? hit.roles : null;
+}
+
+/**
+ * Breadcrumb for the navbar: { group, groupTo, label, to } for a given path.
+ * `to` — yorliq bosilganda o'tiladigan bo'lim ro'yxati (detal sahifadan ham qaytaradi).
+ * `groupTo` — guruh nomi bosilganda o'tiladigan bo'lim (rolega ko'ra birinchi ko'rinadigan bola).
+ */
+export function breadcrumbForPath(pathname, role) {
   const matches = (to) => pathname === to || (to !== '/' && pathname.startsWith(to + '/'));
+  const r = role || 'employee';
   for (const node of NAV) {
     if (node.type === 'group') {
       const child = node.children.find((c) => matches(c.to));
-      if (child) return { group: node.label, label: child.label };
+      if (child) {
+        const visible = node.children.filter((c) => c.roles.includes(r));
+        const groupTo = (visible[0] || child).to;
+        return { group: node.label, groupTo, label: child.label, to: child.to };
+      }
     } else if (matches(node.to)) {
-      return { group: null, label: node.label };
+      return { group: null, groupTo: null, label: node.label, to: node.to };
     }
   }
   // Routes not present in the sidebar nav:
-  if (pathname.startsWith('/settings')) return { group: null, label: 'Sozlamalar' };
-  if (pathname.startsWith('/trash')) return { group: null, label: 'Chiqindi' };
-  return { group: null, label: '' };
+  if (pathname.startsWith('/settings')) return { group: null, groupTo: null, label: 'Sozlamalar', to: '/settings' };
+  if (pathname.startsWith('/trash')) return { group: null, groupTo: null, label: 'Chiqindi', to: '/trash' };
+  return { group: null, groupTo: null, label: '', to: null };
 }

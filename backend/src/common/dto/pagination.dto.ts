@@ -15,7 +15,7 @@ export class PaginationDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(500) // selektor ro'yxatlari (loyiha/xodim) "hammasini" yuklaydi — 200/500 limit yuboradi
   limit: number = 20;
 
   @ApiPropertyOptional({ description: 'Qidiruv matni' })

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Search, Filter, X, FileCheck2, Printer, Download, ChevronDown, FileSpreadsheet, FileText, FileType } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
@@ -19,6 +19,19 @@ export function ReportExportActions({ type, params }) {
     try { await fn(); } catch (e) { toast.error(apiError(e, 'Xatolik')); } finally { setBusy(false); }
   };
 
+  // Tashqariga bosilganda yoki Escape bosilganda yopish (hover bilan emas — bosib bo'lishi uchun).
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
   const formats = [
     { key: 'xlsx', label: 'Excel', icon: FileSpreadsheet },
     { key: 'pdf', label: 'PDF', icon: FileText },
@@ -30,7 +43,7 @@ export function ReportExportActions({ type, params }) {
       <Button variant="outline" onClick={() => run(() => printReport({ type, params }))} loading={busy}>
         <Printer className="h-4 w-4" /> Chop etish
       </Button>
-      <div ref={ref} className="relative" onMouseLeave={() => setOpen(false)}>
+      <div ref={ref} className="relative">
         <Button onClick={() => setOpen((o) => !o)} loading={busy}>
           <Download className="h-4 w-4" /> Yuklab olish <ChevronDown className={cn('h-4 w-4 transition-transform', open && 'rotate-180')} />
         </Button>

@@ -3,11 +3,13 @@ import { Currency, PaymentStatus, ProjectRole, ProjectStatus } from '@prisma/cli
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
+  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -30,6 +32,18 @@ export class ProjectMemberDto {
   @IsOptional()
   @IsEnum(Currency)
   shareCurrency?: Currency;
+}
+
+export class ProjectDocumentDto {
+  @ApiProperty({ description: 'Hujjat nomi (masalan "Frontend")' })
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty({ description: 'Havola (URL)' })
+  @IsString()
+  @IsNotEmpty()
+  url: string;
 }
 
 export class CreateProjectDto {
@@ -78,6 +92,18 @@ export class CreateProjectDto {
   @IsEnum(PaymentStatus)
   paymentStatus?: PaymentStatus;
 
+  @ApiPropertyOptional({ description: 'Jarima foizi (%)' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  penaltyPercent?: number;
+
+  @ApiPropertyOptional({ description: 'Muzlatilganmi (tahrirlash bloklanadi)' })
+  @IsOptional()
+  @IsBoolean()
+  isFrozen?: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsInt()
@@ -89,4 +115,17 @@ export class CreateProjectDto {
   @ValidateNested({ each: true })
   @Type(() => ProjectMemberDto)
   members?: ProjectMemberDto[];
+
+  @ApiPropertyOptional({ description: 'Sinovchilar (foydalanuvchi ID lari) — xodimlardan alohida', type: [Number] })
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  testerIds?: number[];
+
+  @ApiPropertyOptional({ type: [ProjectDocumentDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProjectDocumentDto)
+  documents?: ProjectDocumentDto[];
 }

@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Currency, FinanceRequestType, PaymentMethod } from '@prisma/client';
-import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateFinanceRequestDto {
   @ApiProperty({ description: 'Summa (tiyin)' })
@@ -27,15 +27,20 @@ export class CreateFinanceRequestDto {
   @IsInt()
   projectId?: number;
 
-  @ApiProperty()
+  @ApiPropertyOptional({ description: 'So\'rov sababi (ixtiyoriy)' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'Sabab kiriting' })
-  reason: string;
+  reason?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   card?: string;
+
+  @ApiPropertyOptional({ enum: PaymentMethod, description: 'To\'lov turi (karta/naqd)' })
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  paymentMethod?: PaymentMethod;
 }
 
 export class PayRequestDto {
@@ -43,6 +48,13 @@ export class PayRequestDto {
   @IsOptional()
   @IsEnum(PaymentMethod)
   paymentMethod?: PaymentMethod;
+
+  @ApiPropertyOptional({ description: 'To\'lov cheki/kvitansiya URL\'lari (0-3 ta)' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(3, { message: 'Eng ko\'pi 3 ta chek' })
+  @IsString({ each: true })
+  receipts?: string[];
 }
 
 export class RejectRequestDto {

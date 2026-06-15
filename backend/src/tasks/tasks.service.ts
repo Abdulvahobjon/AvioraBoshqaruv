@@ -9,8 +9,6 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 import { ChangeStatusDto, ReviewTaskDto, CreateCommentDto } from './dto/task-actions.dto';
 
 const PRIVILEGED = ['superadmin', 'admin', 'manager'];
-// Task QA (checked/rejected) — auditor (Nazoratchi) ham bajaradi, lekin yaratmaydi/o'chirmaydi.
-const REVIEWERS = ['superadmin', 'admin', 'manager', 'auditor'];
 // Hamma loyiha/vazifani ko'ra oladigan rollar (read-only nazorat).
 const ALL_VISIBLE = ['superadmin', 'admin', 'accountant', 'auditor'];
 
@@ -42,6 +40,33 @@ export class TasksService {
     const privileged = ALL_VISIBLE.includes(user.role);
     if (!privileged && !isMember) throw new ForbiddenException('Loyihaga ruxsatingiz yo\'q');
     return { project, isMember };
+  }
+
+  /**
+   * Tekshiruv (Ishga tushirilgan → Tekshirilgan/Rad etilgan) ruxsati:
+   * admin/superadmin YOKI loyihaga 'tekshiruvchi' (auditor) sifatida biriktirilgan a'zo.
+   * Loyiha menejeri tekshira olmaydi.
+   */
+  private async assertReviewer(projectId: number, user: AuthUser) {
+    if (['superadmin', 'admin'].includes(user.role)) return;
+    const member = await this.prisma.projectMember.findFirst({
+      where: { projectId, userId: user.id, roleInProject: 'auditor' },
+    });
+    if (!member) {
+      throw new ForbiddenException('Tekshiruvni faqat loyihaning tekshiruvchisi yoki admin bajaradi');
+    }
+  }
+
+  /** Joriy foydalanuvchi shu vazifani tekshira oladimi? (frontend tugmalari uchun) */
+  private async canReview(task: { projectId: number; status: string }, user: AuthUser) {
+    if (user.role === 'superadmin') return true; // hammasi ochiq
+    if (task.status !== 'production') return false;
+    if (user.role === 'admin') return true;
+    const member = await this.prisma.projectMember.findFirst({
+      where: { projectId: task.projectId, userId: user.id, roleInProject: 'auditor' },
+      select: { id: true },
+    });
+    return !!member;
   }
 
   /** Visibility filter: employees see only their own; managers see their projects' tasks; admins all. */
@@ -147,7 +172,9 @@ export class TasksService {
     if (user.role === 'employee' && task.assigneeId !== user.id) {
       throw new ForbiddenException('Bu vazifa sizga biriktirilmagan');
     }
-    return task;
+    // Joriy foydalanuvchi shu vazifani tekshira oladimi (Ishga tushirilgan + tekshiruvchi/admin).
+    const canReview = await this.canReview(task, user);
+    return { ...task, canReview };
   }
 
   /** Generate a task UID like "CRM-T-0001" from the project code (or derived prefix). */
@@ -162,7 +189,8 @@ export class TasksService {
 
   async create(dto: CreateTaskDto, user: AuthUser, ip?: string) {
     if (!PRIVILEGED.includes(user.role)) throw new ForbiddenException('Vazifa yaratishga ruxsatingiz yo\'q');
-    await this.assertProjectAccess(dto.projectId, user);
+    const { project } = await this.assertProjectAccess(dto.projectId, user);
+    if (project.isFrozen) throw new ForbiddenException('Loyiha muzlatilgan — yangi vazifa qo\'shib bo\'lmaydi');
 
     const baseData = {
       projectId: dto.projectId,
@@ -225,6 +253,12 @@ export class TasksService {
     if (dto.deadline !== undefined) data.deadline = dto.deadline ? new Date(dto.deadline) : null;
     if (dto.price !== undefined) data.price = BigInt(dto.price);
 
+    // Muddati o'tgan (overdue) vazifaning muddati kelajakka cho'zilsa — avtomatik "Jarayonda"ga qaytadi.
+    if (existing.status === 'overdue' && data.deadline instanceof Date && data.deadline.getTime() > Date.now()) {
+      data.status = 'in_progress';
+      Object.assign(data, this.trackTime(existing, 'in_progress'));
+    }
+
     const task = await this.prisma.task.update({ where: { id }, data, include: this.taskInclude });
     await this.audit.record({ userId: user.id, entity: 'Task', entityId: id, action: 'UPDATE', ip });
     if (task.assigneeId && task.assigneeId !== prevAssignee) {
@@ -239,24 +273,21 @@ export class TasksService {
     if (!task) throw new NotFoundException('Vazifa topilmadi');
     await this.assertProjectAccess(task.projectId, user);
 
-    // Employee: only own tasks, and cannot set checked/rejected (review is manager-only)
-    if (user.role === 'employee') {
-      if (task.assigneeId !== user.id) throw new ForbiddenException('Bu vazifa sizga biriktirilmagan');
-      if (['checked', 'rejected'].includes(dto.status)) {
-        throw new ForbiddenException('Tekshiruvni faqat menejer bajaradi');
-      }
+    // Employee: only own tasks. checked/rejected pipeline'da yo'q — review orqali hal bo'ladi.
+    if (user.role === 'employee' && task.assigneeId !== user.id) {
+      throw new ForbiddenException('Bu vazifa sizga biriktirilmagan');
     }
 
-    // Kanban statusi faqat OLDINGA siljiydi: todo→in_progress→done→checked→production.
-    // 'rejected' faqat review orqali, 'overdue' avtomatik — ularga drag bilan o'tkazib bo'lmaydi.
-    // Pipeline tashqarisidagi (rejected/overdue) vazifani esa istalgan pipeline statusiga tiklash mumkin.
-    if (dto.status !== task.status) {
-      const PIPELINE = ['todo', 'in_progress', 'done', 'checked', 'production'];
+    // Kanban statusi faqat BITTADAN OLDINGA siljiydi: todo→in_progress→done→production.
+    // 'checked'/'rejected' faqat review (Ishga tushirilgan ustunida) orqali, 'overdue' avtomatik.
+    // Sakrash (masalan todo→done) va orqaga qaytarish taqiqlangan.
+    // Superadmin — hammasi ochiq: istalgan statusga erkin o'tkazadi.
+    if (user.role !== 'superadmin' && dto.status !== task.status) {
+      const PIPELINE = ['todo', 'in_progress', 'done', 'production'];
       const to = PIPELINE.indexOf(dto.status);
-      if (to === -1) throw new BadRequestException('Bu statusga Kanban orqali o\'tkazib bo\'lmaydi');
       const from = PIPELINE.indexOf(task.status);
-      if (from !== -1 && to < from) {
-        throw new BadRequestException('Statusni orqaga qaytarib bo\'lmaydi — faqat oldinga siljitish mumkin');
+      if (to === -1 || to !== from + 1) {
+        throw new BadRequestException('Statusni faqat bittadan keyingi bosqichga siljitish mumkin');
       }
     }
 
@@ -281,17 +312,28 @@ export class TasksService {
    * verdict=rejected -> comment MANDATORY, status auto-returns to 'in_progress', reopened_count++.
    */
   async review(id: number, dto: ReviewTaskDto, user: AuthUser, ip?: string) {
-    if (!REVIEWERS.includes(user.role)) throw new ForbiddenException('Tekshirishga ruxsatingiz yo\'q');
     const task = await this.prisma.task.findFirst({ where: { id } });
     if (!task) throw new NotFoundException('Vazifa topilmadi');
-    await this.assertProjectAccess(task.projectId, user);
+    // Faqat "Ishga tushirilgan" (production) vazifani tekshirish mumkin (superadmin'ga ochiq).
+    if (user.role !== 'superadmin' && task.status !== 'production') {
+      throw new BadRequestException('Faqat "Ishga tushirilgan" vazifani tekshirish mumkin');
+    }
+    // Ruxsat: admin/superadmin yoki loyihaning tekshiruvchisi (auditor a'zosi).
+    await this.assertReviewer(task.projectId, user);
 
     if (dto.verdict === 'rejected') {
       if (!dto.comment?.trim()) throw new BadRequestException('Rad etishda izoh majburiy');
       await this.prisma.taskComment.create({ data: { taskId: id, userId: user.id, body: dto.comment.trim() } });
       const updated = await this.prisma.task.update({
         where: { id },
-        data: { status: 'in_progress', reopenedCount: { increment: 1 }, rejectReason: dto.comment.trim(), ...this.trackTime(task, 'in_progress') },
+        // Rad etilgan vazifa to'g'ridan-to'g'ri "Jarayonda"ga qaytadi va sikl (reopenedCount) oshadi.
+        data: {
+          status: 'in_progress',
+          reopenedCount: { increment: 1 },
+          rejectReason: dto.comment.trim(),
+          rejectPhotoUrl: dto.photoUrl || null,
+          ...this.trackTime(task, 'in_progress'),
+        },
         include: this.taskInclude,
       });
       await this.projects.recomputeProgress(task.projectId);

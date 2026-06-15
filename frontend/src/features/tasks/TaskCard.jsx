@@ -2,6 +2,8 @@ import { Draggable } from '@hello-pangea/dnd';
 import { Flag, Calendar, Clock, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { Avatar } from '@/components/ui/Avatar';
+import { CopyId } from '@/components/ui/CopyId';
+import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { formatDate, deadlineInfo } from '@/lib/utils/format';
 
 /** estimatedMinutes → "4h", "1h 30m", "45m". */
@@ -15,9 +17,10 @@ function formatEstimate(min) {
 }
 
 /** Trello-style draggable card: nomi, UID, muddat, taxminiy vaqt va mas'ul xodim. */
-export function TaskCard({ task, index, onClick }) {
+export function TaskCard({ task, index, onClick, actions }) {
   const dl = task.deadline ? deadlineInfo(task.deadline) : null;
   const estimate = formatEstimate(task.estimatedMinutes);
+  const menuItems = actions?.(task) || [];
 
   return (
     <Draggable draggableId={String(task.id)} index={index}>
@@ -32,22 +35,30 @@ export function TaskCard({ task, index, onClick }) {
             snapshot.isDragging && 'shadow-elevated',
           )}
         >
-          {/* Qayta ochilgan (rad etilgan) belgisi — o'ng yuqori burchakda */}
-          {task.reopenedCount > 0 && (
-            <span className="absolute right-2 top-2 inline-flex items-center gap-0.5 text-[11px] font-medium text-warning-strong" title="Qayta ochilgan">
-              <RotateCcw className="h-3 w-3" />{task.reopenedCount}
-            </span>
-          )}
+          {/* O'ng yuqori burchak: qayta ochilgan belgisi + kebab (⋮) menyu */}
+          <div className="absolute right-1.5 top-1.5 flex items-center gap-1">
+            {task.reopenedCount > 0 && (
+              <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-warning-strong" title="Qayta ochilgan">
+                <RotateCcw className="h-3 w-3" />{task.reopenedCount}
+              </span>
+            )}
+            {menuItems.length > 0 && (
+              // Sudrashni va karta bosilishini boshlamasligi uchun event'larni to'xtatamiz.
+              <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+                <DropdownMenu items={menuItems} />
+              </div>
+            )}
+          </div>
 
           {/* Nomi */}
-          <p className="line-clamp-2 pr-6 text-sm font-semibold leading-snug text-text-strong">{task.title}</p>
+          <p className="line-clamp-2 pr-12 text-sm font-semibold leading-snug text-text-strong">{task.title}</p>
 
           {/* Meta: UID · muddat · taxminiy vaqt */}
           <div className="mt-2.5 space-y-1.5 text-xs">
             {task.uid && (
               <div className="flex items-center gap-1.5 text-text-sub">
                 <Flag className="h-3.5 w-3.5 shrink-0 text-icon-soft" />
-                <span className="font-mono">{task.uid}</span>
+                <CopyId value={task.uid} />
               </div>
             )}
             {task.deadline && (

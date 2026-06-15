@@ -34,6 +34,55 @@ export function useRequestAction() {
   });
 }
 
+const invalidateFinance = (qc) => {
+  qc.invalidateQueries({ queryKey: ['requests'] });
+  qc.invalidateQueries({ queryKey: ['balance'] });
+  qc.invalidateQueries({ queryKey: ['ledger'] });
+};
+
+/** Buxgalter "To'lov qildim" — to'lov turi + chek fayllari bilan. */
+export function usePayRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, paymentMethod, receipts }) =>
+      (await api.post(`/finance/requests/${id}/pay`, { paymentMethod, receipts })).data,
+    onSuccess: () => invalidateFinance(qc),
+  });
+}
+
+/** Buxgalter "Rad etish" — sabab bilan. */
+export function useRejectRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, cancelReason }) =>
+      (await api.post(`/finance/requests/${id}/reject`, { cancelReason })).data,
+    onSuccess: () => invalidateFinance(qc),
+  });
+}
+
+/** Xodim "Tasdiqlash" — to'lovni qabul qildim. */
+export function useConfirmRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id) => (await api.post(`/finance/requests/${id}/confirm`)).data,
+    onSuccess: () => invalidateFinance(qc),
+  });
+}
+
+/** Chek/kvitansiya rasmini yuklash → { url }. */
+export function useUploadReceipt() {
+  return useMutation({
+    mutationFn: async (file) => {
+      const form = new FormData();
+      form.append('file', file);
+      const { data } = await api.post('/finance/upload-receipt', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return data;
+    },
+  });
+}
+
 export function useLedger(params = {}) {
   return useQuery({
     queryKey: ['ledger', params],

@@ -41,6 +41,7 @@ export class FinanceService {
         projectId: dto.projectId ?? null,
         reason: dto.reason,
         card: dto.card ?? null,
+        paymentMethod: dto.paymentMethod ?? null,
         status: 'pending',
       },
       include: this.requestInclude,
@@ -55,15 +56,37 @@ export class FinanceService {
   }
 
   async listRequests(user: AuthUser, q: any) {
-    const where: any = {};
+    const where: any = { deletedAt: null };
+    const seesAll = ['accountant', 'admin', 'superadmin', 'auditor'].includes(user.role);
     // Accountant/admin/superadmin/auditor see all; others see only their own.
-    if (!['accountant', 'admin', 'superadmin', 'auditor'].includes(user.role)) {
+    // `mine=1` — moliyaviy rol o'zining so'rovlarini ham filtrlay oladi ("Mening so'rovlarim").
+    if (!seesAll || q.mine === '1' || q.mine === 'true') {
       where.userId = user.id;
     } else if (q.userId) {
       where.userId = Number(q.userId);
     }
     if (q.status) where.status = q.status;
     if (q.type) where.type = q.type;
+    if (q.categoryId) where.categoryId = Number(q.categoryId);
+    if (q.projectId) where.projectId = Number(q.projectId);
+    if (q.search) where.user = { fullName: { contains: String(q.search), mode: 'insensitive' } };
+
+    // Summa oralig'i (tiyin)
+    if (q.amountMin || q.amountMax) {
+      where.amount = {};
+      if (q.amountMin) where.amount.gte = BigInt(q.amountMin);
+      if (q.amountMax) where.amount.lte = BigInt(q.amountMax);
+    }
+    // Sana oraliqlari: yaratilgan / to'langan / tasdiqlangan
+    const range = (field: string, from?: string, to?: string) => {
+      if (!from && !to) return;
+      where[field] = {};
+      if (from) where[field].gte = new Date(from);
+      if (to) where[field].lte = new Date(to);
+    };
+    range('createdAt', q.createdFrom, q.createdTo);
+    range('paidAt', q.paidFrom, q.paidTo);
+    range('confirmedAt', q.confirmedFrom, q.confirmedTo);
 
     return this.prisma.financeRequest.findMany({
       where,
@@ -88,7 +111,14 @@ export class FinanceService {
       // Atomik holat almashinuvi: faqat hali 'pending' bo'lsa to'laymiz — parallel ikki to'lov dubl ledger yozmaydi.
       const res = await tx.financeRequest.updateMany({
         where: { id, status: 'pending' },
-        data: { status: 'paid', paidAt: new Date(), paidBy: actor.id, paymentMethod: dto?.paymentMethod ?? 'card' },
+        data: {
+          status: 'paid',
+          paidAt: new Date(),
+          paidBy: actor.id,
+          paymentMethod: dto?.paymentMethod ?? req.paymentMethod ?? 'card',
+          // Chek/kvitansiya fayllari (0-3 ta) — buxgalter to'lov qilganda yuklaydi.
+          ...(dto?.receipts && dto.receipts.length ? { receipts: dto.receipts.slice(0, 3) } : {}),
+        },
       });
       if (res.count === 0) throw new BadRequestException('Faqat kutilayotgan so\'rovni to\'lash mumkin');
       await tx.ledgerEntry.create({
@@ -158,19 +188,37 @@ export class FinanceService {
     return { balance: (u?.balance ?? 0n).toString(), pending: pending.toString() };
   }
 
-  // ── Ledger (immutable; correction only via reversal) ──
+  // ── Ledger (immutable; correction only via reversal) — "Tarix" sahifasi shu yerdan o'qiydi ──
   async ledger(q: any) {
     const where: any = {};
     if (q.userId) where.userId = Number(q.userId);
     if (q.type) where.type = q.type;
+    if (q.direction) where.direction = q.direction;
+    if (q.search) where.user = { fullName: { contains: String(q.search), mode: 'insensitive' } };
+    if (q.amountMin || q.amountMax) {
+      where.amount = {};
+      if (q.amountMin) where.amount.gte = BigInt(q.amountMin);
+      if (q.amountMax) where.amount.lte = BigInt(q.amountMax);
+    }
+    if (q.dateFrom || q.dateTo) {
+      where.createdAt = {};
+      if (q.dateFrom) where.createdAt.gte = new Date(q.dateFrom);
+      if (q.dateTo) where.createdAt.lte = new Date(q.dateTo);
+    }
     return this.prisma.ledgerEntry.findMany({
       where,
       include: {
-        user: { select: { id: true, fullName: true } },
-        request: { select: { id: true, reason: true } },
+        user: {
+          select: {
+            id: true, fullName: true, avatar: true, region: true, district: true,
+            fixedSalary: true, passportSeries: true, passportNumber: true,
+            position: { select: { name: true } },
+          },
+        },
+        request: { select: { id: true, reason: true, category: { select: { name: true } } } },
       },
       orderBy: { createdAt: 'desc' },
-      take: 200,
+      take: 300,
     });
   }
 
@@ -179,35 +227,40 @@ export class FinanceService {
     if (!['accountant', 'superadmin', 'admin'].includes(actor.role)) {
       throw new ForbiddenException('Ruxsat yo\'q');
     }
-    const entry = await this.prisma.ledgerEntry.findFirst({ where: { id: entryId } });
-    if (!entry) throw new NotFoundException('Yozuv topilmadi');
-    if (entry.isReversal) throw new BadRequestException('Teskari yozuvni qayta teskari qilib bo\'lmaydi');
-    // Bir yozuvni faqat bir marta teskari qilish mumkin (dubl-bosishdan himoya).
-    // Yakuniy himoya — reversedEntryId ustidagi UNIQUE constraint (quyida P2002 ushlanadi);
-    // bu erdagi tekshiruv tezkor/aniq xabar uchun.
-    const already = await this.prisma.ledgerEntry.findFirst({ where: { reversedEntryId: entry.id } });
-    if (already) throw new BadRequestException('Bu yozuv allaqachon teskari qilingan');
-
-    // Balansga ta'sirni ham teskari qaytaramiz — aks holda ledger yig'indisi balansga mos kelmaydi:
-    //  • kredit (oylik / loyiha ulushi) balansni OSHIRGAN  → teskarisi KAMAYTIRADI
-    //  • debit (oylik yechib olish, faqat tasdiqlangan so'rov) balansni KAMAYTIRGAN → teskarisi OSHIRADI
-    // company/other turdagi so'rovlar balansga umuman ta'sir qilmaydi (confirm faqat 'salary'da kamaytiradi).
-    let balanceDelta = 0n;
-    if (entry.userId) {
-      if (entry.direction === 'credit' && ['salary', 'project_share'].includes(entry.type)) {
-        balanceDelta = -entry.amount;
-      } else if (entry.direction === 'debit' && entry.type === 'salary') {
-        // Yechib olish balansni faqat so'rov TASDIQLANGANDA (closed) kamaytirgan.
-        const linked = entry.requestId
-          ? await this.prisma.financeRequest.findFirst({ where: { id: entry.requestId }, select: { status: true } })
-          : null;
-        if (linked?.status === 'closed') balanceDelta = entry.amount;
-      }
-    }
+    // Dastlabki tezkor tekshiruv (aniq xabar uchun) — yakuniy/atomik tekshiruv
+    // tranzaksiya ichida (UNIQUE + qayta o'qish) amalga oshadi.
+    const pre = await this.prisma.ledgerEntry.findFirst({ where: { id: entryId } });
+    if (!pre) throw new NotFoundException('Yozuv topilmadi');
+    if (pre.isReversal) throw new BadRequestException('Teskari yozuvni qayta teskari qilib bo\'lmaydi');
 
     let reversal;
     try {
       reversal = await this.prisma.$transaction(async (tx) => {
+        // Yozuv va bog'liq so'rov holatini tranzaksiya ICHIDA qayta o'qiymiz —
+        // aks holda balans deltasi eskirgan (TOCTOU) snapshotdan hisoblanardi.
+        const entry = await tx.ledgerEntry.findFirst({ where: { id: entryId } });
+        if (!entry) throw new NotFoundException('Yozuv topilmadi');
+        if (entry.isReversal) throw new BadRequestException('Teskari yozuvni qayta teskari qilib bo\'lmaydi');
+        const already = await tx.ledgerEntry.findFirst({ where: { reversedEntryId: entry.id } });
+        if (already) throw new BadRequestException('Bu yozuv allaqachon teskari qilingan');
+
+        // Balansga ta'sirni ham teskari qaytaramiz — aks holda ledger yig'indisi balansga mos kelmaydi:
+        //  • kredit (oylik / loyiha ulushi) balansni OSHIRGAN  → teskarisi KAMAYTIRADI
+        //  • debit (oylik yechib olish, faqat tasdiqlangan so'rov) balansni KAMAYTIRGAN → teskarisi OSHIRADI
+        // company/other turdagi so'rovlar balansga umuman ta'sir qilmaydi (confirm faqat 'salary'da kamaytiradi).
+        let balanceDelta = 0n;
+        if (entry.userId) {
+          if (entry.direction === 'credit' && ['salary', 'project_share'].includes(entry.type)) {
+            balanceDelta = -entry.amount;
+          } else if (entry.direction === 'debit' && entry.type === 'salary') {
+            // Yechib olish balansni faqat so'rov TASDIQLANGANDA (closed) kamaytirgan.
+            const linked = entry.requestId
+              ? await tx.financeRequest.findFirst({ where: { id: entry.requestId }, select: { status: true } })
+              : null;
+            if (linked?.status === 'closed') balanceDelta = entry.amount;
+          }
+        }
+
         // UNIQUE(reversed_entry_id) ikki bir vaqtli urinishdan birini P2002 bilan rad etadi.
         const r = await tx.ledgerEntry.create({
           data: {
@@ -224,13 +277,13 @@ export class FinanceService {
         if (balanceDelta !== 0n && entry.userId) {
           await tx.user.update({ where: { id: entry.userId }, data: { balance: { increment: balanceDelta } } });
         }
-        return r;
+        return { entry: r, reversedEntryId: entry.id, balanceDelta };
       });
     } catch (e: any) {
       if (e?.code === 'P2002') throw new BadRequestException('Bu yozuv allaqachon teskari qilingan');
       throw e;
     }
-    await this.audit.record({ userId: actor.id, entity: 'LedgerEntry', entityId: reversal.id, action: 'REVERSE', ip, flagged: true, newValue: { reversedEntryId: entry.id, balanceDelta: balanceDelta.toString() } });
-    return reversal;
+    await this.audit.record({ userId: actor.id, entity: 'LedgerEntry', entityId: reversal.entry.id, action: 'REVERSE', ip, flagged: true, newValue: { reversedEntryId: reversal.reversedEntryId, balanceDelta: reversal.balanceDelta.toString() } });
+    return reversal.entry;
   }
 }

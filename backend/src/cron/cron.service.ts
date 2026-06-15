@@ -75,4 +75,27 @@ export class CronService {
     }
     if (projects.length) this.logger.log(`Loyiha overdue: ${projects.length} ta loyiha muddati o'tgan deb belgilandi`);
   }
+
+  /**
+   * Har 5 daqiqada: boshlanishiga 15 daqiqadan kam qolgan, hali yakunlanmagan yig'ilishlar uchun
+   * qatnashchilarga bir martalik eslatma yuboradi (reminder_sent_at orqali takror oldini olamiz).
+   * reminder_sent_at ustuni yangi — client regeneratsiyasiz ishlash uchun raw SQL ishlatamiz.
+   */
+  @Cron('*/5 * * * *', { name: 'meeting-reminder', timeZone: 'Asia/Tashkent' })
+  async meetingReminders() {
+    const now = new Date();
+    const soon = new Date(now.getTime() + 15 * 60000);
+    const due: Array<{ id: number; title: string | null; start_at: Date }> = await this.prisma.$queryRaw`
+      SELECT id, title, start_at FROM "meetings"
+      WHERE deleted_at IS NULL AND finished_at IS NULL AND reminder_sent_at IS NULL
+        AND start_at >= ${now} AND start_at <= ${soon}`;
+    for (const m of due) {
+      const attendees = await this.prisma.meetingAttendance.findMany({ where: { meetingId: m.id }, select: { userId: true } });
+      for (const a of attendees) {
+        await this.notifications.notify(a.userId, 'meeting_reminder', { meetingId: m.id, title: m.title, startAt: m.start_at });
+      }
+      await this.prisma.$executeRaw`UPDATE "meetings" SET reminder_sent_at = ${now} WHERE id = ${m.id}`;
+    }
+    if (due.length) this.logger.log(`Yig'ilish eslatmasi: ${due.length} ta yig'ilish uchun yuborildi`);
+  }
 }

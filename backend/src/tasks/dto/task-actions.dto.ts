@@ -24,6 +24,11 @@ export class ReviewTaskDto {
   @IsOptional()
   @IsString()
   comment?: string;
+
+  @ApiPropertyOptional({ description: 'Rad etish dalili — rasm URL (ixtiyoriy)' })
+  @IsOptional()
+  @IsString()
+  photoUrl?: string;
 }
 
 export class CreateCommentDto {

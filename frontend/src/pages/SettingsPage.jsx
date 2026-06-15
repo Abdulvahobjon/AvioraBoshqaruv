@@ -3,12 +3,13 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { User, KeyRound, ListTree, DollarSign, Plus, Pencil, Trash2, Check, X } from 'lucide-react';
+import { User, KeyRound, ListTree, DollarSign, Plus, Pencil, Trash2, Check, X, RefreshCw } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Tabs } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
+import { PhoneInput } from '@/components/ui/PhoneInput';
 import { Switch } from '@/components/ui/Switch';
 import { Badge } from '@/components/ui/Badge';
 import { PasswordInput } from '@/components/ui/PasswordInput';
@@ -16,10 +17,12 @@ import { FormField } from '@/components/ui/FormField';
 import { Avatar } from '@/components/ui/Avatar';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { useAuthStore } from '@/store/authStore';
+import { can } from '@/lib/permissions';
 import { ROLE_LABELS } from '@/lib/constants';
 import { formatDate, fromTiyin } from '@/lib/utils/format';
 import { apiError } from '@/lib/api/axios';
-import { useChangePassword } from '@/features/auth/authApi';
+import { useChangePassword, useUpdateProfile, useUploadOwnFile, useSwitchRole } from '@/features/auth/authApi';
+import { AvatarUpload, CardInput, RegionDistrict } from '@/features/users/userFields';
 import { useReference, useSaveReference, useDeleteReference, useCurrencies, useUpdateRate } from '@/features/settings/settingsApi';
 
 const passSchema = z
@@ -32,8 +35,8 @@ const passSchema = z
 
 export function SettingsPage() {
   const user = useAuthStore((s) => s.user);
-  const isAdmin = ['superadmin', 'admin'].includes(user?.role);
-  const canRefs = ['superadmin', 'admin', 'manager'].includes(user?.role); // TZ 8.1/8.3
+  const isAdmin = can(user?.role, 'currency.manage');
+  const canRefs = can(user?.role, 'references.manage'); // TZ 8.1/8.3
   const [tab, setTab] = useState('profile');
 
   const tabs = [
@@ -54,6 +57,133 @@ export function SettingsPage() {
 }
 
 function ProfileTab({ user }) {
+  return (
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <PersonalInfoCard user={user} />
+      <div className="space-y-6">
+        <RoleSwitchCard user={user} />
+        <PasswordCard />
+      </div>
+    </div>
+  );
+}
+
+/** Shaxsiy ma'lumotlar — xodim o'zi tahrirlaydi (login va rol o'zgarmaydi). */
+function PersonalInfoCard({ user }) {
+  const update = useUpdateProfile();
+  const uploadHook = useUploadOwnFile();
+  const [form, setForm] = useState(() => ({
+    avatar: user?.avatar || '',
+    phone: user?.phone || '',
+    phone2: user?.phone2 || '',
+    card: user?.card || '',
+    card2: user?.card2 || '',
+    region: user?.region || '',
+    district: user?.district || '',
+    link1: user?.link1 || '',
+    link2: user?.link2 || '',
+  }));
+  const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const onSave = () => {
+    update.mutate(form, {
+      onSuccess: () => toast.success('Profil yangilandi'),
+      onError: (e) => toast.error(apiError(e)),
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader><CardTitle className="flex items-center gap-2"><User className="h-4 w-4" /> Profil ma'lumotlari</CardTitle></CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center gap-4">
+          <AvatarUpload value={form.avatar} onChange={set('avatar')} size="h-20 w-20" uploadHook={uploadHook} />
+          <div className="min-w-0">
+            <p className="truncate font-semibold text-text-strong">{user?.fullName}</p>
+            <p className="text-sm text-text-sub">{ROLE_LABELS[user?.role]}</p>
+            <p className="mt-1 text-xs text-text-soft">Login (Ism Familiya) o'zgartirilmaydi</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <FormField label="Telefon">
+            <PhoneInput value={form.phone} onChange={set('phone')} />
+          </FormField>
+          <FormField label="Qo'shimcha telefon">
+            <PhoneInput value={form.phone2} onChange={set('phone2')} />
+          </FormField>
+          <FormField label="Karta (asosiy)">
+            <CardInput value={form.card} onChange={set('card')} />
+          </FormField>
+          <FormField label="Karta (ikkinchi)">
+            <CardInput value={form.card2} onChange={set('card2')} />
+          </FormField>
+          <RegionDistrict
+            region={form.region}
+            district={form.district}
+            onRegion={set('region')}
+            onDistrict={set('district')}
+          />
+          <FormField label="Havola 1">
+            <Input value={form.link1} onChange={(e) => set('link1')(e.target.value)} placeholder="https://..." />
+          </FormField>
+          <FormField label="Havola 2">
+            <Input value={form.link2} onChange={(e) => set('link2')(e.target.value)} placeholder="https://..." />
+          </FormField>
+        </div>
+
+        <Button onClick={onSave} loading={update.isPending}>Saqlash</Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Aktiv rolni almashtirish — faqat bir nechta rolga ega xodimda ko'rinadi. */
+function RoleSwitchCard({ user }) {
+  const switchRole = useSwitchRole();
+  const roles = user?.roles || [];
+  if (roles.length < 2) return null;
+
+  const onSwitch = (r) => {
+    if (r === user?.role) return;
+    switchRole.mutate(r, {
+      onSuccess: () => toast.success(`${ROLE_LABELS[r]} rejimiga o'tildi`),
+      onError: (e) => toast.error(apiError(e)),
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader><CardTitle className="flex items-center gap-2"><RefreshCw className="h-4 w-4" /> Aktiv rol</CardTitle></CardHeader>
+      <CardContent className="space-y-2">
+        <p className="text-xs text-text-soft">Sizga bir nechta rol biriktirilgan — kerakli rejimga o'ting.</p>
+        <div className="flex flex-wrap gap-2">
+          {roles.map((r) => {
+            const active = r === user?.role;
+            return (
+              <button
+                key={r}
+                type="button"
+                disabled={active || switchRole.isPending}
+                onClick={() => onSwitch(r)}
+                className={
+                  'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ' +
+                  (active
+                    ? 'border-accent-strong bg-accent-strong text-text-white'
+                    : 'border-stroke-sub text-text-sub hover:bg-bg-1-alt')
+                }
+              >
+                {ROLE_LABELS[r]}{active ? ' ✓' : ''}
+              </button>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PasswordCard() {
   const change = useChangePassword();
   const { register, handleSubmit, reset, formState: { errors } } = useForm({ resolver: zodResolver(passSchema) });
 
@@ -65,37 +195,23 @@ function ProfileTab({ user }) {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <Card>
-        <CardHeader><CardTitle>Profil</CardTitle></CardHeader>
-        <CardContent className="flex items-center gap-4">
-          <Avatar name={user?.fullName} src={user?.avatar} size="lg" />
-          <div>
-            <p className="font-medium text-text-strong">{user?.fullName}</p>
-            <p className="text-sm text-text-sub">{ROLE_LABELS[user?.role]}</p>
-            <p className="mt-1 text-xs text-text-soft">Login o'zgartirilmaydi</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><KeyRound className="h-4 w-4" /> Parolni o'zgartirish</CardTitle></CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-            <FormField label="Joriy parol" error={errors.oldPassword?.message} required>
-              <PasswordInput {...register('oldPassword')} error={errors.oldPassword} />
-            </FormField>
-            <FormField label="Yangi parol" error={errors.newPassword?.message} required>
-              <PasswordInput {...register('newPassword')} error={errors.newPassword} />
-            </FormField>
-            <FormField label="Tasdiqlang" error={errors.confirm?.message} required>
-              <PasswordInput {...register('confirm')} error={errors.confirm} />
-            </FormField>
-            <Button type="submit" loading={change.isPending}>Saqlash</Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+    <Card>
+      <CardHeader><CardTitle className="flex items-center gap-2"><KeyRound className="h-4 w-4" /> Parolni o'zgartirish</CardTitle></CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+          <FormField label="Joriy parol" error={errors.oldPassword?.message} required>
+            <PasswordInput {...register('oldPassword')} error={errors.oldPassword} />
+          </FormField>
+          <FormField label="Yangi parol" error={errors.newPassword?.message} required>
+            <PasswordInput {...register('newPassword')} error={errors.newPassword} />
+          </FormField>
+          <FormField label="Tasdiqlang" error={errors.confirm?.message} required>
+            <PasswordInput {...register('confirm')} error={errors.confirm} />
+          </FormField>
+          <Button type="submit" loading={change.isPending}>Saqlash</Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 

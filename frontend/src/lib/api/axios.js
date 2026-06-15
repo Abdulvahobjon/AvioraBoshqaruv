@@ -3,7 +3,8 @@ import { getAuth, useAuthStore } from '@/store/authStore';
 
 const baseURL = (import.meta.env.VITE_API_URL || '') + '/api';
 
-export const api = axios.create({ baseURL });
+// withCredentials — httpOnly refresh cookie'ni so'rovlarga qo'shadi.
+export const api = axios.create({ baseURL, withCredentials: true });
 
 // ── Request: attach access token ──
 api.interceptors.request.use((config) => {
@@ -29,13 +30,10 @@ api.interceptors.response.use(
     const original = error.config;
     const status = error.response?.status;
 
-    if (status === 401 && !original._retry) {
-      const { refreshToken } = getAuth();
-      if (!refreshToken) {
-        useAuthStore.getState().logout();
-        return Promise.reject(error);
-      }
+    // refresh endpointining o'zi 401 bersa — qayta urinmaymiz (cheksiz sikl oldini olish).
+    const isRefreshCall = original?.url?.includes('/auth/refresh');
 
+    if (status === 401 && !original._retry && !isRefreshCall) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           queue.push({ resolve, reject });
@@ -50,11 +48,9 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const { data } = await axios.post(`${baseURL}/auth/refresh`, { refreshToken });
-        useAuthStore.getState().setAuth({
-          accessToken: data.accessToken,
-          refreshToken: data.refreshToken,
-        });
+        // Refresh token httpOnly cookie'da — withCredentials bilan avtomatik yuboriladi.
+        const { data } = await axios.post(`${baseURL}/auth/refresh`, {}, { withCredentials: true });
+        useAuthStore.getState().setAuth({ accessToken: data.accessToken });
         processQueue(null, data.accessToken);
         original.headers.Authorization = `Bearer ${data.accessToken}`;
         return api(original);

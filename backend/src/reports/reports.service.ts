@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CurrenciesService } from '../currencies/currencies.service';
+import { CurrenciesService, RATE_SCALE } from '../currencies/currencies.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 
 const n = (b: bigint) => Number(b) / 100; // tiyin -> unit for display/export
@@ -39,8 +39,8 @@ export class ReportsService {
    * Currency faqat UZS/USD, shuning uchun bitta USD kurs yetarli.
    */
   private async uzsConverter() {
-    const usdRate = BigInt(await this.currencies.getRate('USD'));
-    return (amount: bigint, code: string) => (code === 'USD' ? amount * usdRate : amount);
+    const usdRate = await this.currencies.getRate('USD'); // scaled (×RATE_SCALE)
+    return (amount: bigint, code: string) => (code === 'USD' ? (amount * usdRate) / RATE_SCALE : amount);
   }
 
   /** Loyihalar ro'yxati hisoboti: muallif/boshqaruvchi/xodimlar/sinovchilar + vazifa statuslari kesimi. */
@@ -65,7 +65,7 @@ export class ReportsService {
     const memberAnd: any[] = [];
     if (managerIds.length) memberAnd.push({ members: { some: { roleInProject: 'manager', userId: { in: managerIds } } } });
     if (employeeIds.length) memberAnd.push({ members: { some: { roleInProject: 'employee', userId: { in: employeeIds } } } });
-    if (testerIds.length) memberAnd.push({ members: { some: { roleInProject: 'auditor', userId: { in: testerIds } } } });
+    if (testerIds.length) memberAnd.push({ testers: { some: { userId: { in: testerIds } } } });
     if (memberAnd.length) where.AND = memberAnd;
 
     const projects = await this.prisma.project.findMany({
@@ -73,6 +73,7 @@ export class ReportsService {
       include: {
         creator: { select: { fullName: true } },
         members: { include: { user: { select: { id: true, fullName: true } } } },
+        testers: { include: { user: { select: { id: true, fullName: true } } } },
         tasks: { where: { deletedAt: null }, select: { status: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -87,7 +88,7 @@ export class ReportsService {
     let rows = projects.map((p) => {
       const managers = p.members.filter((m) => m.roleInProject === 'manager');
       const employees = p.members.filter((m) => m.roleInProject === 'employee');
-      const testers = p.members.filter((m) => m.roleInProject === 'auditor');
+      const testers = p.testers;
       let bonus = 0n;
       for (const m of managers) bonus += toUzs(m.shareAmount, m.shareCurrency);
       const tasks = emptyTasks();
@@ -181,6 +182,40 @@ export class ReportsService {
     return { rows, count: rows.length };
   }
 
+  /** "Tarix" (ledger) eksporti uchun yozuvlar. */
+  async ledger(q: any) {
+    const where: any = {};
+    if (q.direction) where.direction = q.direction;
+    if (q.expenseType) where.type = q.expenseType;
+    if (q.dateFrom || q.dateTo) {
+      where.createdAt = {};
+      if (q.dateFrom) where.createdAt.gte = new Date(q.dateFrom);
+      if (q.dateTo) {
+        const t = new Date(q.dateTo);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(q.dateTo)) t.setUTCHours(23, 59, 59, 999);
+        where.createdAt.lte = t;
+      }
+    }
+    const userIds = this.parseIds(q.userIds);
+    if (userIds.length) where.userId = { in: userIds };
+    const entries = await this.prisma.ledgerEntry.findMany({
+      where,
+      include: { user: { select: { fullName: true } }, request: { select: { category: { select: { name: true } } } } },
+      orderBy: { createdAt: 'desc' },
+      take: 1000,
+    });
+    const rows = entries.map((e) => ({
+      fullName: e.user?.fullName || '—',
+      category: e.request?.category?.name || '—',
+      type: e.type,
+      direction: e.direction,
+      amount: n(e.amount),
+      createdAt: e.createdAt,
+      note: e.note || '—',
+    }));
+    return { rows, count: rows.length };
+  }
+
   /** Company finance summary: income (client payments) vs expenses vs payroll → net. */
   async finance(r: Range) {
     const toUzs = await this.uzsConverter();
@@ -223,7 +258,8 @@ export class ReportsService {
       where: { role: { in: ['employee', 'manager'] } },
       include: {
         _count: { select: { assignedTasks: true } },
-        ledgerEntries: { where: { direction: 'credit' }, select: { amount: true } },
+        // isReversal: false — teskari (reversal) kredit yozuvlar "ishlab topilgan"ni shishirmasin.
+        ledgerEntries: { where: { direction: 'credit', isReversal: false }, select: { amount: true } },
       },
     });
     return users.map((u) => ({
@@ -268,14 +304,38 @@ export class ReportsService {
   }
 
   /** Ish haqi (oylik) hisoboti: oy/sana bo'yicha, xodimlar kesimida + jami (UZS). */
-  async payroll(r: Range & { month?: string; status?: string }) {
+  async payroll(r: any) {
     const where: any = {};
     if (r.month) where.month = r.month;
-    else Object.assign(where, this.dateWhere(r, 'createdAt'));
+    // Hisoblangan vaqti (createdAt) va Tasdiqlangan vaqti (confirmedAt) oraliqlari
+    Object.assign(where, this.dateWhere({ from: r.createdFrom, to: r.createdTo }, 'createdAt'));
+    Object.assign(where, this.dateWhere({ from: r.confirmedFrom, to: r.confirmedTo }, 'confirmedAt'));
     if (r.status) where.status = r.status;
+    // Xodimlar / Hisobchi (buxgalter) kesimi
+    const userIds = this.parseIds(r.userIds);
+    if (userIds.length) where.userId = { in: userIds };
+    const accountantIds = this.parseIds(r.accountantIds);
+    if (accountantIds.length) where.paidById = { in: accountantIds };
+    // Pul oraliqlari (UZS unit -> tiyin BigInt)
+    const moneyRange = (field: string, fromKey: string, toKey: string) => {
+      const f = this.numFrom(r, fromKey);
+      const t = this.numFrom(r, toKey);
+      if (f === undefined && t === undefined) return;
+      where[field] = {};
+      if (f !== undefined) where[field].gte = BigInt(Math.round(f * 100));
+      if (t !== undefined) where[field].lte = BigInt(Math.round(t * 100));
+    };
+    moneyRange('total', 'totalFrom', 'totalTo');
+    moneyRange('fixedAmount', 'fixedFrom', 'fixedTo');
+    moneyRange('kpiBonus', 'kpiFrom', 'kpiTo');
+    moneyRange('penalty', 'penaltyFrom', 'penaltyTo');
+
     const payrolls = await this.prisma.payroll.findMany({
       where,
-      include: { user: { select: { fullName: true, position: { select: { name: true } } } } },
+      include: {
+        user: { select: { fullName: true, position: { select: { name: true } } } },
+        paidBy: { select: { fullName: true } },
+      },
       orderBy: [{ month: 'desc' }, { total: 'desc' }],
     });
     const rows = payrolls.map((p) => ({
@@ -285,13 +345,20 @@ export class ReportsService {
       month: p.month,
       fixedAmount: n(p.fixedAmount),
       projectShareTotal: n(p.projectShareTotal),
+      kpiBonus: n(p.kpiBonus),
+      penalty: n(p.penalty),
       total: n(p.total),
       status: p.status,
+      accountant: p.paidBy?.fullName || '—',
+      createdAt: p.createdAt,
+      confirmedAt: p.confirmedAt,
     }));
     const totals = {
       count: rows.length,
       fixedAmount: n(payrolls.reduce((a, p) => a + p.fixedAmount, 0n)),
       projectShareTotal: n(payrolls.reduce((a, p) => a + p.projectShareTotal, 0n)),
+      kpiBonus: n(payrolls.reduce((a, p) => a + p.kpiBonus, 0n)),
+      penalty: n(payrolls.reduce((a, p) => a + p.penalty, 0n)),
       total: n(payrolls.reduce((a, p) => a + p.total, 0n)),
       paid: n(payrolls.filter((p) => ['paid', 'closed'].includes(p.status)).reduce((a, p) => a + p.fixedAmount, 0n)),
     };
@@ -364,6 +431,86 @@ export class ReportsService {
   private parseIds(v: any): number[] {
     if (!v) return [];
     return String(v).split(',').map((x) => Number(x.trim())).filter((x) => Number.isFinite(x) && x > 0);
+  }
+  private parseStrs(v: any): string[] {
+    if (!v) return [];
+    return String(v).split(',').map((x) => x.trim()).filter(Boolean);
+  }
+
+  /**
+   * "Vazifalar bo'yicha" — har-vazifa batafsil hisoboti.
+   * Topshiruvchi = biriktirilgan bajaruvchi (assignee); Muallif = yaratgan (createdBy); Kim uchun = lavozim.
+   */
+  async tasksDetail(q: any) {
+    const where: any = { deletedAt: null, ...this.dateWhere(q, 'createdAt') };
+    const projectIds = this.parseIds(q.projectIds);
+    if (projectIds.length) where.projectId = { in: projectIds };
+    const assigneeIds = this.parseIds(q.assigneeIds);
+    if (assigneeIds.length) where.assigneeId = { in: assigneeIds };
+    const authorIds = this.parseIds(q.authorIds);
+    if (authorIds.length) where.createdBy = { in: authorIds };
+    const positionIds = this.parseIds(q.positionIds);
+    if (positionIds.length) where.positionId = { in: positionIds };
+    if (q.priority) where.priority = q.priority;
+    if (q.status) where.status = q.status;
+    const types = this.parseStrs(q.types);
+    if (types.length) where.type = { in: types };
+    const sprints = this.parseIds(q.sprints);
+    if (sprints.length) where.sprint = { in: sprints };
+    // Vazifa narxi (UZS unit -> tiyin BigInt)
+    const priceFrom = this.numFrom(q, 'priceFrom');
+    const priceTo = this.numFrom(q, 'priceTo');
+    if (priceFrom !== undefined || priceTo !== undefined) {
+      where.price = {};
+      if (priceFrom !== undefined) where.price.gte = BigInt(Math.round(priceFrom * 100));
+      if (priceTo !== undefined) where.price.lte = BigInt(Math.round(priceTo * 100));
+    }
+    // Jarima foizi (%)
+    const penaltyFrom = this.numFrom(q, 'penaltyFrom');
+    const penaltyTo = this.numFrom(q, 'penaltyTo');
+    if (penaltyFrom !== undefined || penaltyTo !== undefined) {
+      where.penaltyPercent = {};
+      if (penaltyFrom !== undefined) where.penaltyPercent.gte = penaltyFrom;
+      if (penaltyTo !== undefined) where.penaltyPercent.lte = penaltyTo;
+    }
+    // Qaytishlar soni
+    const reopenFrom = this.numFrom(q, 'reopenFrom');
+    const reopenTo = this.numFrom(q, 'reopenTo');
+    if (reopenFrom !== undefined || reopenTo !== undefined) {
+      where.reopenedCount = {};
+      if (reopenFrom !== undefined) where.reopenedCount.gte = reopenFrom;
+      if (reopenTo !== undefined) where.reopenedCount.lte = reopenTo;
+    }
+    const tasks = await this.prisma.task.findMany({
+      where,
+      include: {
+        project: { select: { name: true } },
+        assignee: { select: { fullName: true } },
+        creator: { select: { fullName: true } },
+        position: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const rows = tasks.map((t) => ({
+      id: t.id,
+      uid: t.uid || '—',
+      projectName: t.project?.name || '—',
+      title: t.title,
+      assignee: t.assignee?.fullName || '—',
+      author: t.creator?.fullName || '—',
+      priority: t.priority,
+      status: t.status,
+      type: t.type,
+      price: n(t.price),
+      penaltyPercent: t.penaltyPercent ?? 0,
+      deadline: t.deadline,
+      createdAt: t.createdAt,
+      sprint: t.sprint ?? null,
+      position: t.position?.name || '—',
+      reopenedCount: t.reopenedCount,
+      rejectReason: t.rejectReason || '—',
+    }));
+    return { rows };
   }
 
   /** Xodim bo'yicha keng hisobot: maosh, balans, loyiha/vazifa/yig'ilish/so'rov agregatlari. */
@@ -505,7 +652,8 @@ export class ReportsService {
       let sum = 0n;
       if (userId) {
         const entries = await this.prisma.ledgerEntry.findMany({
-          where: { userId, direction: 'credit', createdAt: { gte: start, lt: end } },
+          // isReversal: false — teskari yozuvlar oylik daromad trendini shishirmasin.
+          where: { userId, direction: 'credit', isReversal: false, createdAt: { gte: start, lt: end } },
           select: { amount: true },
         });
         for (const e of entries) sum += e.amount;

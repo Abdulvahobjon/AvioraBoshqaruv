@@ -39,6 +39,14 @@ enum ClientStatus {
   inactive
 }
 
+enum ClientActivityType {
+  call    // qo'ng'iroq
+  meeting // uchrashuv
+  email   // xat
+  note    // eslatma
+  other   // boshqa
+}
+
 enum ProjectStatus {
   planning
   active
@@ -190,7 +198,8 @@ model User {
   id           Int        @id @default(autoincrement())
   fullName     String     @map("full_name")
   passwordHash String     @map("password_hash")
-  role         Role       @default(employee)
+  role         Role       @default(employee) // asosiy (default) rol — login'da birinchi aktiv rol
+  roles        Role[]     @default([]) // qo'shimcha rollar (asosiy 'role'dan tashqari) — faqat superadmin beradi
   positionId   Int?       @map("position_id")
   fixedSalary  BigInt     @default(0) @map("fixed_salary") // tiyin
   balance      BigInt     @default(0) // tiyin (closed/confirmed balans)
@@ -217,6 +226,7 @@ model User {
   managedClients   Client[]            @relation("ClientManager")
   createdProjects  Project[]           @relation("ProjectCreator")
   projectMembers   ProjectMember[]
+  projectTesters   ProjectTester[]     @relation("ProjectTesterUser")
   assignedTasks    Task[]              @relation("TaskAssignee")
   createdTasks     Task[]              @relation("TaskCreator")
   taskComments     TaskComment[]
@@ -226,11 +236,14 @@ model User {
   financeRequests  FinanceRequest[]
   paidFinanceRequests FinanceRequest[] @relation("RequestPaidBy")
   ledgerEntries    LedgerEntry[]
-  payrolls         Payroll[]
+  payrolls         Payroll[]        @relation("PayrollUser")
+  paidPayrolls     Payroll[]        @relation("PayrollPaidBy")
   dailyPlans       DailyPlan[]
   auditLogs        AuditLog[]
   notifications    Notification[]
   reviewedApplications Application[] @relation("ApplicationReviewer")
+  clientActivities ClientActivity[] @relation("ClientActivityAuthor")
+  clientDocuments  ClientDocument[] @relation("ClientDocumentUploader")
 
   @@map("users")
 }
@@ -252,11 +265,16 @@ model Client {
   createdAt DateTime     @default(now()) @map("created_at")
   updatedAt DateTime     @updatedAt @map("updated_at")
 
-  region   Region? @relation(fields: [regionId], references: [id])
-  manager  User?   @relation("ClientManager", fields: [managerId], references: [id])
-  projects Project[]
-  payments ClientPayment[]
+  region     Region?          @relation(fields: [regionId], references: [id])
+  manager    User?            @relation("ClientManager", fields: [managerId], references: [id])
+  projects   Project[]
+  payments   ClientPayment[]
+  contacts   ClientContact[]
+  activities ClientActivity[]
+  documents  ClientDocument[]
 
+  @@index([managerId])
+  @@index([deletedAt])
   @@map("clients")
 }
 
@@ -273,6 +291,8 @@ model Project {
   price           BigInt        @default(0) // tiyin
   currency        Currency      @default(UZS)
   paymentStatus   PaymentStatus @default(unpaid) @map("payment_status")
+  penaltyPercent  Int?          @map("penalty_percent") // jarima foizi (faqat ma'lumot)
+  isFrozen        Boolean       @default(false) @map("is_frozen") // muzlatilgan loyiha tahrirlanmaydi
   clientId        Int?          @map("client_id")
   progressPercent Int           @default(0) @map("progress_percent")
   createdBy       Int?          @map("created_by")
@@ -285,13 +305,47 @@ model Project {
   creator User?        @relation("ProjectCreator", fields: [createdBy], references: [id])
 
   members         ProjectMember[]
+  testers         ProjectTester[]
+  documents       ProjectDocument[]
   tasks           Task[]
   meetings        Meeting[]
   payments        ClientPayment[]
   expenses        Expense[]
   financeRequests FinanceRequest[]
 
+  @@index([clientId])
+  @@index([status])
+  @@index([deletedAt])
   @@map("projects")
+}
+
+// Sinovchilar (testers) — xodimlardan ALOHIDA; ulush olmaydi (faqat QA/sinov).
+// Bir foydalanuvchi ham xodim, ham sinovchi bo'lishi mumkin (shuning uchun alohida jadval).
+model ProjectTester {
+  id        Int      @id @default(autoincrement())
+  projectId Int      @map("project_id")
+  userId    Int      @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation("ProjectTesterUser", fields: [userId], references: [id])
+
+  @@unique([projectId, userId])
+  @@map("project_testers")
+}
+
+// Loyiha hujjatlari — nom + havola juftlari (fayl emas, tashqi link).
+model ProjectDocument {
+  id        Int      @id @default(autoincrement())
+  projectId Int      @map("project_id")
+  name      String
+  url       String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("project_documents")
 }
 
 model ProjectMember {
@@ -334,6 +388,7 @@ model Task {
   inProgressAt     DateTime?    @map("in_progress_at") // oxirgi marta 'in_progress' ga o'tgan vaqt (actualMinutes hisoblash uchun)
   reopenedCount    Int          @default(0) @map("reopened_count")
   rejectReason     String?      @map("reject_reason")
+  rejectPhotoUrl   String?      @map("reject_photo_url") // rad etish dalili (rasm)
   orderIndex       Int          @default(0) @map("order_index") // Kanban tartib
   deletedAt        DateTime?    @map("deleted_at")
   createdAt        DateTime     @default(now()) @map("created_at")
@@ -347,6 +402,10 @@ model Task {
   files    TaskFile[]
   comments TaskComment[]
 
+  @@index([projectId])
+  @@index([assigneeId])
+  @@index([status])
+  @@index([deletedAt])
   @@map("tasks")
 }
 
@@ -361,6 +420,7 @@ model TaskFile {
   task     Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
   uploader User? @relation(fields: [uploadedBy], references: [id])
 
+  @@index([taskId])
   @@map("task_files")
 }
 
@@ -374,6 +434,7 @@ model TaskComment {
   task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id])
 
+  @@index([taskId])
   @@map("task_comments")
 }
 
@@ -390,6 +451,7 @@ model Meeting {
   penaltyPercent Int?  @map("penalty_percent") // jarima foizi (faqat ma'lumot, moliyaga ta'sirsiz)
   startAt    DateTime  @map("start_at")
   finishedAt DateTime? @map("finished_at") // null = tugatilmagan
+  reminderSentAt DateTime? @map("reminder_sent_at") // boshlanish oldidan eslatma yuborilgan vaqt (null = yuborilmagan)
   createdBy  Int?      @map("created_by")
   // ── Google Meet (Calendar API orqali) ──
   googleEventId String? @map("google_event_id") // Calendar event id (patch/delete uchun)
@@ -402,6 +464,8 @@ model Meeting {
   creator    User?               @relation("MeetingCreator", fields: [createdBy], references: [id])
   attendance MeetingAttendance[]
 
+  @@index([projectId])
+  @@index([deletedAt])
   @@map("meetings")
 }
 
@@ -439,11 +503,13 @@ model FinanceRequest {
   projectId     Int?                 @map("project_id") // bog'langan loyiha (ixtiyoriy)
   status        FinanceRequestStatus @default(pending)
   paymentMethod PaymentMethod?       @map("payment_method") // to'lov turi (karta/naqd) — to'langanda
+  receipts      String[]             @default([]) // to'lov cheki/kvitansiya fayl URL'lari (to'langanda, 0-3 ta)
   paidBy        Int?                 @map("paid_by") // qaysi buxgalter to'ladi
   cancelReason  String?              @map("cancel_reason") // rad etish/bekor qilish sababi
   paidAt        DateTime?            @map("paid_at")
   confirmedAt   DateTime?            @map("confirmed_at")
   canceledAt    DateTime?            @map("canceled_at") // rad etilgan vaqt
+  deletedAt     DateTime?            @map("deleted_at") // soft-delete (moliyaviy yozuv hard-delete qilinmaydi)
   createdAt     DateTime             @default(now()) @map("created_at")
   updatedAt     DateTime             @updatedAt @map("updated_at")
 
@@ -453,7 +519,21 @@ model FinanceRequest {
   paidByUser User?           @relation("RequestPaidBy", fields: [paidBy], references: [id])
   ledger    LedgerEntry[]
 
+  @@index([userId])
+  @@index([projectId])
+  @@index([status])
+  @@index([deletedAt])
   @@map("finance_requests")
+}
+
+// Ledger yozuv turi — erkin string emas, enum (append-only jadvalda typo bo'lmasligi uchun).
+enum LedgerType {
+  salary
+  company
+  other
+  project_share
+  withdrawal
+  reversal
 }
 
 // Ledger: yozuvlar O'CHIRILMAYDI. Xato -> reverse (is_reversal) yozuv.
@@ -462,7 +542,7 @@ model LedgerEntry {
   requestId       Int?            @map("request_id")
   userId          Int?            @map("user_id")
   amount          BigInt // tiyin (har doim musbat; yo'nalish direction'da)
-  type            String // "salary" | "company" | "other" | "project_share" | "withdrawal" | "reversal"
+  type            LedgerType
   direction       LedgerDirection
   isReversal      Boolean         @default(false) @map("is_reversal")
   reversedEntryId Int?            @unique @map("reversed_entry_id") // bir yozuv faqat bir marta teskari qilinadi (dubl-himoya)
@@ -474,6 +554,8 @@ model LedgerEntry {
   reversedEntry  LedgerEntry?    @relation("Reversal", fields: [reversedEntryId], references: [id])
   reversals      LedgerEntry[]   @relation("Reversal")
 
+  @@index([userId])
+  @@index([requestId])
   @@map("ledger_entries")
 }
 
@@ -485,16 +567,22 @@ model Payroll {
   month             String // "2026-05"
   fixedAmount       BigInt        @default(0) @map("fixed_amount") // tiyin
   projectShareTotal BigInt        @default(0) @map("project_share_total") // tiyin
-  total             BigInt        @default(0) // tiyin
+  kpiBonus          BigInt        @default(0) @map("kpi_bonus") // KPI bonus (tiyin) — MA'LUMOT uchun, pul oqimiga ta'sir qilmaydi
+  penalty           BigInt        @default(0) // jarima (tiyin) — MA'LUMOT uchun (efficiency), pul oqimiga ta'sir qilmaydi
+  total             BigInt        @default(0) // tiyin (= fixed + projectShare; KPI/jarima qo'shilmaydi)
   status            PayrollStatus @default(draft)
   paidAt            DateTime?     @map("paid_at")
+  paidById          Int?          @map("paid_by_id") // qaysi buxgalter to'ladi (Hisobchi)
   confirmedAt       DateTime?     @map("confirmed_at")
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id])
+  user   User  @relation("PayrollUser", fields: [userId], references: [id])
+  paidBy User? @relation("PayrollPaidBy", fields: [paidById], references: [id])
 
   @@unique([userId, month])
+  @@index([status])
+  @@index([paidById])
   @@map("payrolls")
 }
 
@@ -512,7 +600,61 @@ model ClientPayment {
   client  Client   @relation(fields: [clientId], references: [id])
   project Project? @relation(fields: [projectId], references: [id])
 
+  @@index([clientId])
+  @@index([projectId])
   @@map("client_payments")
+}
+
+// Mijozning kontakt shaxslari (bir nechta) — soft-delete.
+model ClientContact {
+  id        Int       @id @default(autoincrement())
+  clientId  Int       @map("client_id")
+  name      String
+  position  String?
+  phone     String?
+  email     String?
+  isPrimary Boolean   @default(false) @map("is_primary")
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@map("client_contacts")
+}
+
+// Mijoz bilan muloqot/faoliyat tarixi (qo'ng'iroq, uchrashuv, eslatma) — append-only timeline.
+model ClientActivity {
+  id        Int                @id @default(autoincrement())
+  clientId  Int                @map("client_id")
+  userId    Int?               @map("user_id")
+  type      ClientActivityType @default(note)
+  note      String
+  date      DateTime           @default(now())
+  createdAt DateTime           @default(now()) @map("created_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User?  @relation("ClientActivityAuthor", fields: [userId], references: [id])
+
+  @@index([clientId])
+  @@map("client_activities")
+}
+
+// Mijozga biriktirilgan hujjatlar (shartnoma, fayl) — soft-delete.
+model ClientDocument {
+  id           Int       @id @default(autoincrement())
+  clientId     Int       @map("client_id")
+  name         String
+  url          String
+  uploadedById Int?      @map("uploaded_by_id")
+  deletedAt    DateTime? @map("deleted_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  client     Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  uploadedBy User?  @relation("ClientDocumentUploader", fields: [uploadedById], references: [id])
+
+  @@index([clientId])
+  @@map("client_documents")
 }
 
 // ─────────────── CURRENCY ───────────────
@@ -521,7 +663,7 @@ model CurrencyRate {
   id        Int      @id @default(autoincrement())
   code      Currency @unique
   name      String
-  rateToUzs Int      @map("rate_to_uzs") // 1 birlik = N so'm (UZS uchun 1)
+  rateToUzs BigInt   @map("rate_to_uzs") // saqlangan = haqiqiy kurs × RATE_SCALE (10000); kasr yo'qolmaydi
   updatedAt DateTime @updatedAt @map("updated_at")
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -533,11 +675,12 @@ model CurrencyRate {
 model CurrencyHistory {
   id         Int      @id @default(autoincrement())
   currencyId Int      @map("currency_id")
-  rateToUzs  Int      @map("rate_to_uzs")
+  rateToUzs  BigInt   @map("rate_to_uzs") // saqlangan = haqiqiy kurs × RATE_SCALE (10000)
   changedAt  DateTime @default(now()) @map("changed_at")
 
   currency CurrencyRate @relation(fields: [currencyId], references: [id])
 
+  @@index([currencyId])
   @@map("currency_history")
 }
 
@@ -559,6 +702,9 @@ model Expense {
   category ExpenseCategory? @relation(fields: [categoryId], references: [id])
   project  Project?         @relation(fields: [projectId], references: [id])
 
+  @@index([categoryId])
+  @@index([projectId])
+  @@index([deletedAt])
   @@map("expenses")
 }
 
@@ -604,6 +750,9 @@ model AuditLog {
 
   user User? @relation(fields: [userId], references: [id])
 
+  @@index([entity, entityId])
+  @@index([flagged])
+  @@index([createdAt])
   @@map("audit_logs")
 }
 
@@ -620,6 +769,8 @@ model Notification {
 
   user User @relation(fields: [userId], references: [id])
 
+  @@index([userId, isRead])
+  @@index([deletedAt])
   @@map("notifications")
 }
 
@@ -652,5 +803,7 @@ model Application {
   position Position? @relation(fields: [positionId], references: [id])
   reviewer User?     @relation("ApplicationReviewer", fields: [reviewedBy], references: [id])
 
+  @@index([status])
+  @@index([deletedAt])
   @@map("applications")
 }

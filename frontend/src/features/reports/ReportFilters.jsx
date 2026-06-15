@@ -3,7 +3,18 @@ import { ChevronDown, X, Check, Users as UsersIcon } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { Input } from '@/components/ui/Input';
 import { MoneyInput } from '@/components/ui/MoneyInput';
+import { AntDate } from '@/components/ui/AntDate';
 import { ParticipantPicker } from '@/features/meetings/ParticipantPicker';
+
+/** "dan / gacha" sana+vaqt oralig'i — dan=00:00, gacha=23:59 (boshlang'ich vaqt). */
+export function DateRange({ from, to, onFrom, onTo, fromPlaceholder = 'dan', toPlaceholder = 'gacha' }) {
+  return (
+    <div className="flex gap-2">
+      <AntDate value={from} onChange={onFrom} placeholder={fromPlaceholder} showTime />
+      <AntDate value={to} onChange={onTo} placeholder={toPlaceholder} showTime defaultTime="23:59" />
+    </div>
+  );
+}
 
 /** Tashqariga bosilganda yopish. */
 function useOutside(ref, onClose) {

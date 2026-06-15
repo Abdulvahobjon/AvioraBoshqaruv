@@ -2,12 +2,11 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card } from '@/components/ui/Card';
-import { AntDate } from '@/components/ui/AntDate';
 import { formatMoney, formatDate } from '@/lib/utils/format';
 import { useUsersList } from '@/features/users/usersApi';
 import { useProjectsReport } from '@/features/reports/reportsApi';
 import { ReportExportActions, ReportToolbar } from '@/features/reports/ReportShell';
-import { FilterField, MoneyRange, UserPickerField } from '@/features/reports/ReportFilters';
+import { FilterField, MoneyRange, UserPickerField, DateRange } from '@/features/reports/ReportFilters';
 import { ReportTable } from '@/features/reports/ReportTable';
 import { PROJECT_STATUS } from '@/lib/constants';
 
@@ -103,13 +102,10 @@ export function ProjectsReportPage() {
         {filtersOpen && (
           <Card className="mt-3 p-4">
             <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-              <FilterField label="Muddati" className="sm:col-span-2">
-                <div className="flex gap-2">
-                  <AntDate value={filters.from} onChange={(v) => set('from', v)} placeholder="dan" />
-                  <AntDate value={filters.to} onChange={(v) => set('to', v)} placeholder="gacha" />
-                </div>
+              <FilterField label="Muddati">
+                <DateRange from={filters.from} to={filters.to} onFrom={(v) => set('from', v)} onTo={(v) => set('to', v)} />
               </FilterField>
-              <FilterField label="Boshqaruvchi bonusi" className="sm:col-span-2">
+              <FilterField label="Boshqaruvchi bonusi">
                 <MoneyRange from={filters.bonusFrom} to={filters.bonusTo} onFrom={(v) => set('bonusFrom', v)} onTo={(v) => set('bonusTo', v)} />
               </FilterField>
               <FilterField label="Muallifi">

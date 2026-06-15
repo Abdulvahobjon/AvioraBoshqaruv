@@ -10,6 +10,7 @@ const userSelect = {
   id: true,
   fullName: true,
   role: true,
+  roles: true,
   positionId: true,
   position: { select: { id: true, name: true } },
   fixedSalary: true,
@@ -35,6 +36,14 @@ const PROFILE_FIELDS = [
   'card', 'card2', 'phone', 'phone2', 'region', 'district',
   'passportSeries', 'passportNumber', 'passportImage', 'avatar', 'link1', 'link2',
 ] as const;
+
+// Qo'shimcha rol sifatida beriladigan rollar (superadmin alohida — bu yerda yo'q).
+const ASSIGNABLE_ROLES = ['admin', 'manager', 'accountant', 'auditor', 'employee'];
+
+/** Qo'shimcha rollarni tozalash: superadmin chiqariladi, asosiy rol takrorlanmaydi, dedup. */
+function sanitizeRoles(roles: string[], primaryRole: string): string[] {
+  return [...new Set(roles.filter((r) => ASSIGNABLE_ROLES.includes(r) && r !== primaryRole))];
+}
 
 @Injectable()
 export class UsersService {
@@ -76,7 +85,7 @@ export class UsersService {
     if (role) where.role = role;
     return this.prisma.user.findMany({
       where,
-      select: { id: true, fullName: true, role: true, avatar: true, positionId: true, position: { select: { id: true, name: true } } },
+      select: { id: true, fullName: true, role: true, roles: true, avatar: true, positionId: true, position: { select: { id: true, name: true } } },
       orderBy: { fullName: 'asc' },
     });
   }
@@ -150,9 +159,9 @@ export class UsersService {
   }
 
   async create(dto: CreateUserDto, actorId: number, actorRole: string, ip?: string) {
-    // Privilege escalation himoyasi: faqat superadmin 'superadmin' rolini bera oladi.
-    if (dto.role === 'superadmin' && actorRole !== 'superadmin') {
-      throw new ForbiddenException('Faqat superadmin superadmin rolini bera oladi');
+    // Superadmin yagona (seed'dan keladi) — yangi superadmin umuman yaratilmaydi (hatto superadmin ham yarata olmaydi).
+    if (dto.role === 'superadmin') {
+      throw new ForbiddenException('Superadmin yagona — yangi superadmin yaratib bo\'lmaydi');
     }
     const exists = await this.prisma.user.findFirst({ where: { fullName: dto.fullName } });
     if (exists) throw new BadRequestException('Bu login allaqachon mavjud');
@@ -165,6 +174,11 @@ export class UsersService {
       positionId: dto.positionId ?? null,
       fixedSalary: BigInt(dto.fixedSalary ?? 0),
     };
+    // Qo'shimcha rollar — superadmin va admin bera oladi (superadmin roli sanitizeRoles'da chiqariladi).
+    if (dto.roles !== undefined) {
+      if (!['superadmin', 'admin'].includes(actorRole)) throw new ForbiddenException('Qo\'shimcha rollarni faqat superadmin yoki admin beradi');
+      data.roles = sanitizeRoles(dto.roles, dto.role);
+    }
     for (const f of PROFILE_FIELDS) {
       if ((dto as any)[f] !== undefined) data[f] = (dto as any)[f] || null;
     }
@@ -178,14 +192,23 @@ export class UsersService {
     if (!before) throw new NotFoundException('Foydalanuvchi topilmadi');
 
     // Privilege escalation himoyasi (superadmin bo'lmaganlar uchun):
-    if (actorRole !== 'superadmin') {
-      if (before.role === 'superadmin') throw new ForbiddenException('Superadmin foydalanuvchini faqat superadmin tahrirlay oladi');
-      if (dto.role === 'superadmin') throw new ForbiddenException('Faqat superadmin superadmin rolini bera oladi');
+    if (actorRole !== 'superadmin' && before.role === 'superadmin') {
+      throw new ForbiddenException('Superadmin foydalanuvchini faqat superadmin tahrirlay oladi');
+    }
+    // Superadmin yagona — mavjud bo'lmagan xodimni superadmin qilib bo'lmaydi (hatto superadmin ham promote qila olmaydi).
+    if (dto.role === 'superadmin' && before.role !== 'superadmin') {
+      throw new ForbiddenException('Superadmin yagona — boshqa xodimni superadmin qilib bo\'lmaydi');
     }
 
     const data: any = {};
     if (dto.fullName !== undefined) data.fullName = dto.fullName;
     if (dto.role !== undefined) data.role = dto.role;
+    // Qo'shimcha rollar — superadmin va admin. Asosiy rolga nisbatan tozalanadi (superadmin chiqariladi).
+    if (dto.roles !== undefined) {
+      if (!['superadmin', 'admin'].includes(actorRole)) throw new ForbiddenException('Qo\'shimcha rollarni faqat superadmin yoki admin beradi');
+      const primary = dto.role ?? before.role;
+      data.roles = sanitizeRoles(dto.roles, primary);
+    }
     if (dto.positionId !== undefined) data.positionId = dto.positionId;
     if (dto.fixedSalary !== undefined) data.fixedSalary = BigInt(dto.fixedSalary);
     if (dto.status !== undefined) data.status = dto.status;

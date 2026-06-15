@@ -1,10 +1,15 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, Req } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import {
+  BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Post, Query, Req,
+  UploadedFile, UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { FinanceService } from './finance.service';
 import { CreateFinanceRequestDto, PayRequestDto, RejectRequestDto, ReverseDto } from './dto/finance.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
+import { uploadOptions } from '../common/upload.util';
 
 @ApiTags('finance')
 @ApiBearerAuth()
@@ -25,6 +30,16 @@ export class FinanceController {
   @Post('requests')
   createRequest(@Body() dto: CreateFinanceRequestDto, @CurrentUser() user: AuthUser) {
     return this.finance.createRequest(dto, user);
+  }
+
+  /** To'lov cheki/kvitansiya rasm yuklash (faqat URL qaytaradi). Buxgalter to'lov qilganda ishlatadi. */
+  @Post('upload-receipt')
+  @Roles('superadmin', 'admin', 'accountant')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', uploadOptions(10)))
+  uploadReceipt(@UploadedFile() file: any) {
+    if (!file) throw new BadRequestException('Fayl yuklanmadi');
+    return { url: `/uploads/${file.filename}` };
   }
 
   @Post('requests/:id/pay')

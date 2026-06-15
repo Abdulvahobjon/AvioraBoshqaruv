@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { StatCard } from '@/components/shared/StatCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { CopyId } from '@/components/ui/CopyId';
 import { Avatar } from '@/components/ui/Avatar';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -39,7 +40,9 @@ export function ProjectDetailPage() {
         title={project.name}
         subtitle={`${project.type?.name || '—'} · ${project.client?.name || 'Mijozsiz'}`}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {project.isFrozen && <Badge tone="muted">❄ Muzlatilgan</Badge>}
+            {project.penaltyPercent != null && <Badge tone="warning">Jarima {project.penaltyPercent}%</Badge>}
             <Badge tone={PAYMENT_STATUS[project.paymentStatus]?.tone}>{PAYMENT_STATUS[project.paymentStatus]?.label}</Badge>
             <Badge tone={PROJECT_STATUS[project.status]?.tone}>{PROJECT_STATUS[project.status]?.label}</Badge>
             {canEdit && <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}><Pencil className="h-4 w-4" /> Tahrirlash</Button>}
@@ -91,6 +94,40 @@ export function ProjectDetailPage() {
         </Card>
       </div>
 
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Card>
+          <CardHeader><CardTitle>Sinovchilar</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {(project.testers || []).map((t) => (
+              <div key={t.id} className="flex items-center gap-2.5">
+                <Avatar name={t.user?.fullName} src={t.user?.avatar} size="sm" />
+                <p className="text-sm font-medium text-text-strong">{t.user?.fullName}</p>
+              </div>
+            ))}
+            {!project.testers?.length && <p className="text-sm text-text-soft">Sinovchi biriktirilmagan.</p>}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader><CardTitle>Loyiha hujjatlari</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {(project.documents || []).map((d) => (
+              <a
+                key={d.id}
+                href={d.url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-between gap-3 rounded-lg border border-stroke-soft px-3 py-2 transition-colors hover:bg-bg-1-alt"
+              >
+                <span className="shrink-0 text-sm font-medium text-text-strong">{d.name}</span>
+                <span className="truncate text-xs text-text-accent">{d.url}</span>
+              </a>
+            ))}
+            {!project.documents?.length && <p className="text-sm text-text-soft">Hujjat biriktirilmagan.</p>}
+          </CardContent>
+        </Card>
+      </div>
+
       <ProjectTasks projectId={id} />
 
       <ProjectFormDialog open={editOpen} onClose={() => setEditOpen(false)} project={project} />
@@ -127,7 +164,7 @@ function ProjectTasks({ projectId }) {
                 <li key={t.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-text-strong">
-                      {t.uid && <span className="text-text-soft">{t.uid} · </span>}{t.title}
+                      {t.uid && <><CopyId value={t.uid} className="text-text-soft" /> · </>}{t.title}
                     </p>
                     <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs">
                       <Badge tone={TASK_STATUS[t.status]?.tone}>{TASK_STATUS[t.status]?.label || t.status}</Badge>

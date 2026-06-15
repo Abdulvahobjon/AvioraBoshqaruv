@@ -36,7 +36,7 @@ export function Drawer({ open, onClose, title, headerAction, children, width = '
             exit={{ x: '100%' }}
             transition={{ type: 'spring', stiffness: 320, damping: 34 }}
           >
-            <div className="flex items-center justify-between border-b border-stroke-sub px-5 py-4">
+            <div className="flex items-center justify-between px-5 py-4">
               <h2 className="text-base font-semibold text-text-strong">{title}</h2>
               <div className="flex items-center gap-3">
                 {headerAction}

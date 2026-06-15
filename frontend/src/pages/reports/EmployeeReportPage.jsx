@@ -2,14 +2,13 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card } from '@/components/ui/Card';
-import { AntDate } from '@/components/ui/AntDate';
 import { formatMoney } from '@/lib/utils/format';
 import { UZ_REGIONS } from '@/lib/uzRegions';
 import { useReference } from '@/features/settings/settingsApi';
 import { useUsersList } from '@/features/users/usersApi';
 import { useEmployeeReport } from '@/features/reports/reportsApi';
 import { ReportExportActions, ReportToolbar } from '@/features/reports/ReportShell';
-import { FilterField, FilterSelect, MoneyRange, StatusRange, UserPickerField } from '@/features/reports/ReportFilters';
+import { FilterField, FilterSelect, MoneyRange, StatusRange, UserPickerField, DateRange } from '@/features/reports/ReportFilters';
 import { ReportTable } from '@/features/reports/ReportTable';
 
 const money = (v) => formatMoney(Math.round((v || 0) * 100)); // unit -> tiyin
@@ -152,62 +151,55 @@ export function EmployeeReportPage() {
 
         {filtersOpen && (
           <Card className="mt-3 p-4">
-            <div className="grid grid-cols-1 gap-x-4 gap-y-3 lg:grid-cols-2">
-              {/* Chap blok */}
-              <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
-                <FilterField label="Ishga kirgan vaqti" className="sm:col-span-2">
-                  <div className="flex gap-2">
-                    <AntDate value={filters.joinedFrom} onChange={(v) => set('joinedFrom', v)} placeholder="dan" />
-                    <AntDate value={filters.joinedTo} onChange={(v) => set('joinedTo', v)} placeholder="gacha" />
-                  </div>
-                </FilterField>
-                <FilterField label="Oylik maoshi (UZS)">
-                  <MoneyRange from={filters.salaryFrom} to={filters.salaryTo} onFrom={(v) => set('salaryFrom', v)} onTo={(v) => set('salaryTo', v)} />
-                </FilterField>
-                <FilterField label="Balansi (UZS)">
-                  <MoneyRange from={filters.balanceFrom} to={filters.balanceTo} onFrom={(v) => set('balanceFrom', v)} onTo={(v) => set('balanceTo', v)} />
-                </FilterField>
-                <FilterField label="Vazifalar" className="sm:col-span-2">
-                  <StatusRange
-                    statusValue={filters.taskStatus} onStatus={(v) => set('taskStatus', v)} statusOptions={TASK_OPTS}
-                    from={filters.tasksFrom} to={filters.tasksTo} onFrom={(v) => set('tasksFrom', v)} onTo={(v) => set('tasksTo', v)}
-                  />
-                </FilterField>
-                <FilterField label="Xarajat so'rovi (UZS)" className="sm:col-span-2">
-                  <StatusRange
-                    statusValue={filters.requestStatus} onStatus={(v) => set('requestStatus', v)} statusOptions={REQUEST_OPTS} statusPlaceholder="Holat"
-                    from={filters.requestAmountFrom} to={filters.requestAmountTo} onFrom={(v) => set('requestAmountFrom', v)} onTo={(v) => set('requestAmountTo', v)} money
-                  />
-                </FilterField>
-              </div>
+            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+              <FilterField label="Ishga kirgan vaqti">
+                <DateRange from={filters.joinedFrom} to={filters.joinedTo} onFrom={(v) => set('joinedFrom', v)} onTo={(v) => set('joinedTo', v)} />
+              </FilterField>
+              <FilterField label="Lavozimi">
+                <FilterSelect value={filters.positionId} onChange={(v) => set('positionId', v)} options={positionOpts} placeholder="Lavozim tanlang" />
+              </FilterField>
+              <FilterField label="Viloyat">
+                <FilterSelect value={filters.region} onChange={(v) => set('region', v)} options={regionOpts} placeholder="Viloyat tanlang" />
+              </FilterField>
 
-              {/* O'ng blok */}
-              <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
-                <FilterField label="Lavozimi">
-                  <FilterSelect value={filters.positionId} onChange={(v) => set('positionId', v)} options={positionOpts} placeholder="Lavozim tanlang" />
-                </FilterField>
-                <FilterField label="Viloyat">
-                  <FilterSelect value={filters.region} onChange={(v) => set('region', v)} options={regionOpts} placeholder="Viloyat tanlang" />
-                </FilterField>
-                <FilterField label="Loyihalar" className="sm:col-span-2">
-                  <StatusRange
-                    statusValue={filters.projectStatus} onStatus={(v) => set('projectStatus', v)} statusOptions={PROJECT_OPTS}
-                    from={filters.projectsFrom} to={filters.projectsTo} onFrom={(v) => set('projectsFrom', v)} onTo={(v) => set('projectsTo', v)}
-                  />
-                </FilterField>
-                <FilterField label="Yig'ilishlar" className="sm:col-span-2">
-                  <StatusRange
-                    statusValue={filters.meetingStatus} onStatus={(v) => set('meetingStatus', v)} statusOptions={MEETING_OPTS}
-                    from={filters.meetingsFrom} to={filters.meetingsTo} onFrom={(v) => set('meetingsFrom', v)} onTo={(v) => set('meetingsTo', v)}
-                  />
-                </FilterField>
-                <FilterField label="Ish haqi (UZS)" className="sm:col-span-2">
-                  <MoneyRange from={filters.payrollFrom} to={filters.payrollTo} onFrom={(v) => set('payrollFrom', v)} onTo={(v) => set('payrollTo', v)} />
-                </FilterField>
-                <FilterField label="Xodimlar" className="sm:col-span-2">
-                  <UserPickerField value={filters.userIds} onChange={(v) => set('userIds', v)} users={users} placeholder="Xodim tanlang" title="Xodim tanlang" />
-                </FilterField>
-              </div>
+              <FilterField label="Oylik maoshi (UZS)">
+                <MoneyRange from={filters.salaryFrom} to={filters.salaryTo} onFrom={(v) => set('salaryFrom', v)} onTo={(v) => set('salaryTo', v)} />
+              </FilterField>
+              <FilterField label="Balansi (UZS)">
+                <MoneyRange from={filters.balanceFrom} to={filters.balanceTo} onFrom={(v) => set('balanceFrom', v)} onTo={(v) => set('balanceTo', v)} />
+              </FilterField>
+              <FilterField label="Ish haqi (UZS)">
+                <MoneyRange from={filters.payrollFrom} to={filters.payrollTo} onFrom={(v) => set('payrollFrom', v)} onTo={(v) => set('payrollTo', v)} />
+              </FilterField>
+              <FilterField label="Xodimlar">
+                <UserPickerField value={filters.userIds} onChange={(v) => set('userIds', v)} users={users} placeholder="Xodim tanlang" title="Xodim tanlang" />
+              </FilterField>
+
+              <FilterField label="Vazifalar" className="sm:col-span-2">
+                <StatusRange
+                  statusValue={filters.taskStatus} onStatus={(v) => set('taskStatus', v)} statusOptions={TASK_OPTS}
+                  from={filters.tasksFrom} to={filters.tasksTo} onFrom={(v) => set('tasksFrom', v)} onTo={(v) => set('tasksTo', v)}
+                />
+              </FilterField>
+              <FilterField label="Loyihalar" className="sm:col-span-2">
+                <StatusRange
+                  statusValue={filters.projectStatus} onStatus={(v) => set('projectStatus', v)} statusOptions={PROJECT_OPTS}
+                  from={filters.projectsFrom} to={filters.projectsTo} onFrom={(v) => set('projectsFrom', v)} onTo={(v) => set('projectsTo', v)}
+                />
+              </FilterField>
+
+              <FilterField label="Yig'ilishlar" className="sm:col-span-2">
+                <StatusRange
+                  statusValue={filters.meetingStatus} onStatus={(v) => set('meetingStatus', v)} statusOptions={MEETING_OPTS}
+                  from={filters.meetingsFrom} to={filters.meetingsTo} onFrom={(v) => set('meetingsFrom', v)} onTo={(v) => set('meetingsTo', v)}
+                />
+              </FilterField>
+              <FilterField label="Xarajat so'rovi (UZS)" className="sm:col-span-2">
+                <StatusRange
+                  statusValue={filters.requestStatus} onStatus={(v) => set('requestStatus', v)} statusOptions={REQUEST_OPTS} statusPlaceholder="Holat"
+                  from={filters.requestAmountFrom} to={filters.requestAmountTo} onFrom={(v) => set('requestAmountFrom', v)} onTo={(v) => set('requestAmountTo', v)} money
+                />
+              </FilterField>
             </div>
           </Card>
         )}

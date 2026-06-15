@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { Plus, X, UserPlus, Eye, CheckCircle2, Trash2, Video, Search, Filter, Copy, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
@@ -6,7 +6,10 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
+import { CopyId } from '@/components/ui/CopyId';
 import { Input, Textarea, Select } from '@/components/ui/Input';
+import { PercentInput } from '@/components/ui/PercentInput';
+import { RHFSelect } from '@/components/ui/RHFSelect';
 import { FormField } from '@/components/ui/FormField';
 import { DateTimeBox } from '@/components/ui/DateTimeBox';
 import { Avatar } from '@/components/ui/Avatar';
@@ -18,7 +21,7 @@ import { formatDate, deadlineInfo } from '@/lib/utils/format';
 import { apiError } from '@/lib/api/axios';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAuthStore } from '@/store/authStore';
-import { useProjects } from '@/features/projects/projectsApi';
+import { useProjects, useProject } from '@/features/projects/projectsApi';
 import { useUsersList } from '@/features/users/usersApi';
 import { useMeetings, useCreateMeeting, useUpdateMeeting, useDeleteMeeting } from '@/features/meetings/meetingsApi';
 import { ParticipantPicker } from '@/features/meetings/ParticipantPicker';
@@ -84,7 +87,7 @@ export function MeetingsPage() {
 
   const columns = [
     { key: 'idx', header: '№', className: 'w-12', render: (_r, i) => i + 1 },
-    { key: 'uid', header: 'UID', render: (r) => <span className="font-mono text-xs text-text-sub">{r.uid || '—'}</span> },
+    { key: 'uid', header: 'UID', render: (r) => <CopyId value={r.uid} className="text-xs text-text-sub" /> },
     {
       key: 'title', header: 'Nomi',
       render: (r) => (
@@ -245,7 +248,7 @@ function MeetingDialog({ open, onClose, meeting }) {
   const create = useCreateMeeting();
   const update = useUpdateMeeting();
   const saving = create.isPending || update.isPending;
-  const { register, control, handleSubmit, reset, formState: { errors } } = useForm();
+  const { register, control, handleSubmit, reset, watch, formState: { errors } } = useForm();
   const [participants, setParticipants] = useState([]);
   const [finished, setFinished] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -253,6 +256,20 @@ function MeetingDialog({ open, onClose, meeting }) {
 
   const users = userList?.items || [];
   const selectedUsers = users.filter((u) => participants.includes(u.id));
+
+  // Loyiha tanlangan bo'lsa — qatnashchilar faqat o'sha loyihaga biriktirilganlar; aks holda (Umumiy) barcha xodimlar.
+  const projectId = watch('projectId');
+  const { data: projectFull } = useProject(projectId || undefined);
+  const pickerUsers = useMemo(() => {
+    if (!projectId) return users;
+    if (!projectFull) return [];
+    const seen = new Set();
+    const out = [];
+    const add = (u) => { if (u && !seen.has(u.id)) { seen.add(u.id); out.push(users.find((x) => x.id === u.id) || u); } };
+    (projectFull.members || []).forEach((m) => add(m.user));
+    (projectFull.testers || []).forEach((t) => add(t.user));
+    return out;
+  }, [projectId, projectFull, users]);
 
   useEffect(() => {
     if (!open) return;
@@ -350,17 +367,19 @@ function MeetingDialog({ open, onClose, meeting }) {
       ) : (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <FormField label="Loyiha">
-            <Select {...register('projectId')}>
+            <RHFSelect control={control} name="projectId">
               <option value="">Umumiy</option>
               {(projectList?.items || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </Select>
+            </RHFSelect>
           </FormField>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Nomi" required error={errors.title && 'Nom kiriting'}>
               <Input placeholder="Yig'ilish nomi" {...register('title', { required: true })} error={errors.title} />
             </FormField>
             <FormField label="Jarima foizi (%)">
-              <Input type="number" min="0" max="100" placeholder="0" {...register('penaltyPercent')} />
+              <Controller name="penaltyPercent" control={control} render={({ field }) => (
+                <PercentInput value={field.value} onChange={field.onChange} placeholder="0" />
+              )} />
             </FormField>
             <FormField label="Havolasi" className="sm:col-span-2" error={errors.link?.message} hint="Bo'sh qoldirsangiz, tizim avtomatik Google Meet havolasi ochib beradi.">
               <Input
@@ -432,7 +451,7 @@ function MeetingDialog({ open, onClose, meeting }) {
         </form>
       )}
 
-      <ParticipantPicker open={pickerOpen} onClose={() => setPickerOpen(false)} users={users} value={participants} onConfirm={setParticipants} />
+      <ParticipantPicker open={pickerOpen} onClose={() => setPickerOpen(false)} users={pickerUsers} value={participants} onConfirm={setParticipants} />
     </Dialog>
   );
 }

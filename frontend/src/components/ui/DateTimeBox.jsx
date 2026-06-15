@@ -1,4 +1,34 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+
+/**
+ * Popover'ni anchor (input) ostiga `position: fixed` bilan joylaydi — modal/scroll
+ * ichida ham kesilmaydi va doim eng tepada turadi. Joy yetmasa ustiga ochiladi.
+ */
+function usePopoverStyle(anchorRef, estHeight = 320) {
+  const [style, setStyle] = useState({ position: 'fixed', left: 0, top: -9999, visibility: 'hidden' });
+  useEffect(() => {
+    const place = () => {
+      const el = anchorRef?.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - r.bottom;
+      const up = spaceBelow < estHeight && r.top > spaceBelow;
+      setStyle({
+        position: 'fixed',
+        left: Math.max(8, Math.min(r.left, window.innerWidth - 280)),
+        width: r.width, // anchor (input) kengligiga teng
+        ...(up ? { bottom: window.innerHeight - r.top + 4 } : { top: r.bottom + 4 }),
+        visibility: 'visible',
+      });
+    };
+    place();
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place); };
+  }, [anchorRef, estHeight]);
+  return style;
+}
 
 /**
  * DateTimeBox — qo'lda kiritish + calendar/time/month picker popover (native JS Date).
@@ -50,11 +80,12 @@ function CalendarPopover({ value, onChange, onClose, anchorRef, dropUp }) {
   const years = [];
   for (let y = today.getFullYear() - 10; y <= today.getFullYear() + 10; y++) years.push(y);
 
-  return (
+  const popStyle = usePopoverStyle(anchorRef, 360);
+  return createPortal(
     <div
       ref={popRef}
-      className="absolute z-[9999] select-none rounded-2xl border border-stroke-sub bg-bg-base p-3 shadow-elevated"
-      style={{ minWidth: 260, ...(dropUp ? { bottom: '100%', marginBottom: 4 } : { top: '100%', marginTop: 4 }) }}
+      className="z-[9999] select-none rounded-2xl border border-stroke-sub bg-bg-base p-3 shadow-elevated"
+      style={{ ...popStyle, minWidth: 260 }}
     >
       <div className="mb-2 flex items-center justify-between px-1">
         <button type="button" onClick={prevMonth} className="flex h-7 w-7 items-center justify-center rounded-lg text-icon-sub hover:bg-bg-1">
@@ -108,7 +139,8 @@ function CalendarPopover({ value, onChange, onClose, anchorRef, dropUp }) {
         <button type="button" onClick={() => { const t = new Date(); onChange(`${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`); onClose(); }}
           className="rounded-lg px-2 py-1 text-xs font-semibold text-accent-strong hover:bg-accent-disabled">Bugun</button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -128,9 +160,10 @@ function MonthPopover({ value, onChange, onClose, anchorRef, dropUp }) {
   const selected = value ? { y: Number(value.split('-')[0]), m: Number(value.split('-')[1]) - 1 } : null;
   const select = (i) => { onChange(`${viewYear}-${String(i + 1).padStart(2, '0')}`); onClose(); };
 
-  return (
-    <div ref={popRef} className="absolute z-[9999] select-none rounded-2xl border border-stroke-sub bg-bg-base p-3 shadow-elevated"
-      style={{ minWidth: 240, ...(dropUp ? { bottom: '100%', marginBottom: 4 } : { top: '100%', marginTop: 4 }) }}>
+  const popStyle = usePopoverStyle(anchorRef, 280);
+  return createPortal(
+    <div ref={popRef} className="z-[9999] select-none rounded-2xl border border-stroke-sub bg-bg-base p-3 shadow-elevated"
+      style={{ ...popStyle, minWidth: 240 }}>
       <div className="mb-2 flex items-center justify-between px-1">
         <button type="button" onClick={() => setViewYear((y) => y - 1)} className="flex h-7 w-7 items-center justify-center rounded-lg text-icon-sub hover:bg-bg-1">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" /></svg>
@@ -154,7 +187,8 @@ function MonthPopover({ value, onChange, onClose, anchorRef, dropUp }) {
         <button type="button" onClick={() => { const t = new Date(); onChange(`${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}`); onClose(); }}
           className="rounded-lg px-2 py-1 text-xs font-semibold text-accent-strong hover:bg-accent-disabled">Bu oy</button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -183,14 +217,15 @@ function TimePopover({ value, onChange, onClose, anchorRef, dropUp }) {
   const selectHour = (h) => { setHour(h); apply(h, min); };
   const selectMin = (m) => { setMin(m); apply(hour, m); };
 
-  return (
-    <div ref={popRef} className="absolute z-[9999] select-none rounded-2xl border border-stroke-sub bg-bg-base p-3 shadow-elevated"
-      style={{ minWidth: 160, ...(dropUp ? { bottom: '100%', marginBottom: 4 } : { top: '100%', marginTop: 4 }) }}>
-      <p className="mb-2 text-center text-xs font-semibold text-text-sub">Vaqt tanlang</p>
+  const popStyle = usePopoverStyle(anchorRef, 240);
+  return createPortal(
+    <div ref={popRef} className="z-[9999] select-none rounded-2xl border border-stroke-sub bg-bg-base p-2.5 shadow-elevated"
+      style={{ ...popStyle, minWidth: 0 }}>
+      <p className="mb-1.5 text-center text-xs font-semibold text-text-sub">Vaqt tanlang</p>
       <div className="flex gap-2">
         <div className="flex-1">
           <p className="mb-1 text-center text-[10px] font-medium text-text-soft">Soat</p>
-          <div ref={hourRef} className="h-44 overflow-y-auto rounded-xl border border-stroke-sub scroll-smooth scrollbar-none">
+          <div ref={hourRef} className="h-32 overflow-y-auto rounded-xl border border-stroke-sub scroll-smooth scrollbar-none">
             {Array.from({ length: 24 }, (_, i) => (
               <button key={i} type="button" onClick={() => selectHour(i)}
                 className={`w-full py-1.5 text-center text-sm transition-colors ${i === hour ? 'bg-accent-strong font-bold text-white' : 'text-text-strong hover:bg-bg-1'}`}>{String(i).padStart(2, '0')}</button>
@@ -199,7 +234,7 @@ function TimePopover({ value, onChange, onClose, anchorRef, dropUp }) {
         </div>
         <div className="flex-1">
           <p className="mb-1 text-center text-[10px] font-medium text-text-soft">Daqiqa</p>
-          <div ref={minRef} className="h-44 overflow-y-auto rounded-xl border border-stroke-sub scroll-smooth scrollbar-none">
+          <div ref={minRef} className="h-32 overflow-y-auto rounded-xl border border-stroke-sub scroll-smooth scrollbar-none">
             {Array.from({ length: 60 }, (_, i) => (
               <button key={i} type="button" onClick={() => selectMin(i)}
                 className={`w-full py-1.5 text-center text-sm transition-colors ${i === min ? 'bg-accent-strong font-bold text-white' : 'text-text-strong hover:bg-bg-1'}`}>{String(i).padStart(2, '0')}</button>
@@ -212,7 +247,8 @@ function TimePopover({ value, onChange, onClose, anchorRef, dropUp }) {
         <button type="button" onClick={() => { const n = new Date(); setHour(n.getHours()); setMin(n.getMinutes()); apply(n.getHours(), n.getMinutes()); onClose(); }}
           className="rounded-lg px-2 py-1 text-xs font-semibold text-accent-strong hover:bg-accent-disabled">Hozir</button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

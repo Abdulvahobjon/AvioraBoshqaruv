@@ -18,17 +18,22 @@ export class ExpensesController {
     return this.expenses.findAll(q);
   }
 
+  // ⚠️ Yozuv (write) endpointlari auditorga TAQIQLANGAN — auditor faqat o'qiy oladi.
+  // Klass-darajadagi @Roles auditorni ham kiritadi (GET uchun), shuning uchun bu erda override.
   @Post()
+  @Roles('superadmin', 'admin', 'accountant')
   create(@Body() dto: CreateExpenseDto, @CurrentUser() user: AuthUser, @Req() req: Request) {
     return this.expenses.create(dto, user, req.ip);
   }
 
   @Patch(':id')
+  @Roles('superadmin', 'admin', 'accountant')
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateExpenseDto, @CurrentUser() user: AuthUser, @Req() req: Request) {
     return this.expenses.update(id, dto, user, req.ip);
   }
 
   @Delete(':id')
+  @Roles('superadmin', 'admin', 'accountant')
   remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser, @Req() req: Request) {
     return this.expenses.remove(id, user, req.ip);
   }

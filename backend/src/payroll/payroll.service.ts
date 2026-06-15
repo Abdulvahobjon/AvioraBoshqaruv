@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CurrenciesService } from '../currencies/currencies.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
+import { PayManyDto, UpdatePayrollDto } from './dto/payroll.dto';
 
 const ACCT = ['accountant', 'superadmin', 'admin'];
 
@@ -16,7 +17,16 @@ export class PayrollService {
     private currencies: CurrenciesService,
   ) {}
 
-  private include = { user: { select: { id: true, fullName: true } } };
+  // "Ish haqi" jadvali + detal modal uchun zarur foydalanuvchi maydonlari.
+  private include = {
+    user: {
+      select: {
+        id: true, fullName: true, avatar: true, region: true, district: true,
+        passportSeries: true, passportNumber: true,
+        position: { select: { name: true } },
+      },
+    },
+  };
 
   /**
    * Generate/refresh payrolls for a month ("YYYY-MM") for all active employees.
@@ -64,7 +74,67 @@ export class PayrollService {
     if (!seesAll) where.userId = user.id;
     else if (q.userId) where.userId = Number(q.userId);
     if (q.month) where.month = q.month;
+    if (q.search) where.user = { fullName: { contains: String(q.search), mode: 'insensitive' } };
+    // Jami miqdori (tiyin) oralig'i
+    if (q.totalMin || q.totalMax) {
+      where.total = {};
+      if (q.totalMin) where.total.gte = BigInt(q.totalMin);
+      if (q.totalMax) where.total.lte = BigInt(q.totalMax);
+    }
+    // Faqat jarimasi bor yozuvlar (toggle)
+    if (q.hasPenalty === '1' || q.hasPenalty === 'true') where.penalty = { gt: 0 };
+    if (q.createdFrom || q.createdTo) {
+      where.createdAt = {};
+      if (q.createdFrom) where.createdAt.gte = new Date(q.createdFrom);
+      if (q.createdTo) where.createdAt.lte = new Date(q.createdTo);
+    }
     return this.prisma.payroll.findMany({ where, include: this.include, orderBy: [{ month: 'desc' }, { userId: 'asc' }] });
+  }
+
+  /** KPI bonus / jarima (ma'lumot uchun) ni yangilash — total/balansga ta'sir qilmaydi. */
+  async update(id: number, dto: UpdatePayrollDto, actor: AuthUser) {
+    if (!ACCT.includes(actor.role)) throw new ForbiddenException('Ruxsat yo\'q');
+    const p = await this.prisma.payroll.findFirst({ where: { id } });
+    if (!p) throw new NotFoundException('Topilmadi');
+    const data: any = {};
+    if (dto.kpiBonus !== undefined) data.kpiBonus = BigInt(dto.kpiBonus);
+    if (dto.penalty !== undefined) data.penalty = BigInt(dto.penalty);
+    const updated = await this.prisma.payroll.update({ where: { id }, data, include: this.include });
+    await this.audit.record({ userId: actor.id, entity: 'Payroll', entityId: id, action: 'UPDATE', newValue: data });
+    return updated;
+  }
+
+  /**
+   * Buxgalter "Tasdiqlash" — tanlangan oyliklarni to'lash (draft/ready → paid).
+   * Har biri: balansga fiks oylik qo'shiladi + ledger kredit yoziladi + xodimga bildirishnoma.
+   * Atomik: faqat hali to'lanmaganlari o'tadi (dubl-bosish/parallel xavfsiz).
+   */
+  async payMany(dto: PayManyDto, actor: AuthUser, ip?: string) {
+    if (!ACCT.includes(actor.role)) throw new ForbiddenException('To\'lovni buxgalter bajaradi');
+    const ids = [...new Set(dto.ids)];
+    let paid = 0;
+    for (const id of ids) {
+      const p = await this.prisma.payroll.findFirst({ where: { id } });
+      if (!p || !['draft', 'ready'].includes(p.status)) continue;
+      const ok = await this.prisma.$transaction(async (tx) => {
+        const res = await tx.payroll.updateMany({
+          where: { id, status: { in: ['draft', 'ready'] } },
+          data: { status: 'paid', paidAt: new Date(), paidById: actor.id },
+        });
+        if (res.count === 0) return false;
+        await tx.user.update({ where: { id: p.userId }, data: { balance: { increment: p.fixedAmount } } });
+        await tx.ledgerEntry.create({
+          data: { userId: p.userId, amount: p.fixedAmount, type: 'salary', direction: 'credit', note: `Oylik ${p.month}` },
+        });
+        return true;
+      });
+      if (ok) {
+        paid++;
+        await this.notifications.notify(p.userId, 'payroll_paid', { month: p.month, amount: p.fixedAmount.toString() });
+      }
+    }
+    await this.audit.record({ userId: actor.id, entity: 'Payroll', action: 'PAY_MANY', ip, flagged: true, newValue: { ids, paid } });
+    return { paid };
   }
 
   async markReady(id: number, actor: AuthUser) {
@@ -87,7 +157,7 @@ export class PayrollService {
 
     const updated = await this.prisma.$transaction(async (tx) => {
       // Atomik: faqat hali 'ready' bo'lsa to'laymiz — parallel ikki to'lov balansga ikki marta qo'shmaydi.
-      const res = await tx.payroll.updateMany({ where: { id, status: 'ready' }, data: { status: 'paid', paidAt: new Date() } });
+      const res = await tx.payroll.updateMany({ where: { id, status: 'ready' }, data: { status: 'paid', paidAt: new Date(), paidById: actor.id } });
       if (res.count === 0) throw new BadRequestException('Faqat "tayyor" holatdagini to\'lash mumkin');
       await tx.user.update({ where: { id: p.userId }, data: { balance: { increment: p.fixedAmount } } });
       await tx.ledgerEntry.create({

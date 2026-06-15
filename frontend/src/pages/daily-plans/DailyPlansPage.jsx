@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { cn } from '@/lib/utils/cn';
 import { apiError } from '@/lib/api/axios';
+import { useCan } from '@/lib/permissions';
 import { DAILY_PLAN_PRIORITY } from '@/lib/constants';
 import { useDailyPlans, useToggleDailyPlan, useDeleteDailyPlan } from '@/features/daily-plans/dailyPlansApi';
 import { DailyPlanFormDialog } from '@/features/daily-plans/DailyPlanFormDialog';
@@ -24,6 +25,7 @@ const todayISO = () => dayjs().format('YYYY-MM-DD');
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
 export function DailyPlansPage() {
+  const canManage = useCan()('dailyplans.manage'); // auditor (faqat-o'qish) uchun yo'q
   const [date, setDate] = useState(todayISO());
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -57,7 +59,7 @@ export function DailyPlansPage() {
       <PageHeader
         title="Kundalik rejalar"
         subtitle="Har kun uchun shaxsiy rejalaringizni belgilang va kuzatib boring"
-        actions={<Button onClick={openAdd}><Plus className="h-4 w-4" /> Yangi reja</Button>}
+        actions={canManage && <Button onClick={openAdd}><Plus className="h-4 w-4" /> Yangi reja</Button>}
       />
 
       {/* Sana navigatsiyasi + progress */}
@@ -126,7 +128,7 @@ export function DailyPlansPage() {
           icon={CalendarDays}
           title="Bu kun uchun reja yo'q"
           description="Birinchi rejangizni qo'shing va kunni rejalashtirib boshlang."
-          action={<Button onClick={openAdd}><Plus className="h-4 w-4" /> Reja qo'shish</Button>}
+          action={canManage ? <Button onClick={openAdd}><Plus className="h-4 w-4" /> Reja qo'shish</Button> : undefined}
         />
       ) : (
         <div className="grid flex-1 content-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
@@ -148,10 +150,12 @@ export function DailyPlansPage() {
                   >
                     <div className="flex shrink-0 items-start gap-3">
                       <button
-                        onClick={() => onToggle(p)}
+                        onClick={() => canManage && onToggle(p)}
+                        disabled={!canManage}
                         className={cn(
                           'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors',
                           p.isDone ? 'border-accent-strong bg-accent-strong text-text-white' : 'border-stroke-strong text-transparent hover:border-accent-sub',
+                          !canManage && 'cursor-default',
                         )}
                         aria-label="Bajarildi"
                       >
@@ -160,14 +164,16 @@ export function DailyPlansPage() {
                       <h3 className={cn('line-clamp-2 flex-1 text-sm font-semibold leading-snug', p.isDone ? 'text-text-soft line-through' : 'text-text-strong')}>
                         {p.title}
                       </h3>
-                      <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                        <button onClick={() => openEdit(p)} className="rounded p-1.5 text-icon-soft hover:bg-bg-1-alt hover:text-icon-strong" aria-label="Tahrirlash">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button onClick={() => setDeleting(p)} className="rounded p-1.5 text-icon-soft hover:bg-error-soft hover:text-error-strong" aria-label="O'chirish">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
+                      {canManage && (
+                        <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                          <button onClick={() => openEdit(p)} className="rounded p-1.5 text-icon-soft hover:bg-bg-1-alt hover:text-icon-strong" aria-label="Tahrirlash">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button onClick={() => setDeleting(p)} className="rounded p-1.5 text-icon-soft hover:bg-error-soft hover:text-error-strong" aria-label="O'chirish">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {p.description ? (

@@ -8,6 +8,7 @@ import { useUiStore } from '@/store/uiStore';
 import { useAuthStore } from '@/store/authStore';
 import { useNotificationSocket } from '@/features/notifications/notificationsApi';
 import { useMe } from '@/features/auth/authApi';
+import { RequireRoute } from '@/app/guards';
 
 export function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -32,7 +33,9 @@ export function AppLayout() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
           >
-            <Outlet />
+            <RequireRoute>
+              <Outlet />
+            </RequireRoute>
           </motion.div>
         </main>
       </div>

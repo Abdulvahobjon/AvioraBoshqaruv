@@ -2,14 +2,13 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card } from '@/components/ui/Card';
-import { AntDate } from '@/components/ui/AntDate';
 import { formatMoney, formatDate } from '@/lib/utils/format';
 import { useUsersList } from '@/features/users/usersApi';
 import { useProjects } from '@/features/projects/projectsApi';
 import { useReference } from '@/features/settings/settingsApi';
 import { useExpenseRequestsReport } from '@/features/reports/reportsApi';
 import { ReportExportActions, ReportToolbar } from '@/features/reports/ReportShell';
-import { FilterField, FilterSelect, FilterMultiSelect, MoneyRange, UserPickerField } from '@/features/reports/ReportFilters';
+import { FilterField, FilterSelect, MoneyRange, UserPickerField, DateRange } from '@/features/reports/ReportFilters';
 import { ReportTable } from '@/features/reports/ReportTable';
 
 const money = (v) => formatMoney(Math.round((v || 0) * 100));
@@ -77,7 +76,7 @@ export function ExpensesReportPage() {
   const generate = () => { setApplied(buildParams(filters)); setGenerated(true); setFiltersOpen(false); toast.success("Ma'lumotlar shakllantirildi"); };
   const clear = () => { setFilters(EMPTY); setApplied({}); setGenerated(false); setFiltersOpen(true); };
 
-  const projectOpts = (projects?.items || []).map((p) => ({ value: p.id, label: p.name }));
+  const projectUsers = (projects?.items || []).map((p) => ({ id: p.id, fullName: p.name }));
   const categoryOpts = (categories || []).map((c) => ({ value: c.id, label: c.name }));
 
   const rows = useMemo(() => {
@@ -127,18 +126,13 @@ export function ExpensesReportPage() {
         />
         {filtersOpen && (
           <Card className="mt-3 p-4">
-            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
               {DATE_FIELDS.map((d) => (
                 <FilterField key={d.from} label={d.label}>
-                  <div className="flex gap-2">
-                    <AntDate value={filters[d.from]} onChange={(v) => set(d.from, v)} placeholder="dan" />
-                    <AntDate value={filters[d.to]} onChange={(v) => set(d.to, v)} placeholder="gacha" />
-                  </div>
+                  <DateRange from={filters[d.from]} to={filters[d.to]} onFrom={(v) => set(d.from, v)} onTo={(v) => set(d.to, v)} />
                 </FilterField>
               ))}
-            </div>
-            <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-              <FilterField label="Miqdor (UZS)" className="sm:col-span-2">
+              <FilterField label="Miqdor (UZS)">
                 <MoneyRange from={filters.amountFrom} to={filters.amountTo} onFrom={(v) => set('amountFrom', v)} onTo={(v) => set('amountTo', v)} />
               </FilterField>
               <FilterField label="To'lov turi">
@@ -154,7 +148,7 @@ export function ExpensesReportPage() {
                 <UserPickerField value={filters.accountantIds} onChange={(v) => set('accountantIds', v)} users={users} placeholder="Hisobchi tanlang" title="Hisobchi tanlang" />
               </FilterField>
               <FilterField label="Loyihalar">
-                <FilterMultiSelect value={filters.projectIds} onChange={(v) => set('projectIds', v)} options={projectOpts} placeholder="Loyiha tanlang" />
+                <UserPickerField value={filters.projectIds} onChange={(v) => set('projectIds', v)} users={projectUsers} placeholder="Loyiha tanlang" title="Loyiha tanlang" />
               </FilterField>
               <FilterField label="Xarajat turi">
                 <FilterSelect value={filters.type} onChange={(v) => set('type', v)} options={TYPE_OPTS} placeholder="Xarajat turi tanlang" />

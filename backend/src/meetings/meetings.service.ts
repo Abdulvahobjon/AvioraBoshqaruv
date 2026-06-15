@@ -53,15 +53,17 @@ export class MeetingsService {
   }
 
   /** Generate a UID like "DSR-M-0001" from the project code (or a derived prefix). */
-  private async generateUid(projectId?: number | null): Promise<string> {
+  private async generateUid(projectId?: number | null, offset = 0): Promise<string> {
     let prefix = 'GEN';
     if (projectId) {
       const project = await this.prisma.project.findFirst({ where: { id: projectId }, select: { code: true, name: true } });
       if (project?.code) prefix = project.code.toUpperCase();
       else if (project?.name) prefix = project.name.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() || 'GEN';
     }
+    // `count` soft-delete'larni hisobga olmaydi, lekin UID band turadi — shu sabab to'qnashuvda
+    // `offset` orqali raqam oshiriladi (qayta urinishda keyingi bo'sh raqam topilguncha).
     const count = await this.prisma.meeting.count({ where: { uid: { startsWith: `${prefix}-M-` } } });
-    const num = String(count + 1).padStart(4, '0');
+    const num = String(count + 1 + offset).padStart(4, '0');
     return `${prefix}-M-${num}`;
   }
 
@@ -101,18 +103,19 @@ export class MeetingsService {
       attendance: { create: participantIds.map((pid) => ({ userId: pid })) },
     };
 
-    // UID `count+1` asosida — parallel yaratishda unique to'qnashuv bo'lsa (P2002) qayta urinamiz.
+    // UID `count+1+offset` asosida — band bo'lsa (P2002, jumladan soft-delete'lar) keyingi raqamga o'tamiz.
     let meeting;
-    for (let attempt = 0; ; attempt++) {
+    for (let attempt = 0; attempt < 100; attempt++) {
       try {
-        const uid = await this.generateUid(projectId);
+        const uid = await this.generateUid(projectId, attempt);
         meeting = await this.prisma.meeting.create({ data: { uid, ...baseData }, include: this.include });
         break;
       } catch (e: any) {
-        if (e?.code === 'P2002' && attempt < 5) continue;
+        if (e?.code === 'P2002' && attempt < 99) continue;
         throw e;
       }
     }
+    if (!meeting) throw new BadRequestException('Yig\'ilish UID yaratib bo\'lmadi, qayta urinib ko\'ring');
 
     // Notify all participants that a meeting was scheduled
     for (const pid of participantIds) {
@@ -211,17 +214,29 @@ export class MeetingsService {
     if (dto.startAt !== undefined) data.startAt = this.parseStartAt(dto.startAt);
     if (dto.finished !== undefined) data.finishedAt = dto.finished ? (meeting.finishedAt || new Date()) : null;
 
+    // Qatnashchilar o'zgarishini transaksiyadan tashqarida hisoblaymiz (yangi qo'shilganlarga bildirishnoma uchun).
+    let toAdd: number[] = [];
+    if (Array.isArray(dto.participantIds)) {
+      const ids = dto.participantIds.map(Number);
+      const existingIds = meeting.attendance.map((a) => a.userId);
+      toAdd = ids.filter((uid) => !existingIds.includes(uid));
+    }
+
     await this.prisma.$transaction(async (tx) => {
       await tx.meeting.update({ where: { id }, data });
       if (Array.isArray(dto.participantIds)) {
         const ids = dto.participantIds.map(Number);
         const existingIds = meeting.attendance.map((a) => a.userId);
         const toRemove = existingIds.filter((uid) => !ids.includes(uid));
-        const toAdd = ids.filter((uid) => !existingIds.includes(uid));
         if (toRemove.length) await tx.meetingAttendance.deleteMany({ where: { meetingId: id, userId: { in: toRemove } } });
         for (const uid of toAdd) await tx.meetingAttendance.create({ data: { meetingId: id, userId: uid } });
       }
     });
+
+    // Yangi qo'shilgan qatnashchilarni xabardor qilamiz (yaratishdagidek).
+    for (const uid of toAdd) {
+      await this.notifications.notify(uid, 'meeting_created', { meetingId: id, title: data.title ?? meeting.title, startAt: data.startAt ?? meeting.startAt });
+    }
 
     // Best-effort: bog'langan Google Meet eventini yangilaymiz (vaqt/nomi o'zgarsa)
     if (meeting.googleEventId && (dto.startAt !== undefined || dto.title !== undefined || dto.duration !== undefined || dto.content !== undefined)) {

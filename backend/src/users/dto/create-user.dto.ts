@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
-import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { ArrayUnique, IsArray, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Min, MinLength } from 'class-validator';
 
 export class CreateUserDto {
   @ApiProperty({ example: 'Yangi Xodim' })
@@ -16,6 +16,14 @@ export class CreateUserDto {
   @ApiProperty({ enum: Role })
   @IsEnum(Role)
   role: Role;
+
+  // Qo'shimcha rollar (asosiy 'role'dan tashqari) — faqat superadmin bera oladi.
+  @ApiPropertyOptional({ enum: Role, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(Role, { each: true })
+  @ArrayUnique()
+  roles?: Role[];
 
   @ApiPropertyOptional()
   @IsOptional()

@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
+import { PhoneInput } from '@/components/ui/PhoneInput';
 import { MoneyInput } from '@/components/ui/MoneyInput';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 import { FormField } from '@/components/ui/FormField';
@@ -17,10 +18,11 @@ import { cn } from '@/lib/utils/cn';
 import { ROLE_LABELS } from '@/lib/constants';
 import { toTiyin } from '@/lib/utils/format';
 import { apiError } from '@/lib/api/axios';
+import { useAuthStore } from '@/store/authStore';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useReference } from '@/features/settings/settingsApi';
 import { useUsersList, useSaveUser, useDeleteUser } from '@/features/users/usersApi';
-import { CardInput, RegionDistrict, FileUpload, AvatarUpload, moneyUZS, fileUrl } from '@/features/users/userFields';
+import { CardInput, RegionDistrict, FileUpload, AvatarUpload, RolesField, moneyUZS, fileUrl } from '@/features/users/userFields';
 
 const SORTS = [
   { value: 'az', label: 'A dan Z gacha' },
@@ -204,14 +206,18 @@ function TopbarActions({ children }) {
 }
 
 const EMPTY = {
-  fullName: '', password: '', role: 'employee', positionId: '', fixedSalary: '',
-  phone: '', phone2: '', card: '', card2: '', region: '', district: '',
+  fullName: '', password: '', role: 'employee', roles: [], positionId: '', fixedSalary: '',
+  phone: '', card: '', region: '', district: '',
   passportSeries: '', passportNumber: '', passportImage: '', avatar: '', link1: '', link2: '',
 };
 
 function UserDialog({ open, onClose }) {
   const { data: positions } = useReference('position');
   const save = useSaveUser();
+  const userRole = useAuthStore((s) => s.user?.role);
+  const canAssignRoles = ['superadmin', 'admin'].includes(userRole);
+  // superadmin yagona (seed'dan) — yangi xodimga hech qachon berilmaydi, tanlovda ko'rsatilmaydi.
+  const roleKeys = Object.keys(ROLE_LABELS).filter((k) => k !== 'superadmin');
   const [f, setF] = useState(EMPTY);
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
 
@@ -223,15 +229,17 @@ function UserDialog({ open, onClose }) {
   const submit = () => {
     if (!f.fullName.trim()) { toast.error('Ism Sharifini kiriting'); return; }
     if (!f.password.trim() || f.password.length < 6) { toast.error('Parol kamida 6 ta belgi'); return; }
+    if (!f.role) { toast.error('Kamida bitta rol tanlang'); return; }
     save.mutate(
       {
         fullName: f.fullName.trim(),
         password: f.password,
         role: f.role,
+        roles: canAssignRoles ? f.roles : undefined,
         positionId: f.positionId ? Number(f.positionId) : undefined,
         fixedSalary: toTiyin(f.fixedSalary || 0),
-        phone: f.phone || undefined, phone2: f.phone2 || undefined,
-        card: f.card || undefined, card2: f.card2 || undefined,
+        phone: f.phone || undefined,
+        card: f.card || undefined,
         region: f.region || undefined, district: f.district || undefined,
         passportSeries: f.passportSeries || undefined, passportNumber: f.passportNumber || undefined,
         passportImage: f.passportImage || undefined, avatar: f.avatar || undefined,
@@ -247,11 +255,10 @@ function UserDialog({ open, onClose }) {
       onClose={onClose}
       onBack={onClose}
       title="Yangi xodim qo'shish"
+      subtitle="Yangi xodimni tizimga qo'shing va unga tegishli rol hamda maoshni belgilang"
       size="lg"
       footer={<><Button variant="ghost" onClick={onClose}><X className="h-4 w-4" /> Yopish</Button><Button onClick={submit} loading={save.isPending}><Check className="h-4 w-4" /> Qo'shish</Button></>}
     >
-      <p className="-mt-2 mb-4 text-sm text-text-sub">Yangi xodimni tizimga qo'shing va unga tegishli rol hamda maoshni belgilang</p>
-
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField label="Ism Sharifi (login)" required>
           <Input placeholder="Ism Familiya" value={f.fullName} onChange={(e) => set('fullName', e.target.value)} />
@@ -261,46 +268,42 @@ function UserDialog({ open, onClose }) {
         </FormField>
 
         <FormField label="Telefon raqami">
-          <Input placeholder="+998" value={f.phone} onChange={(e) => set('phone', e.target.value)} />
+          <PhoneInput value={f.phone} onChange={(v) => set('phone', v)} />
         </FormField>
-        <FormField label="Qo'shimcha raqam">
-          <Input placeholder="Qoshimcha raqam" value={f.phone2} onChange={(e) => set('phone2', e.target.value)} />
-        </FormField>
-
         <FormField label="Karta raqami">
           <CardInput value={f.card} onChange={(v) => set('card', v)} />
-        </FormField>
-        <FormField label="Ikkinchi karta">
-          <CardInput value={f.card2} onChange={(v) => set('card2', v)} />
         </FormField>
 
         <RegionDistrict region={f.region} district={f.district} onRegion={(v) => set('region', v)} onDistrict={(v) => set('district', v)} />
 
         <FormField label="Passport ma'lumotlari">
           <div className="flex gap-2">
-            <Input className="w-20 uppercase" maxLength={2} placeholder="AA" value={f.passportSeries} onChange={(e) => set('passportSeries', e.target.value.toUpperCase())} />
-            <Input className="flex-1" placeholder="Raqami" value={f.passportNumber} onChange={(e) => set('passportNumber', e.target.value)} />
+            <Input className="w-20 uppercase" maxLength={2} placeholder="AA" value={f.passportSeries} onChange={(e) => set('passportSeries', e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase())} />
+            <Input className="flex-1" inputMode="numeric" maxLength={7} placeholder="Raqami" value={f.passportNumber} onChange={(e) => set('passportNumber', e.target.value.replace(/\D/g, ''))} />
           </div>
         </FormField>
         <FormField label="Passport rasmi">
           <FileUpload value={f.passportImage} onChange={(v) => set('passportImage', v)} accept="image/*,application/pdf" label="Rasm yuklash" />
         </FormField>
 
-        <div className="flex items-end gap-4 sm:col-span-2">
+        <div className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-[auto_1fr_1fr] sm:items-start">
           <div>
             <p className="mb-1.5 text-sm font-medium text-text-sub">Avatar</p>
             <AvatarUpload value={f.avatar} onChange={(v) => set('avatar', v)} />
           </div>
-          <FormField label="Lavozimi" className="flex-1">
+
+          <FormField label="Lavozimi">
             <Select value={f.positionId} onChange={(e) => set('positionId', e.target.value)}>
               <option value="">Tanlang</option>
               {(positions || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </Select>
           </FormField>
-          <FormField label="Roli" className="flex-1">
-            <Select value={f.role} onChange={(e) => set('role', e.target.value)}>
-              {Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </Select>
+          <FormField label="Rollar">
+            <RolesField
+              roleKeys={roleKeys}
+              value={[...new Set([f.role, ...(f.roles || [])].filter(Boolean))]}
+              onChange={(arr) => setF((s) => ({ ...s, role: arr[0] || '', roles: arr.slice(1) }))}
+            />
           </FormField>
         </div>
 
