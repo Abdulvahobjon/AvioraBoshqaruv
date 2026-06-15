@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Trash2, RefreshCw, FileText, ExternalLink } from 'lucide-react';
+import { Trash2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PageLoader } from '@/components/shared/PageLoader';
@@ -17,7 +17,7 @@ import { apiError } from '@/lib/api/axios';
 import { useAuthStore } from '@/store/authStore';
 import { useReference } from '@/features/settings/settingsApi';
 import { useUser, useSaveUser, useDeleteUser } from '@/features/users/usersApi';
-import { CardInput, RegionDistrict, FileUpload, AvatarUpload, RolesField, moneyUZS, fileUrl, formatCard } from '@/features/users/userFields';
+import { CardInput, RegionDistrict, FileUpload, AvatarUpload, RolesField, moneyUZS, formatCard } from '@/features/users/userFields';
 
 export function UserDetailPage() {
   const { id } = useParams();
@@ -121,16 +121,7 @@ export function UserDetailPage() {
           </div>
         </FormField>
         <FormField label="Passport rasmi">
-          {f.passportImage ? (
-            <div className="flex items-center gap-2">
-              <a href={fileUrl(f.passportImage)} target="_blank" rel="noreferrer" className="flex h-10 flex-1 items-center gap-2 rounded-md border border-stroke-strong px-3 text-sm text-text-strong hover:bg-bg-1-alt">
-                <FileText className="h-4 w-4 text-icon-accent" /> Faylni ochish <ExternalLink className="ml-auto h-3.5 w-3.5 text-icon-soft" />
-              </a>
-              <Button variant="outline" onClick={() => set('passportImage', '')}>O'chirish</Button>
-            </div>
-          ) : (
-            <FileUpload value={f.passportImage} onChange={(v) => set('passportImage', v)} accept="image/*,application/pdf" />
-          )}
+          <FileUpload value={f.passportImage} onChange={(v) => set('passportImage', v)} accept="image/*,application/pdf" />
         </FormField>
 
         <FormField label="1.Havola">

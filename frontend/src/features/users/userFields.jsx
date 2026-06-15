@@ -1,5 +1,5 @@
 import { toast } from 'sonner';
-import { Upload, FileText, Camera } from 'lucide-react';
+import { Upload, FileText, Camera, X, ExternalLink } from 'lucide-react';
 import { Input, Select } from '@/components/ui/Input';
 import { FormField } from '@/components/ui/FormField';
 import { cn } from '@/lib/utils/cn';
@@ -48,7 +48,11 @@ export function RegionDistrict({ region, district, onRegion, onDistrict }) {
   );
 }
 
+const isImageUrl = (u) => /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i.test(u || '');
+
 /** File upload (passport image/pdf). Stores the returned URL.
+ *  Fayl yuklangach uni KO'RISH mumkin: rasm bo'lsa bosilganda to'liq ekranda ochiladi
+ *  (Lightbox), PDF bo'lsa yangi oynada. Yonida "O'zgartirish" va "O'chirish".
  *  `uploadHook` — ixtiyoriy: profil o'zining (/auth/upload) hook'ini uzatishi mumkin. */
 export function FileUpload({ value, onChange, accept, label = 'Rasm yuklash', uploadHook }) {
   const fallback = useUploadUserFile();
@@ -64,12 +68,43 @@ export function FileUpload({ value, onChange, accept, label = 'Rasm yuklash', up
     }
     e.target.value = '';
   };
+
+  // Yuklangan fayl bor — ko'rish + o'zgartirish + o'chirish.
+  if (value && !upload.isPending) {
+    const img = isImageUrl(value);
+    return (
+      <div className="flex h-10 items-center justify-between gap-2 rounded-md border border-stroke-sub px-2 text-sm">
+        {img ? (
+          // Rasm: thumbnail bosilganda to'liq ekran (Lightbox `img[data-zoomable]` ni ushlaydi).
+          <button type="button" className="flex min-w-0 items-center gap-2 text-left text-text-strong" title="Ko'rish uchun bosing">
+            <img src={fileUrl(value)} data-zoomable alt="" className="h-7 w-7 shrink-0 cursor-zoom-in rounded border border-stroke-sub object-cover" />
+            <span className="truncate">Rasmni ko'rish</span>
+          </button>
+        ) : (
+          // PDF/boshqa: yangi oynada ochish.
+          <a href={fileUrl(value)} target="_blank" rel="noreferrer" className="flex min-w-0 items-center gap-2 text-text-strong hover:text-text-accent hover:underline" title="Faylni ochish">
+            <FileText className="h-4 w-4 shrink-0 text-icon-accent" />
+            <span className="truncate">Faylni ochish</span>
+            <ExternalLink className="h-3.5 w-3.5 shrink-0 text-icon-soft" />
+          </a>
+        )}
+        <div className="flex shrink-0 items-center gap-0.5">
+          <label className="cursor-pointer rounded px-2 py-1 text-xs text-text-sub transition-colors hover:bg-bg-1-alt hover:text-text-strong">
+            O'zgartirish
+            <input type="file" accept={accept} className="hidden" onChange={onPick} />
+          </label>
+          <button type="button" onClick={() => onChange('')} className="rounded p-1.5 text-error-strong transition-colors hover:bg-error-soft" title="O'chirish" aria-label="O'chirish">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-stroke-strong px-3 text-sm transition-colors hover:bg-bg-1-alt">
       {upload.isPending ? (
         <span className="text-text-soft">Yuklanmoqda…</span>
-      ) : value ? (
-        <span className="flex items-center gap-2 text-text-strong"><FileText className="h-4 w-4 text-icon-accent" /> Fayl yuklandi</span>
       ) : (
         <span className="flex items-center gap-2 text-text-sub"><Upload className="h-4 w-4" /> {label}</span>
       )}
