@@ -15,6 +15,7 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SwitchRoleDto } from './dto/switch-role.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
+import { AuditorCanWrite } from '../common/decorators/auditor.decorator';
 import { uploadOptions } from '../common/upload.util';
 
 const REFRESH_COOKIE = 'refresh_token';
@@ -92,6 +93,7 @@ export class AuthController {
   }
 
   @ApiBearerAuth()
+  @AuditorCanWrite() // Faol roli "nazoratchi" bo'lsa ham o'z rolini almashtira olsin (read-only guard bloklamasin).
   @Post('switch-role')
   async switchRole(@Body() dto: SwitchRoleDto, @CurrentUser('id') userId: number, @Res({ passthrough: true }) res: Response) {
     const result = await this.auth.switchRole(userId, dto.role);
