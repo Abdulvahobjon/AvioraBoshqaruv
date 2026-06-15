@@ -26,50 +26,53 @@ async function main() {
   console.log('🌱 Seeding...');
   const passwordHash = await bcrypt.hash(PASSWORD, 10);
 
+  // Idempotent reference helper: nom bo'yicha topadi, bo'lmasa yaratadi.
+  const ensure = async (model, where, data) =>
+    (await model.findFirst({ where })) ?? (await model.create({ data }));
+
   // ── Reference: regions ──
   const regionNames = ['Toshkent', 'Samarqand', 'Buxoro', 'Andijon', 'Farg\'ona'];
   const regions = [];
   for (let i = 0; i < regionNames.length; i++) {
-    regions.push(await prisma.region.create({ data: { name: regionNames[i], isApplication: i < 3 } }));
+    regions.push(await ensure(prisma.region, { name: regionNames[i] }, { name: regionNames[i], isApplication: i < 3 }));
   }
 
   // ── Reference: districts (Toshkent uchun, arizalarda ishlatiladi) ──
   const districtNames = ['Chilonzor', 'Yunusobod', 'Mirzo Ulug\'bek', 'Yakkasaroy'];
   const districts = [];
   for (const name of districtNames) {
-    districts.push(await prisma.district.create({ data: { name, regionId: regions[0].id, isApplication: true } }));
+    districts.push(await ensure(prisma.district, { name, regionId: regions[0].id }, { name, regionId: regions[0].id, isApplication: true }));
   }
 
   // ── Reference: positions ──
   const positionNames = ['Frontend dasturchi', 'Backend dasturchi', 'UI/UX dizayner', 'Loyiha menejeri', 'QA muhandis'];
   const positions = [];
   for (const name of positionNames) {
-    // Idempotent: mavjud bo'lsa qayta yaratmaymiz (har restart'da dublikat oldini oladi).
-    const existing = await prisma.position.findFirst({ where: { name } });
-    positions.push(existing ?? (await prisma.position.create({ data: { name } })));
+    positions.push(await ensure(prisma.position, { name }, { name }));
   }
 
   // ── Reference: project types (standart 5 ta) ──
   const typeNames = ['Landing page', 'Korporativ sayt', 'Internet-do\'kon', 'Veb-ilova', 'Admin panel'];
   const projectTypes = [];
   for (const name of typeNames) {
-    projectTypes.push(await prisma.projectType.create({ data: { name } }));
+    projectTypes.push(await ensure(prisma.projectType, { name }, { name }));
   }
 
   // ── Reference: expense categories ──
   const expCatNames = ['Ijara', 'Kommunal', 'Texnika', 'Marketing', 'Boshqa'];
   const expenseCategories = [];
   for (const name of expCatNames) {
-    expenseCategories.push(await prisma.expenseCategory.create({ data: { name } }));
+    expenseCategories.push(await ensure(prisma.expenseCategory, { name }, { name }));
   }
 
   // ── Currencies ──
   // Kurs fixed-point masshtabda saqlanadi: haqiqiy kurs × RATE_SCALE (10000).
   // 1 so'm → 10000, 12800 so'm → 128000000. (currencies.service.ts RATE_SCALE bilan mos.)
+  // Idempotent: code unique — qayta seed'da P2002 crash-loop bo'lmasligi uchun.
   const RATE_SCALE = 10000n;
-  await prisma.currencyRate.create({ data: { code: 'UZS', name: 'O\'zbek so\'mi', rateToUzs: 1n * RATE_SCALE } });
-  const usd = await prisma.currencyRate.create({ data: { code: 'USD', name: 'AQSh dollari', rateToUzs: 12800n * RATE_SCALE } });
-  await prisma.currencyHistory.create({ data: { currencyId: usd.id, rateToUzs: 12800n * RATE_SCALE } });
+  await ensure(prisma.currencyRate, { code: 'UZS' }, { code: 'UZS', name: 'O\'zbek so\'mi', rateToUzs: 1n * RATE_SCALE });
+  const usd = await ensure(prisma.currencyRate, { code: 'USD' }, { code: 'USD', name: 'AQSh dollari', rateToUzs: 12800n * RATE_SCALE });
+  await ensure(prisma.currencyHistory, { currencyId: usd.id }, { currencyId: usd.id, rateToUzs: 12800n * RATE_SCALE });
 
   // ── Users (5 rol) ──
   const superadmin = await prisma.user.create({
