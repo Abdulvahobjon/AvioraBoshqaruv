@@ -67,7 +67,8 @@ export function ProjectsPage() {
   const rowActions = (p) => [
     ...(canManage ? [{ label: 'Tahrirlash', icon: Pencil, onClick: () => openEdit(p) }] : []),
     { label: 'Batafsil', icon: Info, onClick: () => navigate(`/projects/${p.id}`) },
-    ...(canManage ? [{ label: "O'chirish", icon: Trash2, tone: 'danger', onClick: () => setDeleting(p) }] : []),
+    // O'chirish faqat rejalashtirilgan loyiha uchun — faolga o'tgach o'chirilmaydi.
+    ...(canManage && p.status === 'planning' ? [{ label: "O'chirish", icon: Trash2, tone: 'danger', onClick: () => setDeleting(p) }] : []),
   ];
 
   const columns = [

@@ -249,6 +249,11 @@ export class ProjectsService {
   async remove(id: number, user: AuthUser, ip?: string) {
     const before = await this.prisma.project.findFirst({ where: { id, deletedAt: null } });
     if (!before) throw new NotFoundException('Loyiha topilmadi');
+    // Faqat hali boshlanmagan (rejalashtirilgan) loyihani o'chirish mumkin.
+    // Faolga o'tgan loyiha o'chirilmaydi (ish boshlangan — doimiy yozuv).
+    if (before.status !== 'planning') {
+      throw new ForbiddenException('Faqat rejalashtirilgan loyihani o\'chirish mumkin — faol loyiha o\'chirilmaydi');
+    }
     // Soft delete (loyiha konvensiyasi: hard delete yo'q — trash/restore uchun).
     await this.prisma.project.update({ where: { id }, data: { deletedAt: new Date() } });
     await this.audit.record({ userId: user.id, entity: 'Project', entityId: id, action: 'DELETE', ip, oldValue: { name: before.name } });

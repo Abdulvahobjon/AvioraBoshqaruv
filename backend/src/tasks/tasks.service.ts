@@ -191,6 +191,11 @@ export class TasksService {
     if (!PRIVILEGED.includes(user.role)) throw new ForbiddenException('Vazifa yaratishga ruxsatingiz yo\'q');
     const { project } = await this.assertProjectAccess(dto.projectId, user);
     if (project.isFrozen) throw new ForbiddenException('Loyiha muzlatilgan — yangi vazifa qo\'shib bo\'lmaydi');
+    // Faqat faol (yoki kechikkan — davom etayotgan) loyihaga vazifa qo'shiladi.
+    // Rejalashtirilgan loyiha avval faolga o'tkazilishi kerak.
+    if (!['active', 'overdue'].includes(project.status)) {
+      throw new ForbiddenException('Faqat faol loyihaga vazifa qo\'shiladi — avval loyihani "Faol" holatiga o\'tkazing');
+    }
 
     const baseData = {
       projectId: dto.projectId,

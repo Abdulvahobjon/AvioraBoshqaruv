@@ -147,7 +147,10 @@ export function TaskFormDialog({ open, onClose, task, template }) {
         <FormField label="Loyiha" required error={errors.projectId && req}>
           <RHFSelect control={control} name="projectId" rules={{ required: true }} error={errors.projectId}>
             <option value="">Loyiha tanlang</option>
-            {(projectList?.items || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {/* Faqat faol/kechikkan loyihaga vazifa qo'shiladi (tahrirlashda joriy loyiha ham ko'rinadi). */}
+            {(projectList?.items || [])
+              .filter((p) => ['active', 'overdue'].includes(p.status) || p.id === source?.projectId)
+              .map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </RHFSelect>
         </FormField>
         <FormField label="Nomi" required error={errors.title && req}>
