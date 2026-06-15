@@ -1,8 +1,12 @@
 import { Injectable, Logger, BadGatewayException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { google } from 'googleapis';
-import type { OAuth2Client } from 'google-auth-library';
 import { randomUUID } from 'crypto';
+
+// google-auth-library bir nechta versiyada (top-level + googleapis-common ichida nested)
+// o'rnatilishi mumkin — OAuth2Client tiplari mos kelmaydi. Skew'dan saqlanish uchun
+// klientni `any` sifatida saqlaymiz (runtime'ga ta'sir yo'q).
+type OAuth2Client = any;
 
 export interface CreateMeetInput {
   title: string;
@@ -102,9 +106,7 @@ export class GoogleCalendarService {
   }
 
   private calendar() {
-    // `auth` cast — googleapis-common bilan google-auth-library versiya-skew bo'lsa
-    // OAuth2Client tipi mos kelmasligi mumkin (runtime'ga ta'sir yo'q, faqat TS).
-    return google.calendar({ version: 'v3', auth: this.getClient() as any });
+    return google.calendar({ version: 'v3', auth: this.getClient() });
   }
 
   /**
