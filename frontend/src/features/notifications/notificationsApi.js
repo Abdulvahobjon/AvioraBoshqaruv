@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
 import { toast } from 'sonner';
@@ -109,11 +110,51 @@ export function notifLink(n) {
   return '/';
 }
 
-/** Connects to the Socket.io gateway and refreshes notifications on push. */
+/** Brauzer (desktop) notification — sahifa ochiq bo'lganда kompyuterga chiqadi.
+ *  Bosilganда oyna fokuslanadi, bo'limga o'tadi va o'qilgan deb belgilanadi. */
+function showDesktopNotification(n, openNotif) {
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+  const d = describeNotification(n);
+  try {
+    const native = new Notification(d.title, {
+      body: d.body || '',
+      icon: '/favicon.svg',
+      tag: `aviora-notif-${n.id}`, // bir bildirishnoma takror chiqmaydi
+    });
+    native.onclick = () => {
+      window.focus();
+      openNotif(n);
+      native.close();
+    };
+  } catch {
+    /* ba'zi brauzerlar new Notification() ni bloklashi mumkin — e'tiborsiz qoldiramiz */
+  }
+}
+
+/** Connects to the Socket.io gateway and refreshes notifications on push.
+ *  Real-time: in-app toast + brauzer (desktop) notification. */
 export function useNotificationSocket() {
   // Faqat auth bor/yo'qligiga bog'lanamiz (token qiymatiga emas) — token-refresh socket'ni uzmaydi.
   const isAuthed = useAuthStore((s) => !!s.accessToken);
   const qc = useQueryClient();
+  const navigate = useNavigate();
+
+  // Bildirishnomani "ochish": bo'limga o'tish + o'qilgan deb belgilash.
+  const openNotif = (n) => {
+    navigate(notifLink(n));
+    api.patch(`/notifications/${n.id}/read`)
+      .then(() => qc.invalidateQueries({ queryKey: ['notifications'] }))
+      .catch(() => {});
+  };
+
+  // Desktop notification uchun ruxsat so'raymiz (bir marta, login bo'lganda).
+  useEffect(() => {
+    if (!isAuthed) return;
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, [isAuthed]);
 
   useEffect(() => {
     if (!isAuthed) return;
@@ -131,7 +172,15 @@ export function useNotificationSocket() {
     });
 
     socket.on('notification', (n) => {
-      toast.info(describeNotification(n).title);
+      const d = describeNotification(n);
+      // 1) Ilova ichida toast (bosilsa bo'limga o'tadi + o'qiladi).
+      toast.info(d.title, {
+        description: d.body || undefined,
+        action: { label: "Ko'rish", onClick: () => openNotif(n) },
+      });
+      // 2) Kompyuter (brauzer) notification'i.
+      showDesktopNotification(n, openNotif);
+      // 3) Ro'yxatni yangilash (qo'ng'iroq belgisidagi soni va ro'yxat).
       qc.invalidateQueries({ queryKey: ['notifications'] });
     });
 
@@ -139,5 +188,5 @@ export function useNotificationSocket() {
     socket.on('reconnect', () => qc.invalidateQueries({ queryKey: ['notifications'] }));
 
     return () => socket.disconnect();
-  }, [isAuthed, qc]);
+  }, [isAuthed, qc, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 }

@@ -36,9 +36,17 @@ export function NotificationBell() {
     navigate(notifLink(n));
   };
 
+  // Qo'ng'iroqni ochish — foydalanuvchi harakati: desktop notification ruxsatini so'rash uchun ham qulay payt.
+  const openBell = () => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+    setOpen(true);
+  };
+
   return (
     <>
-      <button onClick={() => setOpen(true)} className="relative rounded-md p-2 text-icon-sub transition-colors hover:bg-bg-1-alt">
+      <button onClick={openBell} className="relative rounded-md p-2 text-icon-sub transition-colors hover:bg-bg-1-alt">
         <Bell className="h-5 w-5" />
         {unread > 0 && (
           <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-error-strong px-1 text-[10px] font-semibold text-text-white">
