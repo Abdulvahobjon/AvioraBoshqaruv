@@ -23,6 +23,8 @@ export function DataTable({
   emptyDescription,
   transparent = false, // shaffof fon — kartochka emas, sahifa foni ko'rinadi
   fill = false, // bo'limning to'liq balandligini egallaydi (ichki scroll bilan)
+  accentHeader = false, // kuchli aksent sarlavha (Hisobotlar jadvallaridek)
+  selectedId, // tanlangan qatorni ajratib ko'rsatish (row.id)
 }) {
   // Tashqi konteyner: shaffof rejimda fon/ramka olib tashlanadi; fill rejimida flex-column.
   const shell = cn(
@@ -55,15 +57,17 @@ export function DataTable({
             <tr
               className={cn(
                 'border-b border-stroke-sub',
-                transparent ? 'bg-transparent backdrop-blur' : 'bg-bg-1-alt',
+                accentHeader ? 'bg-accent-strong text-text-white' : transparent ? 'bg-transparent backdrop-blur' : 'bg-bg-1-alt',
               )}
             >
               {columns.map((col) => (
                 <th
                   key={col.key}
                   className={cn(
-                    'px-4 py-3 text-left font-medium text-text-sub whitespace-nowrap',
-                    col.sortable && 'cursor-pointer select-none hover:text-text-strong',
+                    'px-4 py-3 text-left font-medium whitespace-nowrap',
+                    accentHeader ? 'text-text-white' : 'text-text-sub',
+                    col.sortable && 'cursor-pointer select-none',
+                    col.sortable && !accentHeader && 'hover:text-text-strong',
                     col.className,
                   )}
                   onClick={() => col.sortable && onSort?.(col.key)}
@@ -88,6 +92,7 @@ export function DataTable({
                 className={cn(
                   'border-b border-stroke-soft last:border-0 transition-colors',
                   onRowClick && 'cursor-pointer hover:bg-bg-1-alt',
+                  selectedId != null && selectedId === row.id && 'bg-accent-soft hover:bg-accent-soft',
                 )}
               >
                 {columns.map((col) => (

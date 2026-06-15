@@ -119,7 +119,13 @@ export function useNotificationSocket() {
     if (!isAuthed) return;
     const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
     const socket = io(base, {
-      transports: ['websocket'],
+      // WebSocket birinchi; ulanmasa polling'ga tushadi (ba'zi proxylar WS upgrade'ni bloklaydi).
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 10_000,
+      timeout: 10_000,
       // Token har ulanish/qayta-ulanishda store'dan yangi o'qiladi.
       auth: (cb) => cb({ token: getAuth().accessToken }),
     });
@@ -128,6 +134,9 @@ export function useNotificationSocket() {
       toast.info(describeNotification(n).title);
       qc.invalidateQueries({ queryKey: ['notifications'] });
     });
+
+    // Qayta ulanganda o'tkazib yuborilgan bildirishnomalarni sinxronlash.
+    socket.on('reconnect', () => qc.invalidateQueries({ queryKey: ['notifications'] }));
 
     return () => socket.disconnect();
   }, [isAuthed, qc]);

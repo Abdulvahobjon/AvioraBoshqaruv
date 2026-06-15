@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Search, RotateCcw, Trash2, Briefcase, KanbanSquare } from 'lucide-react';
+import { Search, RotateCcw, Trash2, Briefcase, KanbanSquare, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
-import { X } from 'lucide-react';
 import { formatDate } from '@/lib/utils/format';
 import { apiError } from '@/lib/api/axios';
 import { TASK_PRIORITY } from '@/lib/constants';
@@ -68,12 +67,46 @@ function ConfirmDeleteDialog({ open, onClose, onConfirm, loading }) {
   );
 }
 
+/** Qator tanlanganda pastda chiqadigan suzuvchi amal paneli. */
+function SelectionBar({ onRestore, onDelete }) {
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center lg:pl-64">
+      <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-stroke-sub bg-bg-base p-1.5 shadow-elevated">
+        <button onClick={onRestore} className="inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold text-text-accent transition-colors hover:bg-bg-1-alt">
+          <RotateCcw className="h-4 w-4" /> Tiklash
+        </button>
+        <span className="h-5 w-px bg-stroke-sub" />
+        <button onClick={onDelete} className="inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold text-error-strong transition-colors hover:bg-error-soft">
+          <Trash2 className="h-4 w-4" /> Butunlay o'chirish
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SearchBar({ value, onChange, placeholder }) {
+  return (
+    <div className="relative mb-4 w-full sm:w-80">
+      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-icon-soft" />
+      <Input placeholder={placeholder} className="pl-9" value={value} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+
+function rowMenu(onRestore, onDelete) {
+  return [
+    { label: 'Tiklash', icon: RotateCcw, tone: 'success', onClick: onRestore },
+    { label: "Butunlay o'chirish", icon: Trash2, tone: 'danger', onClick: onDelete },
+  ];
+}
+
 function ProjectsTrash() {
   const { data, isLoading } = useTrashProjects();
   const restore = useRestoreProject();
   const hardDelete = useHardDeleteProject();
   const [search, setSearch] = useState('');
   const debounced = useDebounce(search);
+  const [selected, setSelected] = useState(null);
   const [toDelete, setToDelete] = useState(null);
 
   const rows = useMemo(() => {
@@ -84,11 +117,11 @@ function ProjectsTrash() {
   }, [data, debounced]);
 
   const onRestore = (id) => restore.mutate(id, {
-    onSuccess: () => toast.success('Tiklandi', { description: "Loyiha tiklandi va ro'yxatga qaytdi" }),
+    onSuccess: () => { toast.success('Tiklandi', { description: "Loyiha tiklandi va ro'yxatga qaytdi" }); setSelected(null); },
     onError: (e) => toast.error(apiError(e)),
   });
   const doHardDelete = () => hardDelete.mutate(toDelete.id, {
-    onSuccess: () => { toast.success("Muvaffaqiyatli o'chirildi", { description: "Tanlangan ma'lumot butunlay o'chirildi" }); setToDelete(null); },
+    onSuccess: () => { toast.success("Muvaffaqiyatli o'chirildi", { description: "Tanlangan ma'lumot butunlay o'chirildi" }); setToDelete(null); setSelected(null); },
     onError: (e) => toast.error(apiError(e)),
   });
 
@@ -103,10 +136,7 @@ function ProjectsTrash() {
       key: 'actions', header: '', className: 'w-12',
       render: (r) => (
         <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
-          <DropdownMenu items={[
-            { label: 'Tiklash', icon: RotateCcw, tone: 'success', onClick: () => onRestore(r.id) },
-            { label: "Butunlay o'chirish", icon: Trash2, tone: 'danger', onClick: () => setToDelete(r) },
-          ]} />
+          <DropdownMenu items={rowMenu(() => onRestore(r.id), () => setToDelete(r))} />
         </div>
       ),
     },
@@ -115,7 +145,12 @@ function ProjectsTrash() {
   return (
     <>
       <SearchBar value={search} onChange={setSearch} placeholder="Loyihani izlash" />
-      <DataTable columns={columns} data={rows} loading={isLoading} emptyTitle="Chiqindi bo'sh" emptyDescription="O'chirilgan loyiha yo'q." />
+      <DataTable
+        columns={columns} data={rows} loading={isLoading} accentHeader
+        onRowClick={(r) => setSelected((s) => (s?.id === r.id ? null : r))} selectedId={selected?.id}
+        emptyTitle="Chiqindi bo'sh" emptyDescription="O'chirilgan loyiha yo'q."
+      />
+      {selected && <SelectionBar onRestore={() => onRestore(selected.id)} onDelete={() => setToDelete(selected)} />}
       <ConfirmDeleteDialog open={!!toDelete} onClose={() => setToDelete(null)} onConfirm={doHardDelete} loading={hardDelete.isPending} />
     </>
   );
@@ -127,6 +162,7 @@ function TasksTrash() {
   const hardDelete = useHardDeleteTask();
   const [search, setSearch] = useState('');
   const debounced = useDebounce(search);
+  const [selected, setSelected] = useState(null);
   const [toDelete, setToDelete] = useState(null);
 
   const rows = useMemo(() => {
@@ -137,11 +173,11 @@ function TasksTrash() {
   }, [data, debounced]);
 
   const onRestore = (id) => restore.mutate(id, {
-    onSuccess: () => toast.success('Tiklandi', { description: "Vazifa tiklandi va ro'yxatga qaytdi" }),
+    onSuccess: () => { toast.success('Tiklandi', { description: "Vazifa tiklandi va ro'yxatga qaytdi" }); setSelected(null); },
     onError: (e) => toast.error(apiError(e)),
   });
   const doHardDelete = () => hardDelete.mutate(toDelete.id, {
-    onSuccess: () => { toast.success("Muvaffaqiyatli o'chirildi", { description: "Tanlangan ma'lumot butunlay o'chirildi" }); setToDelete(null); },
+    onSuccess: () => { toast.success("Muvaffaqiyatli o'chirildi", { description: "Tanlangan ma'lumot butunlay o'chirildi" }); setToDelete(null); setSelected(null); },
     onError: (e) => toast.error(apiError(e)),
   });
 
@@ -159,10 +195,7 @@ function TasksTrash() {
       key: 'actions', header: '', className: 'w-12',
       render: (r) => (
         <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
-          <DropdownMenu items={[
-            { label: 'Tiklash', icon: RotateCcw, tone: 'success', onClick: () => onRestore(r.id) },
-            { label: "Butunlay o'chirish", icon: Trash2, tone: 'danger', onClick: () => setToDelete(r) },
-          ]} />
+          <DropdownMenu items={rowMenu(() => onRestore(r.id), () => setToDelete(r))} />
         </div>
       ),
     },
@@ -171,17 +204,13 @@ function TasksTrash() {
   return (
     <>
       <SearchBar value={search} onChange={setSearch} placeholder="Vazifani izlash" />
-      <DataTable columns={columns} data={rows} loading={isLoading} emptyTitle="Chiqindi bo'sh" emptyDescription="O'chirilgan vazifa yo'q." />
+      <DataTable
+        columns={columns} data={rows} loading={isLoading} accentHeader
+        onRowClick={(r) => setSelected((s) => (s?.id === r.id ? null : r))} selectedId={selected?.id}
+        emptyTitle="Chiqindi bo'sh" emptyDescription="O'chirilgan vazifa yo'q."
+      />
+      {selected && <SelectionBar onRestore={() => onRestore(selected.id)} onDelete={() => setToDelete(selected)} />}
       <ConfirmDeleteDialog open={!!toDelete} onClose={() => setToDelete(null)} onConfirm={doHardDelete} loading={hardDelete.isPending} />
     </>
-  );
-}
-
-function SearchBar({ value, onChange, placeholder }) {
-  return (
-    <div className="relative mb-4 w-full sm:w-80">
-      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-icon-soft" />
-      <Input placeholder={placeholder} className="pl-9" value={value} onChange={(e) => onChange(e.target.value)} />
-    </div>
   );
 }

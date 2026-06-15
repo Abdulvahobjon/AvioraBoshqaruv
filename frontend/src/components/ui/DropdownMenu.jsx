@@ -29,10 +29,11 @@ export function DropdownMenu({ items = [], align = 'right' }) {
     };
   }, [open]);
 
+  const MENU_W = 208;
   const toggle = (e) => {
     e.stopPropagation();
     const r = btnRef.current.getBoundingClientRect();
-    setCoords({ top: r.bottom + 4, left: align === 'right' ? r.right - 176 : r.left });
+    setCoords({ top: r.bottom + 4, left: align === 'right' ? r.right - MENU_W : r.left });
     setOpen((o) => !o);
   };
 
@@ -52,16 +53,16 @@ export function DropdownMenu({ items = [], align = 'right' }) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: -4 }}
               transition={{ duration: 0.14 }}
-              style={{ position: 'fixed', top: coords.top, left: coords.left, width: 176, zIndex: 60 }}
+              style={{ position: 'fixed', top: coords.top, left: coords.left, width: MENU_W, zIndex: 60 }}
               className="overflow-hidden rounded-lg border border-stroke-sub bg-bg-base py-1 shadow-elevated"
             >
               {items.map((it, i) => (
                 <button
                   key={i}
                   onClick={(e) => { e.stopPropagation(); setOpen(false); it.onClick?.(); }}
-                  className={cn('flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-text-sub transition-colors hover:bg-bg-1-alt', toneClass[it.tone])}
+                  className={cn('flex w-full items-center gap-2.5 whitespace-nowrap px-4 py-2.5 text-sm text-text-sub transition-colors hover:bg-bg-1-alt', toneClass[it.tone])}
                 >
-                  {it.icon && <it.icon className="h-4 w-4" />}
+                  {it.icon && <it.icon className="h-4 w-4 shrink-0" />}
                   {it.label}
                 </button>
               ))}
