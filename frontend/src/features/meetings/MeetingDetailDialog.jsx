@@ -32,10 +32,10 @@ export function MeetingDetailDialog({ meetingId, open, onClose, onFinish }) {
   const [expanded, setExpanded] = useState(null);
   const [reason, setReason] = useState('');
 
-  // Tashkilotchi qarori: sababli (excused=true) / sababsiz (excused=false).
+  // Tashkilotchi qarori: sababli (excused=true) / sababsiz (excused=false). Qaror berilgach modal yopiladi.
   const decide = (userId, excused) => {
     setAtt.mutate({ id: meetingId, userId, excused }, {
-      onSuccess: () => toast.success(excused ? 'Sababli deb belgilandi' : 'Sababsiz deb belgilandi'),
+      onSuccess: () => { toast.success(excused ? 'Sababli deb belgilandi' : 'Sababsiz deb belgilandi'); onClose?.(); },
       onError: (e) => toast.error(apiError(e)),
     });
   };

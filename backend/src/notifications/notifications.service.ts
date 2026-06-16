@@ -29,16 +29,23 @@ export class NotificationsService {
     }
   }
 
-  async findForUser(userId: number) {
-    const [items, unread] = await Promise.all([
-      this.prisma.notification.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-        take: 50,
-      }),
-      this.prisma.notification.count({ where: { userId, isRead: false } }),
-    ]);
-    return { items, unread };
+  /**
+   * Cursor pagination — eng yangisi yuqorida (id desc).
+   * `cursor` oxirgi olingan bildirishnoma id'si; `nextCursor` null bo'lsa boshqa sahifa yo'q.
+   * `unread` — har doim umumiy o'qilmaganlar soni (qo'ng'iroq belgisi uchun).
+   */
+  async findForUser(userId: number, cursor?: number, take = 20) {
+    const limit = Math.min(Math.max(Number(take) || 20, 1), 50);
+    const rows = await this.prisma.notification.findMany({
+      where: { userId },
+      orderBy: { id: 'desc' },
+      take: limit + 1, // keyingi sahifa bor-yo'qligini bilish uchun bitta ortiq
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    });
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
+    const unread = await this.prisma.notification.count({ where: { userId, isRead: false } });
+    return { items, unread, nextCursor: hasMore ? items[items.length - 1].id : null };
   }
 
   async markRead(id: number, userId: number) {
@@ -48,18 +55,6 @@ export class NotificationsService {
 
   async markAllRead(userId: number) {
     await this.prisma.notification.updateMany({ where: { userId, isRead: false }, data: { isRead: true } });
-    return { ok: true };
-  }
-
-  /** Bitta bildirishnomani o'chirish (soft-delete, faqat o'ziniki). */
-  async remove(id: number, userId: number) {
-    await this.prisma.notification.deleteMany({ where: { id, userId } }); // middleware -> soft delete
-    return { ok: true };
-  }
-
-  /** Barcha bildirishnomalarni tozalash (soft-delete). */
-  async clearAll(userId: number) {
-    await this.prisma.notification.deleteMany({ where: { userId } });
     return { ok: true };
   }
 }

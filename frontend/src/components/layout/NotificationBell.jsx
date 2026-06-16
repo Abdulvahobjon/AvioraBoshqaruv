@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Check, BellOff, Trash2, X } from 'lucide-react';
+import { Bell, Check, BellOff, Loader2 } from 'lucide-react';
 import { Drawer } from '@/components/ui/Drawer';
 import { cn } from '@/lib/utils/cn';
 import { formatDate } from '@/lib/utils/format';
 import dayjs from 'dayjs';
-import { useNotifications, useMarkAllRead, useMarkRead, useDeleteNotification, useClearNotifications, describeNotification, notifLink } from '@/features/notifications/notificationsApi';
+import { useNotifications, useMarkAllRead, useMarkRead, describeNotification, notifLink } from '@/features/notifications/notificationsApi';
 
 /** Group notifications by calendar day (newest first). */
 function groupByDay(items) {
@@ -20,15 +20,29 @@ function groupByDay(items) {
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
-  const { data } = useNotifications();
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useNotifications();
   const markAll = useMarkAllRead();
   const markRead = useMarkRead();
-  const delOne = useDeleteNotification();
-  const clearAll = useClearNotifications();
+  const sentinelRef = useRef(null);
 
-  const unread = data?.unread || 0;
-  const items = data?.items || [];
+  const pages = data?.pages || [];
+  const unread = pages[0]?.unread || 0;
+  const items = pages.flatMap((p) => p.items || []);
   const groups = groupByDay(items);
+
+  // Pastga yetganda keyingi sahifani yuklash (infinite scroll).
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!open || !el || !hasNextPage) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) fetchNextPage();
+      },
+      { rootMargin: '120px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [open, hasNextPage, isFetchingNextPage, fetchNextPage, items.length]);
 
   const onItemClick = (n) => {
     if (!n.isRead) markRead.mutate(n.id);
@@ -60,17 +74,10 @@ export function NotificationBell() {
         onClose={() => setOpen(false)}
         title="Bildirishnomalar"
         headerAction={
-          items.length > 0 && (
-            <div className="flex items-center gap-3">
-              {unread > 0 && (
-                <button onClick={() => markAll.mutate()} className="inline-flex items-center gap-1 text-xs font-medium text-text-accent hover:underline">
-                  <Check className="h-3.5 w-3.5" /> Barchasi o'qish
-                </button>
-              )}
-              <button onClick={() => clearAll.mutate()} className="inline-flex items-center gap-1 text-xs font-medium text-error-strong hover:underline">
-                <Trash2 className="h-3.5 w-3.5" /> Tozalash
-              </button>
-            </div>
+          unread > 0 && (
+            <button onClick={() => markAll.mutate()} className="inline-flex items-center gap-1 text-xs font-medium text-text-accent hover:underline">
+              <Check className="h-3.5 w-3.5" /> Barchasi o'qish
+            </button>
           )
         }
       >
@@ -102,18 +109,18 @@ export function NotificationBell() {
                         {d.body && <p className="text-xs text-text-sub">{d.body}</p>}
                       </div>
                       <span className="shrink-0 text-xs text-text-soft">{dayjs(n.createdAt).format('HH:mm')}</span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); delOne.mutate(n.id); }}
-                        className="shrink-0 rounded p-1 text-icon-soft transition-colors hover:bg-error-soft hover:text-error-strong"
-                        title="O'chirish"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
                     </div>
                   );
                 })}
               </div>
             ))}
+            {/* Infinite scroll sentinel + yuklanish indikatori */}
+            <div ref={sentinelRef} className="h-4" />
+            {isFetchingNextPage && (
+              <div className="flex items-center justify-center py-3 text-text-soft">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
+            )}
           </div>
         )}
       </Drawer>

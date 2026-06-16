@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
 import { toast } from 'sonner';
 import { FolderOpen, Wallet, CalendarClock, AlertTriangle, Bell } from 'lucide-react';
@@ -34,7 +34,7 @@ export function describeNotification(n) {
     case 'meeting_reminder':
       return { title: 'Yig\'ilish tez orada boshlanadi', body: p.title ? `'${p.title}' yig'ilishi boshlanmoqda` : 'Yig\'ilishingiz boshlanmoqda', icon: CalendarClock };
     case 'meeting_absent':
-      return { title: 'Siz yig\'ilishda ishtirok etmadingiz', body: p.title ? `'${p.title}' — sababini kiriting` : 'Sababini kiriting', icon: CalendarClock };
+      return { title: 'Yig\'ilishga qatnashmadingiz', body: 'Iltimos, qatnashmaganlik sababini kiriting', icon: CalendarClock };
     case 'meeting_reason':
       return { title: 'Yig\'ilish sababi keldi', body: p.requester ? `${p.requester}: ${p.reason || ''}` : (p.reason || 'Sababni ko\'rib chiqing'), icon: CalendarClock };
     case 'expense_request':
@@ -60,10 +60,16 @@ export function describeNotification(n) {
   }
 }
 
+const PAGE_SIZE = 20;
+
+/** Infinite (scroll) pagination — eng yangisi yuqorida. Sahifa: { items, unread, nextCursor }. */
 export function useNotifications() {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ['notifications'],
-    queryFn: async () => (await api.get('/notifications')).data,
+    queryFn: async ({ pageParam }) =>
+      (await api.get('/notifications', { params: { cursor: pageParam || undefined, take: PAGE_SIZE } })).data,
+    initialPageParam: undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
     refetchInterval: 60_000,
   });
 }
@@ -84,27 +90,14 @@ export function useMarkRead() {
   });
 }
 
-export function useDeleteNotification() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id) => (await api.delete(`/notifications/${id}`)).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
-  });
-}
-
-export function useClearNotifications() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async () => (await api.delete('/notifications/clear')).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
-  });
-}
-
 /** Where a notification leads when clicked. */
 export function notifLink(n) {
   const p = n.payload || {};
   const t = n.type || '';
   if (t.startsWith('task')) return '/tasks';
+  // Yig'ilish: tugagach tashkilotchi → davomat oynasi; qatnashmagan xodim → sabab oynasi; qolgani → tafsilot.
+  if (t === 'meeting_finished') return p.meetingId ? `/meetings?attendance=${p.meetingId}` : '/meetings';
+  if (t === 'meeting_absent') return p.meetingId ? `/meetings?reason=${p.meetingId}` : '/meetings';
   if (t.startsWith('meeting')) return p.meetingId ? `/meetings?meeting=${p.meetingId}` : '/meetings';
   if (t === 'payroll_paid') return '/payroll';
   if (t === 'expense_request' || t.startsWith('request')) return '/finance';

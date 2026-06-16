@@ -259,9 +259,9 @@ export class MeetingsService {
 
   /**
    * Finish a meeting (creator/admin only). Two-sided attendance:
-   *  - attendedUserIds → attended=true
-   *  - others → attended=false (reason submitted later by them)
-   * Notifies absentees ("you didn't attend") and attendees ("meeting finished").
+   *  - attendedUserIds → attended=true (davomat olingan)
+   *  - others → attended=false (davomat olinmagan = qatnashmagan; sababini keyin o'zi yuboradi)
+   * Faqat qatnashmaganlarga "siz qatnashmadingiz — sababini kiriting" bildirishnomasi boradi.
    */
   async finish(id: number, attendedUserIds: number[], user: AuthUser) {
     const meeting = await this.prisma.meeting.findFirst({ where: { id }, include: { attendance: true } });
@@ -277,10 +277,9 @@ export class MeetingsService {
       await tx.meeting.update({ where: { id }, data: { finishedAt: new Date() } });
     });
 
+    // Davomat olinmagan (qatnashmagan) xodimlarga sabab so'rab bildirishnoma — bosilganda sabab oynasi ochiladi.
     for (const a of meeting.attendance) {
-      if (attended.has(a.userId)) {
-        await this.notifications.notify(a.userId, 'meeting_finished', { meetingId: id, title: meeting.title });
-      } else {
+      if (!attended.has(a.userId)) {
         await this.notifications.notify(a.userId, 'meeting_absent', { meetingId: id, title: meeting.title });
       }
     }

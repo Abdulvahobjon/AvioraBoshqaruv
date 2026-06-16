@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
-import { Plus, X, UserPlus, Eye, CheckCircle2, Trash2, Video, Search, Filter, Copy, Pencil } from 'lucide-react';
+import { Plus, X, UserPlus, Eye, CheckCircle2, Trash2, Video, Search, Filter, Copy, Pencil, Check, Minus } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
@@ -14,7 +14,6 @@ import { RHFSelect } from '@/components/ui/RHFSelect';
 import { FormField } from '@/components/ui/FormField';
 import { DateTimeBox } from '@/components/ui/DateTimeBox';
 import { Avatar } from '@/components/ui/Avatar';
-import { Switch } from '@/components/ui/Switch';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { cn } from '@/lib/utils/cn';
@@ -27,6 +26,7 @@ import { useUsersList } from '@/features/users/usersApi';
 import { useMeetings, useCreateMeeting, useUpdateMeeting, useDeleteMeeting } from '@/features/meetings/meetingsApi';
 import { ParticipantPicker } from '@/features/meetings/ParticipantPicker';
 import { MeetingDetailDialog } from '@/features/meetings/MeetingDetailDialog';
+import { MeetingReasonDialog } from '@/features/meetings/MeetingReasonDialog';
 import { AttendanceDialog } from '@/features/meetings/AttendanceDialog';
 import { MeetingStatusBadge } from '@/features/meetings/MeetingStatusBadge';
 
@@ -79,17 +79,24 @@ export function MeetingsPage() {
   const [editing, setEditing] = useState(null);
   const [detailId, setDetailId] = useState(null);
   const [attendanceId, setAttendanceId] = useState(null);
+  const [reasonId, setReasonId] = useState(null);
   const [deleting, setDeleting] = useState(null);
 
-  // Bildirishnoma deep-link: /meetings?meeting=<id> → tegishli yig'ilish oynasi ochiladi.
+  // Bildirishnoma deep-linklari:
+  //  ?meeting=<id>    → yig'ilish tafsiloti (umumiy)
+  //  ?attendance=<id> → davomat olish oynasi (tashkilotchiga "yig'ilish yakunlandi")
+  //  ?reason=<id>     → sabab kiritish oynasi (qatnashmagan xodimga)
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
     const mid = searchParams.get('meeting');
-    if (mid) {
-      setDetailId(Number(mid));
-      searchParams.delete('meeting');
-      setSearchParams(searchParams, { replace: true });
-    }
+    const aid = searchParams.get('attendance');
+    const rid = searchParams.get('reason');
+    if (!mid && !aid && !rid) return;
+    if (mid) setDetailId(Number(mid));
+    if (aid) setAttendanceId(Number(aid));
+    if (rid) setReasonId(Number(rid));
+    ['meeting', 'attendance', 'reason'].forEach((k) => searchParams.delete(k));
+    setSearchParams(searchParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
   const canManage = (m) => m.createdBy === user?.id || isAdmin;
@@ -133,11 +140,17 @@ export function MeetingsPage() {
     },
     { key: 'status', header: 'Holati', render: (r) => <MeetingStatusBadge meeting={r} /> },
     {
+      key: 'finished', header: 'Tugatildimi?', className: 'w-28',
+      // Holat ko'rsatkichi: yakunlangan → yashil ✓, aks holda → qizil −. (Yakunlash tugmasi modal ichida.)
+      render: (r) => r.finishedAt
+        ? <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-success-strong text-text-white"><Check className="h-4 w-4" /></span>
+        : <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-error-strong text-text-white"><Minus className="h-4 w-4" /></span>,
+    },
+    {
       key: 'actions', header: '', className: 'w-12',
       render: (r) => {
         const items = [{ label: "Ko'rish", icon: Eye, onClick: () => setDetailId(r.id) }];
         if (canEdit(r)) items.push({ label: 'Tahrirlash', icon: Pencil, onClick: () => setEditing(r) });
-        if (canManage(r) && !r.finishedAt) items.push({ label: 'Yakunlash', icon: CheckCircle2, tone: 'success', onClick: () => setAttendanceId(r.id) });
         if (canManage(r)) items.push({ label: "O'chirish", icon: Trash2, tone: 'danger', onClick: () => setDeleting(r) });
         return <div onClick={(e) => e.stopPropagation()}><DropdownMenu items={items} /></div>;
       },
@@ -179,7 +192,12 @@ export function MeetingsPage() {
         emptyDescription={canCreate ? "Yangi yig'ilish tashkil eting." : "Sizni yig'ilishlarga taklif qilishadi."}
       />
 
-      <MeetingDialog open={createOpen || !!editing} onClose={() => { setCreateOpen(false); setEditing(null); }} meeting={editing} />
+      <MeetingDialog
+        open={createOpen || !!editing}
+        onClose={() => { setCreateOpen(false); setEditing(null); }}
+        meeting={editing}
+        onFinish={(id) => { setCreateOpen(false); setEditing(null); setAttendanceId(id); }}
+      />
       <MeetingFilterDialog open={filterOpen} onClose={() => setFilterOpen(false)} value={filters} onApply={setFilters} />
       {detailId && (
         <MeetingDetailDialog
@@ -190,6 +208,7 @@ export function MeetingsPage() {
         />
       )}
       {attendanceId && <AttendanceDialog meetingId={attendanceId} open={!!attendanceId} onClose={() => setAttendanceId(null)} />}
+      {reasonId && <MeetingReasonDialog meetingId={reasonId} open={!!reasonId} onClose={() => setReasonId(null)} />}
       <ConfirmDialog
         open={!!deleting}
         onClose={() => setDeleting(null)}
@@ -253,7 +272,7 @@ function toLocalInput(iso) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-function MeetingDialog({ open, onClose, meeting }) {
+function MeetingDialog({ open, onClose, meeting, onFinish }) {
   const isEdit = !!meeting;
   const { data: projectList } = useProjects({ limit: 100 });
   const { data: userList } = useUsersList();
@@ -262,7 +281,6 @@ function MeetingDialog({ open, onClose, meeting }) {
   const saving = create.isPending || update.isPending;
   const { register, control, handleSubmit, reset, watch, formState: { errors } } = useForm();
   const [participants, setParticipants] = useState([]);
-  const [finished, setFinished] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [created, setCreated] = useState(null); // muvaffaqiyatli yaratilgan yig'ilish (Meet havolasi bilan)
 
@@ -296,11 +314,9 @@ function MeetingDialog({ open, onClose, meeting }) {
         startAt: meeting.startAt ? toLocalInput(meeting.startAt) : '',
       });
       setParticipants((meeting.attendance || []).map((a) => a.userId));
-      setFinished(!!meeting.finishedAt);
     } else {
       reset({ title: '', penaltyPercent: '', projectId: '', link: '', content: '', duration: 30, startAt: '' });
       setParticipants([]);
-      setFinished(false);
     }
     setCreated(null);
   }, [open, meeting, reset]);
@@ -318,7 +334,7 @@ function MeetingDialog({ open, onClose, meeting }) {
       participantIds: participants,
     };
     if (isEdit) {
-      update.mutate({ id: meeting.id, ...payload, finished },
+      update.mutate({ id: meeting.id, ...payload },
         { onSuccess: () => { toast.success('Saqlandi'); onClose(); }, onError: (e) => toast.error(apiError(e)) });
     } else {
       create.mutate(payload,
@@ -342,8 +358,12 @@ function MeetingDialog({ open, onClose, meeting }) {
         <Button onClick={onClose}>Yopish</Button>
       ) : (
         <div className="flex w-full items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5">
-            {isEdit && (<><span className="text-sm font-semibold text-text-strong">Tugatildimi?</span><Switch checked={finished} onChange={() => setFinished((f) => !f)} /></>)}
+          <div>
+            {isEdit && onFinish && !meeting?.finishedAt && (
+              <Button onClick={() => onFinish(meeting.id)} className="bg-success-strong text-text-white hover:opacity-90">
+                <CheckCircle2 className="h-4 w-4" /> Yig'ilish tugatish
+              </Button>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={onClose}><X className="h-4 w-4" /> Yopish</Button>

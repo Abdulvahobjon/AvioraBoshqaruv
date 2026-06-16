@@ -98,4 +98,25 @@ export class CronService {
     }
     if (due.length) this.logger.log(`Yig'ilish eslatmasi: ${due.length} ta yig'ilish uchun yuborildi`);
   }
+
+  /**
+   * Har 5 daqiqada: vaqti tugagan (start_at + davomiyligi o'tgan), hali yakunlanmagan yig'ilishlar uchun
+   * tashkilotchiga bir martalik "yig'ilish yakunlandi — davomat oling" eslatmasi yuboradi.
+   * Bosilganda frontend AttendanceDialog (davomat oynasi)ni ochadi. attendance_due_sent_at takror oldini oladi.
+   */
+  @Cron('*/5 * * * *', { name: 'meeting-attendance-due', timeZone: 'Asia/Tashkent' })
+  async meetingAttendanceDue() {
+    const now = new Date();
+    // start_at — timezone'siz (UTC saqlanadi); now() bilan to'g'ri solishtirish uchun UTC deb belgilaymiz.
+    const due: Array<{ id: number; title: string | null; created_by: number }> = await this.prisma.$queryRaw`
+      SELECT id, title, created_by FROM "meetings"
+      WHERE deleted_at IS NULL AND finished_at IS NULL AND attendance_due_sent_at IS NULL
+        AND created_by IS NOT NULL
+        AND (start_at AT TIME ZONE 'UTC') + make_interval(mins => COALESCE(duration, 30)) <= ${now}`;
+    for (const m of due) {
+      await this.notifications.notify(m.created_by, 'meeting_finished', { meetingId: m.id, title: m.title });
+      await this.prisma.$executeRaw`UPDATE "meetings" SET attendance_due_sent_at = ${now} WHERE id = ${m.id}`;
+    }
+    if (due.length) this.logger.log(`Davomat eslatmasi: ${due.length} ta yig'ilish tashkilotchisiga yuborildi`);
+  }
 }

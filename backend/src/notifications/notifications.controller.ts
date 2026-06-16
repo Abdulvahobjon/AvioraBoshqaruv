@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Param, ParseIntPipe, Patch } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, Patch, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -9,14 +9,14 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 export class NotificationsController {
   constructor(private readonly notifications: NotificationsService) {}
 
+  // Bildirishnomalar faqat o'qiladi — o'chirish yo'q. Scroll pagination: ?cursor=&take=
   @Get()
-  list(@CurrentUser('id') userId: number) {
-    return this.notifications.findForUser(userId);
-  }
-
-  @Patch(':id/read')
-  markRead(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
-    return this.notifications.markRead(id, userId);
+  list(
+    @CurrentUser('id') userId: number,
+    @Query('cursor') cursor?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.notifications.findForUser(userId, cursor ? Number(cursor) : undefined, take ? Number(take) : undefined);
   }
 
   @Patch('read-all')
@@ -24,13 +24,8 @@ export class NotificationsController {
     return this.notifications.markAllRead(userId);
   }
 
-  @Delete('clear')
-  clearAll(@CurrentUser('id') userId: number) {
-    return this.notifications.clearAll(userId);
-  }
-
-  @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
-    return this.notifications.remove(id, userId);
+  @Patch(':id/read')
+  markRead(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
+    return this.notifications.markRead(id, userId);
   }
 }

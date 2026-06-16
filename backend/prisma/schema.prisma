@@ -452,6 +452,7 @@ model Meeting {
   startAt    DateTime  @map("start_at")
   finishedAt DateTime? @map("finished_at") // null = tugatilmagan
   reminderSentAt DateTime? @map("reminder_sent_at") // boshlanish oldidan eslatma yuborilgan vaqt (null = yuborilmagan)
+  attendanceDueSentAt DateTime? @map("attendance_due_sent_at") // tugagach tashkilotchiga "davomat oling" eslatmasi yuborilgan vaqt (null = yuborilmagan)
   createdBy  Int?      @map("created_by")
   // ── Google Meet (Calendar API orqali) ──
   googleEventId String? @map("google_event_id") // Calendar event id (patch/delete uchun)
