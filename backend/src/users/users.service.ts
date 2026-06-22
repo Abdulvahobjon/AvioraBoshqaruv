@@ -27,6 +27,7 @@ const userSelect = {
   link1: true,
   link2: true,
   avatar: true,
+  hireDate: true,
   status: true,
   createdAt: true,
 };
@@ -182,6 +183,7 @@ export class UsersService {
     for (const f of PROFILE_FIELDS) {
       if ((dto as any)[f] !== undefined) data[f] = (dto as any)[f] || null;
     }
+    if (dto.hireDate !== undefined) data.hireDate = dto.hireDate ? new Date(dto.hireDate) : null;
     const user = await this.prisma.user.create({ data, select: userSelect });
     await this.audit.record({ userId: actorId, entity: 'User', entityId: user.id, action: 'CREATE', ip, newValue: { fullName: user.fullName, role: user.role } });
     return user;
@@ -219,6 +221,7 @@ export class UsersService {
     for (const f of PROFILE_FIELDS) {
       if ((dto as any)[f] !== undefined) data[f] = (dto as any)[f] || null;
     }
+    if (dto.hireDate !== undefined) data.hireDate = dto.hireDate ? new Date(dto.hireDate) : null;
 
     const user = await this.prisma.user.update({ where: { id }, data, select: userSelect });
     await this.audit.record({

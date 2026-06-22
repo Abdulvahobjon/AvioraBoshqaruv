@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
+import { AntDate } from '@/components/ui/AntDate';
 import { PhoneInput } from '@/components/ui/PhoneInput';
 import { MoneyInput } from '@/components/ui/MoneyInput';
 import { PasswordInput } from '@/components/ui/PasswordInput';
@@ -209,6 +210,7 @@ const EMPTY = {
   fullName: '', password: '', role: 'employee', roles: [], positionId: '', fixedSalary: '',
   phone: '', card: '', region: '', district: '',
   passportSeries: '', passportNumber: '', passportImage: '', avatar: '', link1: '', link2: '',
+  hireDate: '',
 };
 
 function UserDialog({ open, onClose }) {
@@ -244,6 +246,7 @@ function UserDialog({ open, onClose }) {
         passportSeries: f.passportSeries || undefined, passportNumber: f.passportNumber || undefined,
         passportImage: f.passportImage || undefined, avatar: f.avatar || undefined,
         link1: f.link1 || undefined, link2: f.link2 || undefined,
+        hireDate: f.hireDate || undefined,
       },
       { onSuccess: () => { toast.success("Qo'shildi"); onClose(); }, onError: (e) => toast.error(apiError(e)) },
     );
@@ -307,8 +310,11 @@ function UserDialog({ open, onClose }) {
           </FormField>
         </div>
 
-        <FormField label="Oylik maosh (UZS)" className="sm:col-span-2">
+        <FormField label="Oylik maosh (UZS)">
           <MoneyInput value={f.fixedSalary} onChange={(v) => set('fixedSalary', v)} placeholder="0" />
+        </FormField>
+        <FormField label="Ishga kirgan sana">
+          <AntDate value={f.hireDate} onChange={(v) => set('hireDate', v)} placeholder="Sanani tanlang" />
         </FormField>
 
         <FormField label="1.Havola">

@@ -7,6 +7,7 @@ import { PageLoader } from '@/components/shared/PageLoader';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils/cn';
 import { Input, Select } from '@/components/ui/Input';
+import { AntDate } from '@/components/ui/AntDate';
 import { PhoneInput } from '@/components/ui/PhoneInput';
 import { MoneyInput } from '@/components/ui/MoneyInput';
 import { FormField } from '@/components/ui/FormField';
@@ -46,6 +47,7 @@ export function UserDetailPage() {
       passportSeries: user.passportSeries || '', passportNumber: user.passportNumber || '',
       passportImage: user.passportImage || '', avatar: user.avatar || '',
       link1: user.link1 || '', link2: user.link2 || '',
+      hireDate: user.hireDate ? user.hireDate.split('T')[0] : '',
     });
   }, [user]);
 
@@ -66,6 +68,7 @@ export function UserDetailPage() {
         region: f.region, district: f.district,
         passportSeries: f.passportSeries, passportNumber: f.passportNumber,
         passportImage: f.passportImage, avatar: f.avatar, link1: f.link1, link2: f.link2,
+        hireDate: f.hireDate || null,
       },
       { onSuccess: () => toast.success('Saqlandi'), onError: (e) => toast.error(apiError(e)) },
     );
@@ -103,6 +106,10 @@ export function UserDetailPage() {
         </FormField>
         <FormField label="Balansi (UZS)">
           <Input value={moneyUZS(user.balance)} disabled className="text-right" />
+        </FormField>
+
+        <FormField label="Ishga kirgan sana" className="sm:col-span-2">
+          <AntDate value={f.hireDate} onChange={(v) => set('hireDate', v)} placeholder="Sanani tanlang" />
         </FormField>
 
         <FormField label="Telefon raqami">

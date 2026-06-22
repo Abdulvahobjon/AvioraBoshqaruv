@@ -40,3 +40,8 @@ Thumbs.db
 
 # Coverage
 coverage/
+.dbsync/
+
+# Secret backup archives
+.env.zip
+*.env.zip

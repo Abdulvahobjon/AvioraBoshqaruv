@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
-import { ArrayUnique, IsArray, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { ArrayUnique, IsArray, IsDateString, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Min, MinLength } from 'class-validator';
 
 export class CreateUserDto {
   @ApiProperty({ example: 'Yangi Xodim' })
@@ -95,4 +95,9 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   link2?: string;
+
+  @ApiPropertyOptional({ description: 'Ishga kirgan sana (ISO sana, YYYY-MM-DD)' })
+  @IsOptional()
+  @IsDateString()
+  hireDate?: string;
 }

@@ -215,6 +215,7 @@ model User {
   link1        String?    // havola 1
   link2        String?    // havola 2
   avatar       String?
+  hireDate     DateTime?  @map("hire_date") // ishga kirgan sana
   status       UserStatus @default(active)
   tokenVersion Int        @default(0) @map("token_version") // refresh tokenlarni bekor qilish uchun (parol o'zgarsa oshadi)
   deletedAt    DateTime?  @map("deleted_at")
