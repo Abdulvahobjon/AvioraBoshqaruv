@@ -44,6 +44,7 @@ const PERMISSIONS = {
   'finance.process': [SA, AC], // to'lash / rad etish — faqat buxgalter va superadmin
   'expenses.write': [SA, AD, AC],
   'payroll.manage': [SA, AD, AC],
+  'income.manage': [SA, AD, AC], // qo'shimcha (mijozsiz) tushum kiritish/o'chirish — Sozlamalar tab
 
   // Ma'lumotnomalar (Sozlamalar)
   'references.manage': [SA, AD, MN],

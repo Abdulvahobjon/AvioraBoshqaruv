@@ -30,6 +30,27 @@ export function useDeleteReference(model) {
   });
 }
 
+// ── Qo'shimcha tushumlar (mijozsiz umumiy tushum) ──
+export function useIncomes() {
+  return useQuery({ queryKey: ['incomes'], queryFn: async () => (await api.get('/income')).data });
+}
+
+export function useAddIncome() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body) => (await api.post('/income', body)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['incomes'] }),
+  });
+}
+
+export function useDeleteIncome() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id) => (await api.delete(`/income/${id}`)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['incomes'] }),
+  });
+}
+
 // ── Currencies ──
 export function useCurrencies() {
   return useQuery({ queryKey: ['currencies'], queryFn: async () => (await api.get('/currencies')).data });

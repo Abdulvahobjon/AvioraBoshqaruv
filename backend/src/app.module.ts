@@ -17,6 +17,7 @@ import { CurrenciesModule } from './currencies/currencies.module';
 import { FinanceModule } from './finance/finance.module';
 import { PayrollModule } from './payroll/payroll.module';
 import { ExpensesModule } from './expenses/expenses.module';
+import { IncomeModule } from './income/income.module';
 import { ReportsModule } from './reports/reports.module';
 import { MeetingsModule } from './meetings/meetings.module';
 import { DailyPlansModule } from './daily-plans/daily-plans.module';
@@ -59,6 +60,7 @@ function validateEnv(config: Record<string, any>) {
     FinanceModule,
     PayrollModule,
     ExpensesModule,
+    IncomeModule,
     ReportsModule,
     MeetingsModule,
     DailyPlansModule,

@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { User, KeyRound, ListTree, DollarSign, Plus, Pencil, Trash2, Check, X, RefreshCw } from 'lucide-react';
+import { User, KeyRound, ListTree, DollarSign, Plus, Pencil, Trash2, Check, X, RefreshCw, TrendingUp, Banknote } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Tabs } from '@/components/ui/Tabs';
@@ -19,11 +19,13 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { useAuthStore } from '@/store/authStore';
 import { can } from '@/lib/permissions';
 import { ROLE_LABELS } from '@/lib/constants';
-import { formatDate, fromTiyin } from '@/lib/utils/format';
+import { MoneyInput } from '@/components/ui/MoneyInput';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { formatDate, fromTiyin, formatMoney, toTiyin } from '@/lib/utils/format';
 import { apiError } from '@/lib/api/axios';
 import { useChangePassword, useUpdateProfile, useUploadOwnFile, useSwitchRole } from '@/features/auth/authApi';
 import { AvatarUpload, CardInput, RegionDistrict } from '@/features/users/userFields';
-import { useReference, useSaveReference, useDeleteReference, useCurrencies, useUpdateRate } from '@/features/settings/settingsApi';
+import { useReference, useSaveReference, useDeleteReference, useCurrencies, useUpdateRate, useIncomes, useAddIncome, useDeleteIncome } from '@/features/settings/settingsApi';
 
 const passSchema = z
   .object({
@@ -37,11 +39,13 @@ export function SettingsPage() {
   const user = useAuthStore((s) => s.user);
   const isAdmin = can(user?.role, 'currency.manage');
   const canRefs = can(user?.role, 'references.manage'); // TZ 8.1/8.3
+  const canIncome = can(user?.role, 'income.manage');
   const [tab, setTab] = useState('profile');
 
   const tabs = [
     { value: 'profile', label: 'Profil', icon: User },
     ...(canRefs ? [{ value: 'refs', label: "Ma'lumotnomalar", icon: ListTree }] : []),
+    ...(canIncome ? [{ value: 'income', label: 'Tushumlar', icon: TrendingUp }] : []),
     ...(isAdmin ? [{ value: 'currency', label: 'Valuta', icon: DollarSign }] : []),
   ];
 
@@ -51,7 +55,101 @@ export function SettingsPage() {
       <Tabs tabs={tabs} value={tab} onChange={setTab} className="mb-6" />
       {tab === 'profile' && <ProfileTab user={user} />}
       {tab === 'refs' && canRefs && <ReferencesTab />}
+      {tab === 'income' && canIncome && <IncomeTab />}
       {tab === 'currency' && isAdmin && <CurrencyTab />}
+    </div>
+  );
+}
+
+/**
+ * Qo'shimcha tushumlar — mijoz/loyihaga bog'lanmagan umumiy kassa kirimi.
+ * Moliya hisobotidagi "Tushum" summasiga avtomatik qo'shiladi.
+ */
+function IncomeTab() {
+  const { data: incomes } = useIncomes();
+  const add = useAddIncome();
+  const del = useDeleteIncome();
+  const [amount, setAmount] = useState('');
+  const [currency, setCurrency] = useState('UZS');
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [deleting, setDeleting] = useState(null);
+
+  const total = (incomes || []).reduce((acc, i) => acc + (i.currency === 'UZS' ? Number(i.amount) : 0), 0);
+
+  const submit = () => {
+    const tiyin = toTiyin(amount);
+    if (!tiyin || tiyin < 1) { toast.error('Summani kiriting'); return; }
+    add.mutate(
+      { amount: tiyin, currency, date: date ? new Date(date).toISOString() : undefined },
+      { onSuccess: () => { toast.success("Tushum qo'shildi"); setAmount(''); }, onError: (e) => toast.error(apiError(e)) },
+    );
+  };
+
+  return (
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-4 w-4" /> Yangi tushum</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-text-soft">
+            Mijoz yoki loyihaga bog'lanmagan umumiy tushum (kassaga kirim). Moliya hisobotidagi "Tushum"ga qo'shiladi.
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <FormField label="Summa" required>
+              <MoneyInput value={amount} onChange={setAmount} placeholder="0" />
+            </FormField>
+            <FormField label="Valyuta">
+              <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                <option value="UZS">so'm (UZS)</option>
+                <option value="USD">dollar (USD)</option>
+              </Select>
+            </FormField>
+            <FormField label="Sana">
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </FormField>
+          </div>
+          <Button onClick={submit} loading={add.isPending}>Qo'shish</Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Kiritilgan tushumlar</CardTitle></CardHeader>
+        <CardContent>
+          <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-stroke-soft bg-bg-1-alt px-4 py-3">
+            <span className="text-sm text-text-sub">Jami (UZS)</span>
+            <span className="text-lg font-semibold text-text-strong">{formatMoney(total)}</span>
+          </div>
+          {!incomes?.length ? (
+            <EmptyState title="Tushumlar yo'q" description="Hali qo'shimcha tushum kiritilmagan." />
+          ) : (
+            <div className="max-h-80 space-y-2 overflow-y-auto">
+              {incomes.map((i) => (
+                <div key={i.id} className="flex items-center justify-between gap-3 rounded-lg border border-stroke-soft p-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-success-soft text-success-strong">
+                      <Banknote className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="font-medium text-text-strong">{formatMoney(i.amount, i.currency)}</p>
+                      <p className="truncate text-xs text-text-soft">{formatDate(i.date)}</p>
+                    </div>
+                  </div>
+                  <button className="rounded p-1.5 text-error-strong hover:bg-error-soft" onClick={() => setDeleting(i)}>
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <ConfirmDialog
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => del.mutate(deleting.id, { onSuccess: () => { toast.success("Tushum o'chirildi"); setDeleting(null); }, onError: (e) => toast.error(apiError(e)) })}
+        loading={del.isPending}
+        message={`${deleting ? formatMoney(deleting.amount, deleting.currency) : ''} tushumni o'chirmoqchimisiz?`}
+      />
     </div>
   );
 }
