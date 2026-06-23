@@ -593,14 +593,14 @@ model Payroll {
 
 model ClientPayment {
   id        Int      @id @default(autoincrement())
-  clientId  Int      @map("client_id")
+  clientId  Int?     @map("client_id") // null = mijozga bog'lanmagan umumiy tushum (kompaniya kassasiga kirim)
   projectId Int?     @map("project_id")
   amount    BigInt // tiyin
   currency  Currency @default(UZS)
   date      DateTime @default(now())
   createdAt DateTime @default(now()) @map("created_at")
 
-  client  Client   @relation(fields: [clientId], references: [id])
+  client  Client?  @relation(fields: [clientId], references: [id])
   project Project? @relation(fields: [projectId], references: [id])
 
   @@index([clientId])
